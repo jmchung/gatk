@@ -42,7 +42,7 @@ public class Funcotator extends VariantWalker {
     /**
      * The name of the field inside the VCF INFO field in which to put {@link Funcotator} results.
      */
-    private static final String FUNCOTATOR_VCF_FIELD_NAME = "FUNCOTATOR";
+    private static final String FUNCOTATOR_VCF_FIELD_NAME = "FUNCOTATION";
 
     //==================================================================================================================
 

@@ -52,15 +52,10 @@ package org.broadinstitute.hellbender.tools.funcotator;
 
 import java.util.HashMap;
 
-/**
- * @author chartl
- * @since June 28, 2010
- */
-
 public class AminoAcidUtils {
 
-    private static final HashMap<String,AminoAcid> tableByCodon = new HashMap<String,AminoAcid>(22);
-    private static final HashMap<String,AminoAcid> tableByCode = new HashMap<String,AminoAcid>(22);
+    private static final HashMap<String,AminoAcid> tableByCodon = new HashMap<String,AminoAcid>(AminoAcid.values().length);
+    private static final HashMap<String,AminoAcid> tableByCode = new HashMap<String,AminoAcid>(AminoAcid.values().length);
 
     /**
      * Initialize our hashmaps of lookup tables:
@@ -74,12 +69,24 @@ public class AminoAcidUtils {
         }
     }
 
+    /**
+     * Returns the {@link AminoAcid} corresponding to the given three-letter Eukaryotic {@code codon}
+     * The codons given are expected to be valid for Eukaryotic DNA.
+     * @param codon The three-letter codon (each letter one of A,T,G,C) representing a Eukaryotic {@link AminoAcid}
+     * @return The {@link AminoAcid} corresponding to the given {@code codon}.  Returns {@code null} if the given {@code codon} does not code for a Eucaryotic {@link AminoAcid}.
+     */
     public static AminoAcid getEukaryoticAminoAcidByCodon(final String codon) {
         return tableByCodon.get(codon.toUpperCase());
     }
 
+    /**
+     * Returns the {@link AminoAcid} corresponding to the given three-letter Mitochondrial {@code codon}.
+     * The codons given are expected to be valid for Mitochondrial DNA.
+     * @param codon The three-letter codon (each letter one of A,T,G,C) representing a Mitochondrial {@link AminoAcid}
+     * @return The {@link AminoAcid} corresponding to the given {@code codon}.  Returns {@code null} if the given {@code codon} does not code for a Mitochondrial {@link AminoAcid}.
+     */
     public static AminoAcid getMitochondrialAminoAcidByCodon(final String codon, final boolean isFirst) {
-        String upperCodon = codon.toUpperCase();
+        final String upperCodon = codon.toUpperCase();
         if ( isFirst && upperCodon.equals("ATT") || upperCodon.equals("ATA") ) {
             return AminoAcid.METHIONINE;
         } else if ( upperCodon.equals("AGA") || upperCodon.equals("AGG") ) {
@@ -91,22 +98,33 @@ public class AminoAcidUtils {
         }
     }
 
+    /**
+     * Gets the {@link AminoAcid} corresponding to the given three-letter abbreviation, {@code code}
+     * @param code a three-letter {@link String} corresponding to an {@link AminoAcid}
+     * @return The {@link AminoAcid} corresponding to the given {@code code}.  Returns {@code null} if the given {@code code} is not a valid {@link AminoAcid}.
+     */
     public static AminoAcid getAminoAcidByCode(final String code) {
         return tableByCode.get(code);
     }
 
+    /**
+     * @return A {@link String} array of long names for all amino acids in {@link AminoAcid}
+     */
     public static String[] getAminoAcidNames() {
-        String[] names = new String[AminoAcid.values().length];
-        for ( AminoAcid acid : AminoAcid.values() ) {
+        final String[] names = new String[AminoAcid.values().length];
+        for ( final AminoAcid acid : AminoAcid.values() ) {
             names[acid.ordinal()] = acid.getName();
         }
 
         return names;
     }
 
+    /**
+     * @return A {@link String} array of short names / three-letter abbreviations for all amino acids in {@link AminoAcid}
+     */
     public static String[] getAminoAcidCodes() {
-        String[] codes = new String[AminoAcid.values().length];
-        for ( AminoAcid acid : AminoAcid.values() ) {
+        final String[] codes = new String[AminoAcid.values().length];
+        for ( final AminoAcid acid : AminoAcid.values() ) {
             codes[acid.ordinal()] = acid.getCode();
         }
 

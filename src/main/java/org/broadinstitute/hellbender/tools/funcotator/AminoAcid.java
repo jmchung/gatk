@@ -50,11 +50,6 @@ package org.broadinstitute.hellbender.tools.funcotator;
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-/**
- * @author chartl
- * @since June 28, 2010
- */
-
 public enum AminoAcid {
     
     ALANINE("Alanine","Ala","A",new String[]{"GCA","GCC","GCG","GCT"}),
@@ -85,7 +80,7 @@ public enum AminoAcid {
     String code;
     String letter;
 
-    AminoAcid(String name, String shortName, String abbrev, String[] myCodons) {
+    AminoAcid(final String name, final String shortName, final String abbrev, final String[] myCodons) {
         codons = myCodons;
         fullName = name;
         code = shortName;

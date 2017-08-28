@@ -27,6 +27,10 @@ public class Funcotation {
 
     //==================================================================================================================
 
+    /**
+     * Converts this {@link Funcotation} to a string suitable for insertion into a VCF file.
+     * @return a {@link String} representing this {@link Funcotation} suitable for insertion into a VCF file.
+     */
     public String serializeToVcfString() {
 
         // Only serialize this funcotation if we have an allele:
@@ -214,6 +218,11 @@ public class Funcotation {
         RNA(4),
         LINCRNA(4);
 
+        /**
+         * The relative severity of each {@link VariantClassification}.
+         * Lower numbers are considered more severe.
+         * Higher numbers are considered less severe.
+         */
         final private int relativeSeverity;
 
         VariantClassification(final int sev) {
