@@ -1,5 +1,6 @@
 package org.broadinstitute.hellbender.tools.funcotator;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.broadinstitute.hellbender.utils.BaseUtils;
 
 import java.util.List;
@@ -10,7 +11,8 @@ import java.util.List;
  */
 public class Funcotation {
 
-    private static final String FIELD_DELIMITER = "|";
+    @VisibleForTesting
+    static final String FIELD_DELIMITER = "|";
 
     //==================================================================================================================
 
@@ -26,6 +28,11 @@ public class Funcotation {
     private int                     proteinPosition;
 
     //==================================================================================================================
+
+    /**
+     * Basic constructor for a {@link Funcotation}.
+     */
+    public Funcotation() {}
 
     /**
      * Converts this {@link Funcotation} to a string suitable for insertion into a VCF file.
@@ -60,7 +67,7 @@ public class Funcotation {
         final Funcotation that = (Funcotation) o;
 
         if (cdsPosition != that.cdsPosition) return false;
-        if ( exonNumber != that.exonNumber) return false;
+        if (exonNumber != that.exonNumber) return false;
         if (proteinPosition != that.proteinPosition) return false;
         if (allele != null ? !allele.equals(that.allele) : that.allele != null) return false;
         if (classification != that.classification) return false;
