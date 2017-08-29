@@ -1,3 +1,8 @@
 ##fileformat=VCFv4.2
+##fileDate=201708028
+##source=FuncotatorTestsV0.1
+##reference=file:///Users/jonn/Development/references/Homo_sapiens_assembly19.fasta
+##phasing=partial
+##INFO=<ID=END,Number=1,Type=Integer,Description="Where it ends">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NA12878	NA12892
 chr2	263995	.	G	T	.	.	END=10433048	GT:DP:GQ:MIN_DP:PL	./.:73:99:40:0,99,1485	./.:50:99:43:0,102,1530

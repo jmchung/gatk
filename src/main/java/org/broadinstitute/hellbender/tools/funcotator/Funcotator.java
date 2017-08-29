@@ -3,6 +3,7 @@ package org.broadinstitute.hellbender.tools.funcotator;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
+import htsjdk.variant.variantcontext.VariantContextUtils;
 import htsjdk.variant.variantcontext.writer.VariantContextWriter;
 import htsjdk.variant.vcf.*;
 import org.broadinstitute.barclay.argparser.Argument;
@@ -20,6 +21,7 @@ import java.io.File;
 import java.util.*;
 
 import htsjdk.variant.variantcontext.VariantContext.Type;
+import org.broadinstitute.hellbender.utils.variant.VariantUtils;
 
 /**
  * Funcotator (FUNCtional annOTATOR) performs functional analysis on given variants
@@ -136,10 +138,14 @@ public class Funcotator extends VariantWalker {
             funcotatorAnnotationStringBuilder.append( funcotation.serializeToVcfString() );
             funcotatorAnnotationStringBuilder.append( ',' );
         }
+
         // Remove trailing ',':
-        funcotatorAnnotationStringBuilder.deleteCharAt( funcotatorAnnotationStringBuilder.length() - 1 );
+        if ( funcotatorAnnotationStringBuilder.length() > 0 ) {
+            funcotatorAnnotationStringBuilder.deleteCharAt(funcotatorAnnotationStringBuilder.length() - 1);
+        }
 
         // Add our new annotation and render the VariantContext:
+        System.out.println(funcotatorAnnotationStringBuilder.toString());
         variantContextBuilder.attribute(FUNCOTATOR_VCF_FIELD_NAME, funcotatorAnnotationStringBuilder.toString());
         vcfWriter.add( variantContextBuilder.make() );
     }
@@ -163,17 +169,22 @@ public class Funcotator extends VariantWalker {
      */
     private void setupVCFWriter() {
         vcfWriter = createVCFWriter(outputFile);
-        vcfWriter.writeHeader(createVCFHeader());
+        vcfWriter.writeHeader(createVCFHeader(getHeaderForVariants()));
     }
 
     /**
      * Create a header for a VCF file.
+     * @param existingHeader The current {@link VCFHeader} for the open VCF file.
      * @return The {@link VCFHeader} object with relevant information for {@link Funcotator}.
      */
-    private static VCFHeader createVCFHeader() {
+    private static VCFHeader createVCFHeader( final VCFHeader existingHeader ) {
         final Set<VCFHeaderLine> headerLines = new HashSet<>();
 
-        headerLines.add(new VCFFormatHeaderLine(FUNCOTATOR_VCF_FIELD_NAME, VCFHeaderLineCount.UNBOUNDED,
+        // Add all lines of our existing VCF header:
+        headerLines.addAll( existingHeader.getMetaDataInInputOrder() );
+
+        // Add in the line about Funcotations:
+        headerLines.add(new VCFInfoHeaderLine(FUNCOTATOR_VCF_FIELD_NAME, VCFHeaderLineCount.A,
                 VCFHeaderLineType.String, "Functional annotation from the Funcotator tool.")
         );
 
@@ -236,7 +247,7 @@ public class Funcotator extends VariantWalker {
 
                     if ( exon.getGenomicPosition().overlaps(variantPosition) ) {
                         // Find the variant in this exon:
-                        if (exon.getStartCodon().getGenomicPosition().overlaps(variantPosition)) {
+                        if ((exon.getStartCodon() != null) && exon.getStartCodon().getGenomicPosition().overlaps(variantPosition)) {
                             // It's a start codon variant.
 
                             if ( variant.getType() == Type.SNP ) {
@@ -255,7 +266,7 @@ public class Funcotator extends VariantWalker {
                                 funcotation.setClassification( Funcotation.VariantClassification.START_CODON_DEL );
                             }
 
-                        } else if (exon.getCds().getGenomicPosition().overlaps(variantPosition)) {
+                        } else if ((exon.getCds() != null) && exon.getCds().getGenomicPosition().overlaps(variantPosition)) {
                             // It's a 'normal' variant in the coding region.
 
                             final Funcotation.VariantClassification variantClass;
