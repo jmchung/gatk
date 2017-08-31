@@ -50,12 +50,14 @@ package org.broadinstitute.hellbender.tools.funcotator;
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import htsjdk.variant.variantcontext.Allele;
+
 import java.util.HashMap;
 
-public class AminoAcidUtils {
+public class FuncotatorUtils {
 
-    private static final HashMap<String,AminoAcid> tableByCodon = new HashMap<String,AminoAcid>(AminoAcid.values().length);
-    private static final HashMap<String,AminoAcid> tableByCode = new HashMap<String,AminoAcid>(AminoAcid.values().length);
+    private static final HashMap<String,AminoAcid> tableByCodon = new HashMap<>(AminoAcid.values().length);
+    private static final HashMap<String,AminoAcid> tableByCode = new HashMap<>(AminoAcid.values().length);
 
     /**
      * Initialize our hashmaps of lookup tables:
@@ -67,6 +69,19 @@ public class AminoAcidUtils {
                 tableByCodon.put(codon,acid);
             }
         }
+    }
+
+    /**
+     * Determines whether the given reference and alternate alleles constitute a frameshift mutation.
+     * @param reference The reference {@link Allele}.
+     * @param alternate The alternate / variant {@link Allele}.
+     * @return {@code true} if replacing the reference with the alternate results in a frameshift.  {@code false} otherwise.
+     */
+    public static boolean isFrameshift(final Allele reference, final Allele alternate) {
+
+        // We know it's a frameshift if we have a replacement that is not of a
+        // length evenly divisible by 3 because that's how many bases are read at once:
+        return ((Math.abs( reference.length() - alternate.length() ) % 3) == 0);
     }
 
     /**
