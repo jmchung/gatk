@@ -81,7 +81,7 @@ public class FuncotatorUtils {
 
         // We know it's a frameshift if we have a replacement that is not of a
         // length evenly divisible by 3 because that's how many bases are read at once:
-        return ((Math.abs( reference.length() - alternate.length() ) % 3) == 0);
+        return ((Math.abs( reference.length() - alternate.length() ) % 3) != 0);
     }
 
     /**

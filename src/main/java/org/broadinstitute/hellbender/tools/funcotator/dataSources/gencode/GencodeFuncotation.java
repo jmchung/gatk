@@ -1,6 +1,5 @@
 package org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.broadinstitute.hellbender.tools.funcotator.Funcotation;
 
 import java.lang.reflect.Field;
