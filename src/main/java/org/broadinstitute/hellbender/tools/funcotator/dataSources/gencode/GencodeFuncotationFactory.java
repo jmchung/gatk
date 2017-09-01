@@ -247,8 +247,6 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 //        // Must be an intron:
 //        gencodeFuncotation.setClassification(GencodeFuncotation.VariantClassification.INTRON);
 
-
-
         gencodeFuncotations.add(gencodeFuncotation);
         return gencodeFuncotations;
     }

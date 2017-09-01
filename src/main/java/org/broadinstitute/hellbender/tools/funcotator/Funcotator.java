@@ -76,6 +76,7 @@ public class Funcotator extends VariantWalker {
         // Set up our output renderer:
         // TODO: in the future this should be encapsulated into a factory for output renderers based on an input argument.
         outputRenderer = new VcfOutputRenderer(getHeaderForVariants(), createVCFWriter(outputFile), dataSourceFactories);
+        outputRenderer.open();
     }
 
     @Override

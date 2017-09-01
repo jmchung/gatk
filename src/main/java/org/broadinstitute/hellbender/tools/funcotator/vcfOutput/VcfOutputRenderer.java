@@ -12,6 +12,7 @@ import org.broadinstitute.hellbender.tools.funcotator.OutputRenderer;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A Funcotator output renderer for writing to VCF files.
@@ -68,15 +69,9 @@ public class VcfOutputRenderer extends OutputRenderer {
             funcotatorAnnotationStringBuilder.append( ',' );
         }
 
-        for ( final Funcotation funcotation : funcotations) {
-            funcotatorAnnotationStringBuilder.append( funcotation.serializeToVcfString() );
-            funcotatorAnnotationStringBuilder.append( ',' );
-        }
-
-        // Remove trailing ',':
-        if ( funcotatorAnnotationStringBuilder.length() > 0 ) {
-            funcotatorAnnotationStringBuilder.deleteCharAt(funcotatorAnnotationStringBuilder.length() - 1);
-        }
+        funcotatorAnnotationStringBuilder.append(
+                funcotations.stream().map(Funcotation::serializeToVcfString).collect(Collectors.joining(","))
+        );
 
         // Add our new annotation and render the VariantContext:
         System.out.println(funcotatorAnnotationStringBuilder.toString());
@@ -116,13 +111,9 @@ public class VcfOutputRenderer extends OutputRenderer {
      * @return A {@link String} containing the field names from our {@link VcfOutputRenderer#dataSourceFactories} suitable for putting in the VCF header.
      */
     private static String getDataSourceFieldNamesForHeader(final List<DataSourceFuncotationFactory> dataSourceFactories) {
-        final StringBuilder sb = new StringBuilder();
-        for ( final DataSourceFuncotationFactory dataSourceFactory : dataSourceFactories ) {
-            for ( final String fieldName : dataSourceFactory.getSupportedFuncotationFields() ) {
-                sb.append(fieldName);
-                sb.append(",");
-            }
-        }
-        return sb.toString();
+        return dataSourceFactories.stream()
+                        .map(DataSourceFuncotationFactory::getSupportedFuncotationFields)
+                        .flatMap(List::stream)
+                        .map(Object::toString).collect(Collectors.joining(";"));
     }
 }

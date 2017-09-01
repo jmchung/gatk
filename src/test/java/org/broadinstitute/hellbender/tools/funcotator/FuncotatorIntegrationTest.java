@@ -2,6 +2,7 @@ package org.broadinstitute.hellbender.tools.funcotator;
 
 import org.broadinstitute.hellbender.CommandLineProgramTest;
 import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
+import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -25,19 +26,20 @@ public class FuncotatorIntegrationTest extends CommandLineProgramTest {
 
     // TODO: REFACTOR ALL THIS:
 
-//    @Test
-//    public void testRun() throws IOException {
-//        final File outputFile = File.createTempFile("funcotator_tmp_out", ".vcf");
-//        final List<String> arguments = new ArrayList<>();
-//
-//        arguments.add("-" + Funcotator.GTF_FILE_SHORT_NAME);
-//        arguments.add("/Users/jonn/Downloads/gencode.v19.chr_patch_hapl_scaff.annotation.fixed.truncated.gtf");
-//        arguments.add("-" + StandardArgumentDefinitions.REFERENCE_SHORT_NAME);
-//        arguments.add("/Users/jonn/Development/references/GRCh37.p13.genome.fasta");
-//        arguments.add("-" + StandardArgumentDefinitions.VARIANT_SHORT_NAME);
-//        arguments.add("/Users/jonn/Development/gatk/src/test/resources/org/broadinstitute/hellbender/tools/funcotator/singleSnpTest_chr2_hg19.vcf");
-//        arguments.add("-" + StandardArgumentDefinitions.OUTPUT_SHORT_NAME);
-//        arguments.add(outputFile.getAbsolutePath());
-//        runCommandLine(arguments);
-//    }
+    @Test
+    public void testRun() throws IOException {
+//        final File outputFile = BaseTest.createTempFile("funcotator_tmp_out", ".vcf");
+        final File outputFile = new File("funcotator_tmp_out" + ".vcf");
+        final List<String> arguments = new ArrayList<>();
+
+        arguments.add("-" + Funcotator.GTF_FILE_SHORT_NAME);
+        arguments.add("/Users/jonn/Downloads/gencode.v19.chr_patch_hapl_scaff.annotation.fixed.truncated.gtf");
+        arguments.add("-" + StandardArgumentDefinitions.REFERENCE_SHORT_NAME);
+        arguments.add("/Users/jonn/Development/references/GRCh37.p13.genome.fasta");
+        arguments.add("-" + StandardArgumentDefinitions.VARIANT_SHORT_NAME);
+        arguments.add("/Users/jonn/Development/gatk/src/test/resources/org/broadinstitute/hellbender/tools/funcotator/singleSnpTest_chr2_hg19.vcf");
+        arguments.add("-" + StandardArgumentDefinitions.OUTPUT_SHORT_NAME);
+        arguments.add(outputFile.getAbsolutePath());
+        runCommandLine(arguments);
+    }
 }
