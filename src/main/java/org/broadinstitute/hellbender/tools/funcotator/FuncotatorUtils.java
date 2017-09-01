@@ -50,11 +50,25 @@ package org.broadinstitute.hellbender.tools.funcotator;
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.Allele;
+import org.broadinstitute.hellbender.engine.ReferenceContext;
+import org.broadinstitute.hellbender.exceptions.GATKException;
+import org.broadinstitute.hellbender.utils.SimpleInterval;
+import org.broadinstitute.hellbender.utils.Utils;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 
 public class FuncotatorUtils {
+
+    /**
+     * PRIVATE CONSTRUCTOR
+     * DO NOT INSTANTIATE THIS CLASS!
+     */
+    private FuncotatorUtils() {}
 
     private static final HashMap<String,AminoAcid> tableByCodon = new HashMap<>(AminoAcid.values().length);
     private static final HashMap<String,AminoAcid> tableByCode = new HashMap<>(AminoAcid.values().length);
@@ -69,19 +83,6 @@ public class FuncotatorUtils {
                 tableByCodon.put(codon,acid);
             }
         }
-    }
-
-    /**
-     * Determines whether the given reference and alternate alleles constitute a frameshift mutation.
-     * @param reference The reference {@link Allele}.
-     * @param alternate The alternate / variant {@link Allele}.
-     * @return {@code true} if replacing the reference with the alternate results in a frameshift.  {@code false} otherwise.
-     */
-    public static boolean isFrameshift(final Allele reference, final Allele alternate) {
-
-        // We know it's a frameshift if we have a replacement that is not of a
-        // length evenly divisible by 3 because that's how many bases are read at once:
-        return ((Math.abs( reference.length() - alternate.length() ) % 3) != 0);
     }
 
     /**
@@ -144,5 +145,86 @@ public class FuncotatorUtils {
         }
 
         return codes;
+    }
+
+    /**
+     * Determines whether the given reference and alternate alleles constitute a frameshift mutation.
+     * @param reference The reference {@link Allele}.
+     * @param alternate The alternate / variant {@link Allele}.
+     * @return {@code true} if replacing the reference with the alternate results in a frameshift.  {@code false} otherwise.
+     */
+    public static boolean isFrameshift(final Allele reference, final Allele alternate) {
+
+        Utils.nonNull(reference);
+        Utils.nonNull(alternate);
+
+        // We know it's a frameshift if we have a replacement that is not of a
+        // length evenly divisible by 3 because that's how many bases are read at once:
+        return ((Math.abs( reference.length() - alternate.length() ) % 3) != 0);
+    }
+
+    /**
+     * Creates and returns the coding sequence given a {@link ReferenceContext} and a {@link List} of {@link Locatable} representing a set of Exons.
+     * @param reference A {@link ReferenceContext} from which to construct the coding region.
+     * @param exonList A {@link List} of {@link Locatable} representing a set of Exons to be concatenated together to create the coding sequence.
+     * @return
+     */
+    public static String getCodingSequence(final ReferenceContext reference, final List<Locatable> exonList) {
+
+        Utils.nonNull(reference);
+        Utils.nonNull(exonList);
+
+        // Sanity check:
+        if (exonList.size() == 0) {
+            return "";
+        }
+
+        final StringBuilder sb = new StringBuilder();
+
+        int start = Integer.MAX_VALUE;
+        int end = Integer.MIN_VALUE;
+
+        // Start by sorting our list of exons.
+        // This is very important to ensure that we have all sequences in the right order at the end.
+        exonList.sort((lhs, rhs) -> lhs.getStart() < rhs.getStart() ? -1 : (lhs.getStart() > rhs.getStart() ) ? 1 : 0 );
+
+        for ( final Locatable exon : exonList ) {
+
+            // First a basic sanity check:
+            if ( !exon.getContig().equals(reference.getWindow().getContig()) ) {
+                throw new GATKException("Cannot create a coding sequence! Contigs not the same - Ref: "
+                        + reference.getInterval().getContig() + ", Exon: " + exon.getContig());
+            }
+
+            if ( start > exon.getStart() ) { start = exon.getStart(); }
+            if ( end < exon.getEnd() ) { end = exon.getEnd(); }
+        }
+
+        // Set the window on our reference to be correct for our start and end:
+        reference.setWindow(
+                Math.abs(start - reference.getInterval().getStart()),
+                Math.abs(reference.getInterval().getEnd() - end)
+        );
+
+        // Now that the window size is correct, we can go through and pull our sequences out.
+
+        // Get the window so we can convert to reference coordinates from genomic coordinates of the exons:
+        final SimpleInterval refWindow = reference.getWindow();
+        final byte[] bases = reference.getBases();
+
+        // Go through and grab our sequences based on our exons:
+        for ( final Locatable exon : exonList ) {
+
+            final int exonStartArrayCoords = exon.getStart() - refWindow.getStart();
+            final int exonEndArrayCoords = exonStartArrayCoords + (exon.getEnd() - exon.getStart());
+
+            sb.append(
+                    new String(
+                            Arrays.copyOfRange(bases, exonStartArrayCoords, exonEndArrayCoords)
+                    )
+            );
+        }
+
+        return sb.toString();
     }
 }

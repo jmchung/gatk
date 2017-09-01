@@ -86,9 +86,8 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
 //        private GencodeFuncotation.VariantClassification variantClassification;
 //
-//        private String                  genomeChange;
-//        private int                     transcriptExon;
-//        private int                     transcriptPos;
+//        private int                     transcriptExon; - indexed by 0
+//        private int                     transcriptPos; - position in the transcript of the start of this change
 //        private String                  cDnaChange;
 //        private String                  codonChange;
 //        private String                  proteinChange;
@@ -102,19 +101,15 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 gtfFeature.getTranscripts().stream().map(GencodeGtfTranscriptFeature::getTranscriptId).collect(Collectors.toList())
         );
         gencodeFuncotation.setStart(variant.getStart());
-        gencodeFuncotation.setEnd(variant.getStart() + altAllele.length());
+        // The end position is inclusive, so we need to make sure we don't double-count the start position (so we subtract 1):
+        gencodeFuncotation.setEnd(variant.getStart() + altAllele.length() - 1);
         gencodeFuncotation.setVariantType( getVariantType(variant.getReference(), altAllele) );
         gencodeFuncotation.setRefAllele( variant.getReference().getBaseString() );
         gencodeFuncotation.setTumorSeqAllele1( altAllele.getBaseString() );
         gencodeFuncotation.setTumorSeqAllele2( altAllele.getBaseString() );
         gencodeFuncotation.setAnnotationTranscript( transcript.getTranscriptId() );
-        if ( transcript.getGenomicStrand() == GencodeGtfFeature.GenomicStrand.FORWARD ) {
-            gencodeFuncotation.setTranscriptStrand("3'");
-        }
-        else {
-            gencodeFuncotation.setTranscriptStrand("5'");
-        }
-
+        gencodeFuncotation.setTranscriptStrand( transcript.getGenomicStrand().toString() );
+        gencodeFuncotation.setGenomeChange(getGenomeChangeString(variant, altAllele, gtfFeature));
 
 //        // Go through our sub-features and determine what the VariantClassification is:
 //
@@ -252,6 +247,19 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     }
 
     /**
+     * Creates a string representing the genome change given the variant, allele, and gene feature for this variant.
+     * @param variant {@link VariantContext} of which to create the change.
+     * @param altAllele {@link Allele} representing the alternate allele for this variant.
+     * @param gtfFeature {@link GencodeGtfGeneFeature} corresponding to this variant.
+     * @return A short {@link String} representation of the genomic change for the given variant, allele, and feature.
+     */
+    private String getGenomeChangeString(final VariantContext variant, final Allele altAllele, final GencodeGtfGeneFeature gtfFeature) {
+        return "g." + gtfFeature.getChromosomeName() +
+                ":" + variant.getStart() +
+                variant.getReference().getBaseString() + ">" + altAllele.getBaseString();
+    }
+
+    /**
      * Return the index of the "best" transcript in this gene.
      * @param geneFeature A {@link GencodeGtfGeneFeature} from which to get the index of the "best" transcript.
      * @param variant The {@link VariantContext} for which we want to get the best index.
@@ -271,7 +279,6 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         // Oops... we didn't find anything.
         return -1;
     }
-
 
     /**
      * Creates a {@link List} of {@link GencodeFuncotation}s based on the given {@link VariantContext}.
