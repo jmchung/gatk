@@ -7,6 +7,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * A class to represent a Functional Annotation.
@@ -14,8 +15,7 @@ import java.util.List;
  */
 public class GencodeFuncotation extends Funcotation {
 
-    @VisibleForTesting
-    static final String FIELD_DELIMITER = "|";
+    private static final String FIELD_DELIMITER = "|";
 
     //==================================================================================================================
 
@@ -33,8 +33,8 @@ public class GencodeFuncotation extends Funcotation {
     private String                  genomeChange;
     private String                  annotationTranscript;
     private String                  transcriptStrand;
-    private int                     transcriptExon;
-    private int                     transcriptPos;
+    private Integer                 transcriptExon;
+    private Integer                 transcriptPos;
     private String                  cDnaChange;
     private String                  codonChange;
     private String                  proteinChange;
@@ -87,18 +87,19 @@ public class GencodeFuncotation extends Funcotation {
                 (genomeChange != null ? genomeChange : "") + FIELD_DELIMITER +
                 (annotationTranscript != null ? annotationTranscript : "") + FIELD_DELIMITER +
                 (transcriptStrand != null ? transcriptStrand : "") + FIELD_DELIMITER +
-                transcriptExon + FIELD_DELIMITER +
-                transcriptPos + FIELD_DELIMITER +
+                (transcriptExon != null ? transcriptExon : "") + FIELD_DELIMITER +
+                (transcriptPos != null ? transcriptPos : "") + FIELD_DELIMITER +
                 (cDnaChange != null ? cDnaChange : "") + FIELD_DELIMITER +
                 (codonChange != null ? codonChange : "") + FIELD_DELIMITER +
                 (proteinChange != null ? proteinChange : "") + FIELD_DELIMITER +
-                (otherTranscripts != null ? otherTranscripts : "");
+                (otherTranscripts != null ? otherTranscripts.stream().map(Object::toString).collect(Collectors.joining(",")) : "");
     }
 
     //==================================================================================================================
 
+
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
@@ -106,8 +107,6 @@ public class GencodeFuncotation extends Funcotation {
 
         if (start != that.start) return false;
         if (end != that.end) return false;
-        if (transcriptExon != that.transcriptExon) return false;
-        if (transcriptPos != that.transcriptPos) return false;
         if (hugoSymbol != null ? !hugoSymbol.equals(that.hugoSymbol) : that.hugoSymbol != null) return false;
         if (ncbiBuild != null ? !ncbiBuild.equals(that.ncbiBuild) : that.ncbiBuild != null) return false;
         if (chromosome != null ? !chromosome.equals(that.chromosome) : that.chromosome != null) return false;
@@ -122,6 +121,10 @@ public class GencodeFuncotation extends Funcotation {
         if (annotationTranscript != null ? !annotationTranscript.equals(that.annotationTranscript) : that.annotationTranscript != null)
             return false;
         if (transcriptStrand != null ? !transcriptStrand.equals(that.transcriptStrand) : that.transcriptStrand != null)
+            return false;
+        if (transcriptExon != null ? !transcriptExon.equals(that.transcriptExon) : that.transcriptExon != null)
+            return false;
+        if (transcriptPos != null ? !transcriptPos.equals(that.transcriptPos) : that.transcriptPos != null)
             return false;
         if (cDnaChange != null ? !cDnaChange.equals(that.cDnaChange) : that.cDnaChange != null) return false;
         if (codonChange != null ? !codonChange.equals(that.codonChange) : that.codonChange != null) return false;
@@ -145,8 +148,8 @@ public class GencodeFuncotation extends Funcotation {
         result = 31 * result + (genomeChange != null ? genomeChange.hashCode() : 0);
         result = 31 * result + (annotationTranscript != null ? annotationTranscript.hashCode() : 0);
         result = 31 * result + (transcriptStrand != null ? transcriptStrand.hashCode() : 0);
-        result = 31 * result + transcriptExon;
-        result = 31 * result + transcriptPos;
+        result = 31 * result + (transcriptExon != null ? transcriptExon.hashCode() : 0);
+        result = 31 * result + (transcriptPos != null ? transcriptPos.hashCode() : 0);
         result = 31 * result + (cDnaChange != null ? cDnaChange.hashCode() : 0);
         result = 31 * result + (codonChange != null ? codonChange.hashCode() : 0);
         result = 31 * result + (proteinChange != null ? proteinChange.hashCode() : 0);
@@ -179,7 +182,7 @@ public class GencodeFuncotation extends Funcotation {
                 '}';
     }
 
-    //==================================================================================================================
+//==================================================================================================================
 
     public String getHugoSymbol() {
         return hugoSymbol;
@@ -285,19 +288,19 @@ public class GencodeFuncotation extends Funcotation {
         this.transcriptStrand = transcriptStrand;
     }
 
-    public int getTranscriptExon() {
+    public Integer getTranscriptExon() {
         return transcriptExon;
     }
 
-    public void setTranscriptExon(final int transcriptExon) {
+    public void setTranscriptExon(final Integer transcriptExon) {
         this.transcriptExon = transcriptExon;
     }
 
-    public int getTranscriptPos() {
+    public Integer getTranscriptPos() {
         return transcriptPos;
     }
 
-    public void setTranscriptPos(final int transcriptPos) {
+    public void setTranscriptPos(final Integer transcriptPos) {
         this.transcriptPos = transcriptPos;
     }
 

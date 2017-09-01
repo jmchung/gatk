@@ -109,4 +109,8 @@ public enum AminoAcid {
     public String toString() {
         return getName();
     }
+
+    public String[] getCodons() {
+        return codons;
+    }
 }
