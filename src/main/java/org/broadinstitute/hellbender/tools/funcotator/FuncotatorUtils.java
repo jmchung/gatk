@@ -165,9 +165,10 @@ public class FuncotatorUtils {
 
     /**
      * Creates and returns the coding sequence given a {@link ReferenceContext} and a {@link List} of {@link Locatable} representing a set of Exons.
+     * Locatables start and end values are inclusive.
      * @param reference A {@link ReferenceContext} from which to construct the coding region.
      * @param exonList A {@link List} of {@link Locatable} representing a set of Exons to be concatenated together to create the coding sequence.
-     * @return
+     * @return A string of bases for the given {@code exonList} concatenated together.
      */
     public static String getCodingSequence(final ReferenceContext reference, final List<Locatable> exonList) {
 
@@ -216,7 +217,9 @@ public class FuncotatorUtils {
         for ( final Locatable exon : exonList ) {
 
             final int exonStartArrayCoords = exon.getStart() - refWindow.getStart();
-            final int exonEndArrayCoords = exonStartArrayCoords + (exon.getEnd() - exon.getStart());
+
+            // Because copyOfRange has an exclusive end range spec, we add 1 to get all the bases:
+            final int exonEndArrayCoords = exonStartArrayCoords + (exon.getEnd() - exon.getStart() + 1);
 
             sb.append(
                     new String(
