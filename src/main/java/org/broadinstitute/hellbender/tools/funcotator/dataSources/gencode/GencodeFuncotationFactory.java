@@ -115,11 +115,11 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         sequenceComparison.setAlignedReferenceAllele(
                 sequenceComparison.getWholeReferenceSequence().substring(
                         sequenceComparison.getAlignedCodingSequenceAlleleStart(),
-                        sequenceComparison.getAlignedReferenceAlleleStop()
+                        sequenceComparison.getAlignedReferenceAlleleStop() + 1 // Add 1 because the stop position is inclusive
                 )
         );
         sequenceComparison.setReferenceAminoAcidSequence(
-                FuncotatorUtils.createAminoAcidSequence( sequenceComparison.getWholeReferenceSequence() )
+                FuncotatorUtils.createAminoAcidSequence( sequenceComparison.getAlignedReferenceAllele() )
         );
         sequenceComparison.setProteinChangeStartPosition(
                 sequenceComparison.getAlignedCodingSequenceAlleleStart() / 3

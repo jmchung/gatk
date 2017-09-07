@@ -2,6 +2,7 @@ package org.broadinstitute.hellbender.tools.funcotator;
 
 import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.Allele;
+import lombok.Data;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceFileSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
@@ -158,6 +159,23 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     }
 
     @DataProvider
+    Object[][] provideDataForGetStartPositionInTranscript() {
+        return new Object[][] {
+                {
+                    new SimpleInterval("chr1", 0, 1),
+                    Arrays.asList(
+                            new SimpleInterval("chr1", 10,19),
+                            new SimpleInterval("chr1", 30,39),
+                            new SimpleInterval("chr1", 50,59),
+                            new SimpleInterval("chr1", 70,79),
+                            new SimpleInterval("chr1", 90,99)
+                    ),
+
+                },
+        };
+    }
+
+    @DataProvider
     Object[][] provideAllelesAndFrameshiftResults() {
         return new Object[][] {
                 { Allele.create((byte)'A'), Allele.create((byte)'A'), false },
@@ -243,6 +261,91 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
         };
     }
 
+    @DataProvider
+    Object[][] providePositionAndExpectedAlignedPosition() {
+        return new Object[][] {
+                {0,0},
+                {1,0},
+                {2,0},
+                {3,3},
+                {4,3},
+                {5,3},
+                {1635,1635},
+                {1636,1635},
+                {1637,1635},
+        };
+    }
+
+    @DataProvider
+    Object[][] providePositionAndExpectedAlignedEndPosition() {
+        return new Object[][] {
+                {0,1,2},
+                {0,2,2},
+                {0,3,2},
+                {0,4,5},
+                {0,5,5},
+                {0,6,5},
+        };
+    }
+
+    @DataProvider
+    Object[][] provideDataForGetAlternateCodingSequence() {
+        return new Object[][] {
+                {
+                    "01234567890A1234567890123456789", 11, Allele.create((byte)'A'), Allele.create((byte)'A'), "01234567890A1234567890123456789"
+                },
+                {
+                    "01234567890A1234567890123456789", 11, Allele.create((byte)'A'), Allele.create("ATGCATGC".getBytes()), "01234567890ATGCATGC1234567890123456789"
+                },
+                {
+                    "A", 0, Allele.create((byte)'A'), Allele.create("ATGCATGC".getBytes()), "ATGCATGC"
+                },
+                {
+                    "BA", 1, Allele.create((byte)'A'), Allele.create("ATGCATGC".getBytes()), "BATGCATGC"
+                },
+                {
+                    "AB", 0, Allele.create((byte)'A'), Allele.create("ATGCATGC".getBytes()), "ATGCATGCB"
+                },
+        };
+    }
+
+    @DataProvider
+    Object[][] provideDataForGetEukaryoticAminoAcidByCodon() {
+        return new Object[][] {
+                {null, null},
+                {"", null},
+                {"XQZ", null},
+                {"ATG", AminoAcid.METHIONINE},
+                {"CCA", AminoAcid.PROLINE},
+                {"CCC", AminoAcid.PROLINE},
+                {"CCG", AminoAcid.PROLINE},
+                {"CCT", AminoAcid.PROLINE},
+        };
+    }
+
+    @DataProvider
+    Object[][] provideDataForGetMitochondrialAminoAcidByCodon() {
+        return new Object[][]{
+                {null, false, null},
+                {"", false, null},
+                {"XQZ", false, null},
+                {null, true, null},
+                {"", true, null},
+                {"XQZ", true, null},
+                {"ATG", false, AminoAcid.METHIONINE},
+                {"CCA", false, AminoAcid.PROLINE},
+                {"CCC", false, AminoAcid.PROLINE},
+                {"CCG", false, AminoAcid.PROLINE},
+                {"CCT", false, AminoAcid.PROLINE},
+                {"ATT", false, AminoAcid.ISOLEUCINE},
+                {"ATT", true, AminoAcid.METHIONINE},
+                {"ATA", false, AminoAcid.METHIONINE},
+                {"AGA", false, AminoAcid.STOP_CODON},
+                {"AGG", false, AminoAcid.STOP_CODON},
+                {"TGA", false, AminoAcid.TRYPTOPHAN},
+        };
+    }
+
     //==================================================================================================================
     // Tests:
 
@@ -262,14 +365,99 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
         FuncotatorUtils.getCodingSequence(reference, exonList);
     }
 
-    @Test(dataProvider = "provideReferenceAndExonListForIllegalArgumentExceptions",
-            expectedExceptions = IllegalArgumentException.class)
-    void testGetCodingSequenceWithIllegalArgumentExceptions(final ReferenceContext reference, final List<Locatable> exonList) {
-        FuncotatorUtils.getCodingSequence(reference, exonList);
+//    @Test(dataProvider = "provideReferenceAndExonListForIllegalArgumentExceptions",
+//            expectedExceptions = IllegalArgumentException.class)
+//    void testGetCodingSequenceWithIllegalArgumentExceptions(final ReferenceContext reference, final List<Locatable> exonList) {
+//        FuncotatorUtils.getCodingSequence(reference, exonList);
+//    }
+
+    @Test(dataProvider = "provideDataForGetStartPositionInTranscript")
+    void testGetStartPositionInTranscript(final Locatable variant, final List<? extends Locatable> transcript, final int expected) {
+        Assert.assertEquals( FuncotatorUtils.getStartPositionInTranscript(variant, transcript), expected );
+    }
+
+    @Test(dataProvider = "providePositionAndExpectedAlignedPosition")
+    void testGetAlignedPosition(final int pos, final int expected) {
+        Assert.assertEquals(FuncotatorUtils.getAlignedPosition(pos), expected);
+    }
+
+    @Test(dataProvider = "providePositionAndExpectedAlignedEndPosition")
+    void testGetAlignedEndPosition(final int alignedStart, final int length, final int expected) {
+        Assert.assertEquals(FuncotatorUtils.getAlignedEndPosition(alignedStart, length), expected);
+    }
+
+    @Test(dataProvider = "provideDataForGetAlternateCodingSequence")
+    void testGetAlternateCodingSequence(final String refCodingSeq, final int startPos, final Allele refAllele, final Allele altAllele, final String expected) {
+        Assert.assertEquals(FuncotatorUtils.getAlternateCodingSequence(refCodingSeq, startPos, refAllele, altAllele), expected);
+    }
+
+    @Test(dataProvider = "provideDataForGetEukaryoticAminoAcidByCodon")
+    void testGetEukaryoticAminoAcidByCodon(final String codon, final AminoAcid expected) {
+        Assert.assertEquals(FuncotatorUtils.getEukaryoticAminoAcidByCodon(codon), expected);
+    }
+
+    @Test(dataProvider = "provideDataForGetMitochondrialAminoAcidByCodon")
+    void testGetMitochondrialAminoAcidByCodon(final String codon, final boolean isFirst, final AminoAcid expected) {
+        Assert.assertEquals(FuncotatorUtils.getMitochondrialAminoAcidByCodon(codon, isFirst), expected);
     }
 
     @Test
-    void testGetStartPositionInTranscript() {
-        throw new GATKException("Method not implemented!");
+    void testGetAminoAcidNames() {
+        Assert.assertEquals(FuncotatorUtils.getAminoAcidNames(),
+                new String[]{
+                        "Alanine",
+                        "Arganine",
+                        "Asparagine",
+                        "Aspartic acid",
+                        "Cysteine",
+                        "Glutamic acid",
+                        "Glutamine",
+                        "Glycine",
+                        "Histidine",
+                        "Isoleucine",
+                        "Leucine",
+                        "Lysine",
+                        "Methionine",
+                        "Phenylalanine",
+                        "Proline",
+                        "Serine",
+                        "Stop codon",
+                        "Threonine",
+                        "Tryptophan",
+                        "Tyrosine",
+                        "Valine",
+                        "Nonsense Acid"
+                }
+        );
+    }
+
+    @Test
+    void testGetAminoAcidCodes() {
+        Assert.assertEquals(FuncotatorUtils.getAminoAcidCodes(),
+                new String[] {
+                        "Ala",
+                        "Arg",
+                        "Asn",
+                        "Asp",
+                        "Cys",
+                        "Glu",
+                        "Gln",
+                        "Gly",
+                        "His",
+                        "Ile",
+                        "Leu",
+                        "Lys",
+                        "Met",
+                        "Phe",
+                        "Pro",
+                        "Ser",
+                        "Stop",
+                        "Thr",
+                        "Trp",
+                        "Tyr",
+                        "Val",
+                         "NONSENSE",
+                }
+        );
     }
 }

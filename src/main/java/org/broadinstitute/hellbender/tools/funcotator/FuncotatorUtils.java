@@ -92,6 +92,9 @@ public class FuncotatorUtils {
      * @return The {@link AminoAcid} corresponding to the given {@code codon}.  Returns {@code null} if the given {@code codon} does not code for a Eucaryotic {@link AminoAcid}.
      */
     public static AminoAcid getEukaryoticAminoAcidByCodon(final String codon) {
+        if (codon == null) {
+            return null;
+        }
         return tableByCodon.get(codon.toUpperCase());
     }
 
@@ -102,6 +105,11 @@ public class FuncotatorUtils {
      * @return The {@link AminoAcid} corresponding to the given {@code codon}.  Returns {@code null} if the given {@code codon} does not code for a Mitochondrial {@link AminoAcid}.
      */
     public static AminoAcid getMitochondrialAminoAcidByCodon(final String codon, final boolean isFirst) {
+
+        if (codon == null) {
+            return null;
+        }
+
         final String upperCodon = codon.toUpperCase();
         if ( isFirst && upperCodon.equals("ATT") || upperCodon.equals("ATA") ) {
             return AminoAcid.METHIONINE;
@@ -156,16 +164,18 @@ public class FuncotatorUtils {
 
     /**
      * Gets the position describing where the given allele and variant lie inside the given transcript using transcript-based coordinates.
-     * @param variant A {@link VariantContext} to locate inside the given {@code transcript}.
+     * @param variant A {@link Locatable} to locate inside the given {@code transcript}.
      * @param transcript A {@link List} of {@link Locatable} that describe the transcript to use for locating the given {@code allele}.
      * @return The index describing where the given {@code allele} lies in the given {@code transcript}.  If the variant is not in the given {@code transcript}, then this returns -1.
      */
-    public static int getStartPositionInTranscript(final VariantContext variant,
+    public static int getStartPositionInTranscript(final Locatable variant,
                                                    final List<? extends Locatable> transcript) {
         Utils.nonNull(variant);
         Utils.nonNull(transcript);
 
         int position = 0;
+
+        boolean foundPosition = false;
 
         for (final Locatable exon : transcript) {
             if (!exon.getContig().equals(variant.getContig())) {
@@ -175,47 +185,29 @@ public class FuncotatorUtils {
 
             if (new SimpleInterval(exon).contains(variant)) {
                 position += variant.getStart() - exon.getStart();
+                foundPosition = true;
                 break;
             } else {
                 position += exon.getEnd() - exon.getStart();
             }
         }
 
-        return position;
-    }
+        if ( foundPosition ) {
+            return position;
+        }
 
-    /**
-     * Gets the codon change between the given reference and alternate alleles.
-     * @param refAllele Reference {@link Allele} to compare.
-     * @param altAllele Alternate {@link Allele} to compare.
-     * @param startPosInCodingSeq Position in the given transcript of the start of the alleles.
-     * @param referenceTranscriptSequence The transcript sequence taken from the reference genome.
-     * @return A string representing the codon change between the given reference and alternate alleles.
-     */
-    public static String getCodonChange( final Allele refAllele, final Allele altAllele, final int startPosInCodingSeq, final String referenceTranscriptSequence ) {
-//        c.(2335-2337)Gac>Aac
-
-        final int codonStartPos = getAlignedPosition(startPosInCodingSeq);
-        final int refCodonEndPos = getAlignedEndPosition(codonStartPos, refAllele.length());
-        final int altCodonEndPos = getAlignedEndPosition(codonStartPos, altAllele.length());
-
-        final String refCodingSequence = referenceTranscriptSequence.substring(codonStartPos, refCodonEndPos);
-        final String altCodingSequence =
-                referenceTranscriptSequence.substring(codonStartPos, startPosInCodingSeq) +
-                        altAllele.getBaseString() +
-                        referenceTranscriptSequence.substring(startPosInCodingSeq + refAllele.length(), altCodonEndPos);
-
-        return "c.(" + codonStartPos + "-" + (refCodonEndPos-1) + ")" + refCodingSequence + ">" + altCodingSequence;
+        return -1;
     }
 
     /**
      * Get the sequence-aligned end position for the given allele and start position.
-     * @param codonStartPos The sequence-aligned starting position from which to calculate the end position.
+     * @param seqAlignedStart The sequence-aligned starting position from which to calculate the end position.
      * @param alleleLength The length of the allele for this end position.
      * @return An aligned end position (inclusive) for the given codon start and allele length.
      */
-    public static int getAlignedEndPosition(final int codonStartPos, final int alleleLength) {
-        return codonStartPos + (int)Math.ceil(alleleLength % 3) * 3;
+    public static int getAlignedEndPosition(final int seqAlignedStart, final int alleleLength) {
+        // We subtract 1 because the start and end positions must be inclusive.
+        return seqAlignedStart + ((int)Math.ceil(alleleLength / 3.0) * 3) - 1;
     }
 
     /**
@@ -358,7 +350,7 @@ public class FuncotatorUtils {
 
         final StringBuilder sb = new StringBuilder();
         for ( int i = 0; (i+3) < codingSequence.length(); i += 3 ) {
-            AminoAcid aa = getEukaryoticAminoAcidByCodon(codingSequence.substring(i, i+3));
+            final AminoAcid aa = getEukaryoticAminoAcidByCodon(codingSequence.substring(i, i+3));
             if ( aa == null ) {
                 sb.append(AminoAcid.NONSENSE.getLetter());
             }
@@ -378,7 +370,7 @@ public class FuncotatorUtils {
      * @return The coding sequence that includes the given alternate allele in place of the given reference allele.
      */
     public static String getAlternateCodingSequence( final String referenceCodingSequence, final int alleleStartPos,
-                                                     final Allele refAllele, final Allele altAllele) {
+                                                     final Allele refAllele, final Allele altAllele ) {
 
         Utils.nonNull(referenceCodingSequence);
         Utils.nonNull(refAllele);
