@@ -5,10 +5,7 @@ import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.exceptions.GATKException;
-import org.broadinstitute.hellbender.tools.funcotator.AminoAcid;
-import org.broadinstitute.hellbender.tools.funcotator.DataSourceFuncotationFactory;
-import org.broadinstitute.hellbender.tools.funcotator.Funcotation;
-import org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils;
+import org.broadinstitute.hellbender.tools.funcotator.*;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.codecs.GENCODE.*;
 
@@ -83,18 +80,10 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         }
         final GencodeGtfTranscriptFeature transcript = gtfFeature.getTranscripts().remove(bestTranscriptIndex);
 
-
 //        private GencodeFuncotation.VariantClassification variantClassification;
-//
-//        private int                     transcriptExon; - indexed by 0
-//        private int                     transcriptPos; - position in the transcript of the start of this change
-//        private String                  cDnaChange;
-//        private String                  codonChange;
-//        private String                  proteinChange;
 
+        // Setup the "trivial" fields of the gencodeFuncotation:
         final GencodeFuncotation gencodeFuncotation = new GencodeFuncotation();
-
-        // Set the "trivial" fields of the funcotation up top:
         gencodeFuncotation.setHugoSymbol( gtfFeature.getGeneName() );
         gencodeFuncotation.setChromosome( gtfFeature.getChromosomeName() );
         gencodeFuncotation.setOtherTranscripts(
@@ -110,140 +99,231 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         gencodeFuncotation.setAnnotationTranscript( transcript.getTranscriptId() );
         gencodeFuncotation.setTranscriptStrand( transcript.getGenomicStrand().toString() );
         gencodeFuncotation.setGenomeChange(getGenomeChangeString(variant, altAllele, gtfFeature));
+        gencodeFuncotation.setTranscriptPos( variant.getStart() - transcript.getStart() );
 
-//        // Go through our sub-features and determine what the VariantClassification is:
-//
-//        // Find our Exon:
-//        for ( final GencodeGtfExonFeature exon : transcript.getExons() ) {
-//
-//            // Set our Exon fields:
-//            gencodeFuncotation.setFeatureType( "Exon" );
-//            gencodeFuncotation.setFeature( exon.getExonId() );
-//            gencodeFuncotation.setExon( exon.getExonNumber() );
-//
-//            if ( exon.getGenomicPosition().overlaps(variantPosition) ) {
-//                // Find the variant in this exon:
-//                if ((exon.getStartCodon() != null) && exon.getStartCodon().getGenomicPosition().overlaps(variantPosition)) {
-//                    // It's a start codon variant.
-//
-//                    if ( variant.getType() == VariantContext.Type.SNP ) {
-//                        gencodeFuncotation.setClassification( GencodeFuncotation.VariantClassification.START_CODON_SNP );
-//                    }
-//                    else if ( variant.getType() == VariantContext.Type.MNP ) {
-//                        // TODO: FIX THIS IT'S WRONG - NEED TO DETERMINE INSERTION OR DELETION
-//                        gencodeFuncotation.setClassification( GencodeFuncotation.VariantClassification.START_CODON_INS );
-//                    }
-//                    else if ( variant.getType() == VariantContext.Type.INDEL ) {
-//                        // TODO: FIX THIS IT'S WRONG - NEED TO DETERMINE INSERTION OR DELETION
-//                        gencodeFuncotation.setClassification( GencodeFuncotation.VariantClassification.START_CODON_INS );
-//                    }
-//                    else {
-//                        // TODO: FIX THIS IT'S WRONG - NEED TO DETERMINE INSERTION OR DELETION
-//                        gencodeFuncotation.setClassification( GencodeFuncotation.VariantClassification.START_CODON_DEL );
-//                    }
-//
-//                } else if ((exon.getCds() != null) && exon.getCds().getGenomicPosition().overlaps(variantPosition)) {
-//                    // It's a 'normal' variant in the coding region.
-//
-//                    final GencodeFuncotation.VariantClassification variantClass;
-//
-//                    switch (variant.getType()) {
-//                        case SNP:
-//                            variantClass = getVariantClassificationSnp(variant, altAllele, reference, transcript);
-//                            break;
-//                        case MIXED:
-//                        case MNP:
-//                        case SYMBOLIC:
-//                        case INDEL:
-//                            if ( isFrameshift(variant.getReference(), altAllele) ) {
-//                                // TODO: THIS IS ALMOST CERTAINLY WRONG:
-//                                if ( altAllele.length() < variant.getReference().length()) {
-//                                    variantClass = GencodeFuncotation.VariantClassification.FRAME_SHIFT_DEL;
-//                                }
-//                                else if ( altAllele.length() > variant.getReference().length()) {
-//                                    variantClass = GencodeFuncotation.VariantClassification.FRAME_SHIFT_INS;
-//                                }
-//                                else {
-//                                    variantClass = GencodeFuncotation.VariantClassification.FRAME_SHIFT_SUB;
-//                                }
-//                            }
-//                            else {
-//                                if ( altAllele.length() < variant.getReference().length()) {
-//                                    variantClass = GencodeFuncotation.VariantClassification.IN_FRAME_DEL;
-//                                }
-//                                else if ( altAllele.length() > variant.getReference().length()) {
-//                                    variantClass = GencodeFuncotation.VariantClassification.IN_FRAME_INS;
-//                                }
-//                                else {
-//                                    variantClass = getVariantClassificationSnp(variant, altAllele, reference, transcript);
-//                                }
-//                            }
-//                            break;
-//                        case NO_VARIATION:
-//                        default:
-//                            variantClass = GencodeFuncotation.VariantClassification.SILENT;
-//                            break;
-//                    }
-//
-//                    gencodeFuncotation.setClassification( variantClass );
-//
-//                    // Get the CDS position:
-//                    final int cdsPosition = variantPosition.getStart() - exon.getCds().getGenomicPosition().getStart();
-//                    gencodeFuncotation.setCdsPosition( cdsPosition );
-//                    gencodeFuncotation.setProteinPosition( (int)Math.ceil(cdsPosition/3.0) );
-//
-//                } else {
-//                    // Must be a stop_codon variant.
-//
-//                    if ( variant.getType() == VariantContext.Type.SNP ) {
-//                        gencodeFuncotation.setClassification( GencodeFuncotation.VariantClassification.STOP_CODON_SNP );
-//                    }
-//                    else if ( variant.getType() == VariantContext.Type.MNP ) {
-//                        // TODO: FIX THIS IT'S WRONG - NEED TO DETERMINE INSERTION OR DELETION
-//                        gencodeFuncotation.setClassification( GencodeFuncotation.VariantClassification.STOP_CODON_INS );
-//                    }
-//                    else if ( variant.getType() == VariantContext.Type.INDEL ) {
-//                        // TODO: FIX THIS IT'S WRONG - NEED TO DETERMINE INSERTION OR DELETION
-//                        gencodeFuncotation.setClassification( GencodeFuncotation.VariantClassification.STOP_CODON_INS );
-//                    }
-//                    else {
-//                        // TODO: FIX THIS IT'S WRONG - NEED TO DETERMINE INSERTION OR DELETION
-//                        gencodeFuncotation.setClassification( GencodeFuncotation.VariantClassification.STOP_CODON_DEL );
-//                    }
-//
-//                }
-//
-//                gencodeFuncotations.add(gencodeFuncotation);
-//                hasHandledVariant = true;
-//            }
-//        }
-//
-//        // Find our UTR:
-//        for ( final GencodeGtfUTRFeature utr : transcript.getUtrs() ) {
-//            if ( utr.getGenomicPosition().overlaps(variantPosition) ) {
-//                // We need to determine if this is a 3' or 5' UTR variation
-//
-//                // There are 2 UTRs.  One is at the front (3'), the other at the back (5'):
-//                if ( utr.getGenomicStartLocation() == transcript.getStart() ) {
-//                    gencodeFuncotation.setClassification(GencodeFuncotation.VariantClassification.THREE_PRIME_UTR);
-//                }
-//                else {
-//                    gencodeFuncotation.setClassification(GencodeFuncotation.VariantClassification.FIVE_PRIME_UTR);
-//                }
-//
-//                gencodeFuncotations.add(gencodeFuncotation);
-//                hasHandledVariant = true;
-//            }
-//        }
-//
-//        // NOTE: We do not have to handle the Selenocysteines differently.
-//        // They will be contained in CDS regions and will be handled there.
-//
-//        // Must be an intron:
-//        gencodeFuncotation.setClassification(GencodeFuncotation.VariantClassification.INTRON);
+        // Set up our SequenceComparison object so we can calculate some useful fields more easily
+        // These fields can all be set without knowing the alternate allele:
+        final FuncotatorUtils.SequenceComparison sequenceComparison = new FuncotatorUtils.SequenceComparison();
+        sequenceComparison.setContig(variant.getContig());
+        sequenceComparison.setWholeReferenceSequence(FuncotatorUtils.getCodingSequence(reference, transcript.getExons()));
+        sequenceComparison.setReferenceAllele(variant.getReference().getBaseString());
+        sequenceComparison.setAlleleStart(variant.getStart());
+        sequenceComparison.setTranscriptAlleleStart(variant.getStart() - transcript.getStart());
+        sequenceComparison.setCodingSequenceAlleleStart(FuncotatorUtils.getStartPositionInTranscript(variant, transcript.getExons()));
+        sequenceComparison.setAlignedCodingSequenceAlleleStart(FuncotatorUtils.getAlignedPosition(sequenceComparison.getCodingSequenceAlleleStart()));
+        sequenceComparison.setAlignedReferenceAlleleStop(FuncotatorUtils.getAlignedEndPosition(sequenceComparison.getAlignedCodingSequenceAlleleStart(), variant.getReference().length() ));
+        sequenceComparison.setAlignedReferenceAllele(
+                sequenceComparison.getWholeReferenceSequence().substring(
+                        sequenceComparison.getAlignedCodingSequenceAlleleStart(),
+                        sequenceComparison.getAlignedReferenceAlleleStop()
+                )
+        );
+        sequenceComparison.setReferenceAminoAcidSequence(
+                FuncotatorUtils.createAminoAcidSequence( sequenceComparison.getWholeReferenceSequence() )
+        );
+        sequenceComparison.setProteinChangeStartPosition(
+                sequenceComparison.getAlignedCodingSequenceAlleleStart() / 3
+        );
+
+        boolean hasBeenAnnotated = false;
+
+        // Find the exon in which we have the variant:
+        for ( final GencodeGtfExonFeature exon : transcript.getExons() ) {
+            if ( exon.getGenomicPosition().overlaps(variantPosition) ) {
+
+                // Set our transcript exon number:
+                gencodeFuncotation.setTranscriptExon( exon.getExonNumber() );
+
+                sequenceComparison.setAlignedAlternateAlleleStop(
+                        FuncotatorUtils.getAlignedEndPosition(sequenceComparison.getAlignedCodingSequenceAlleleStart(),
+                                altAllele.length() )
+                );
+
+                sequenceComparison.setAlignedAlternateAllele(
+                        sequenceComparison.getWholeReferenceSequence().substring(
+                                sequenceComparison.getAlignedCodingSequenceAlleleStart(),
+                                sequenceComparison.getAlignedAlternateAlleleStop()
+                        )
+                );
+
+                sequenceComparison.setAlternateAminoAcidSequence(
+                        FuncotatorUtils.createAminoAcidSequence( sequenceComparison.getAlignedAlternateAllele() )
+                );
+
+                sequenceComparison.setProteinChangeEndPosition(
+                        sequenceComparison.getProteinChangeStartPosition() + (sequenceComparison.getAlignedAlternateAllele().length() / 3)
+                );
+
+                gencodeFuncotation.setCodonChange( FuncotatorUtils.getCodonChangeString(sequenceComparison) );
+                gencodeFuncotation.setProteinChange( FuncotatorUtils.getProteinChangeString(sequenceComparison) );
+                gencodeFuncotation.setcDnaChange( FuncotatorUtils.getCodingSequenceChangeString(sequenceComparison) );
+
+                final String altCodingSequence = FuncotatorUtils.getAlternateCodingSequence(
+                        sequenceComparison.getWholeReferenceSequence(), sequenceComparison.getCodingSequenceAlleleStart(),
+                        variant.getReference(), altAllele );
+                final String altAminoAcidSequence = FuncotatorUtils.createAminoAcidSequence(altCodingSequence);
+
+//        TODO: FIVE_PRIME_FLANK(15),
+//        TODO: THREE_PRIME_FLANK(15),
+
+//        TODO: RNA(4),
+//        TODO: LINCRNA(4);
+
+                // Determine the variant classification:
+                if ( FuncotatorUtils.isFrameshift(variant.getReference(), altAllele)) {
+
+                    //        TODO: FRAME_SHIFT_SUB(2),
+
+                    if ( variant.getReference().length() < altAllele.length() ) {
+                        gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.FRAME_SHIFT_INS);
+                    }
+                    else {
+                        gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.FRAME_SHIFT_DEL);
+                    }
+
+                    // check for de novo starts out of frame:
+                    for ( int i = 0 ; i < sequenceComparison.getAlternateAminoAcidSequence().length(); ++i) {
+                        final char aa = sequenceComparison.getAlternateAminoAcidSequence().charAt(i);
+                        if ( aa == AminoAcid.METHIONINE.getLetter().charAt(0) ) {
+                            gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.DE_NOVO_START_OUT_FRAME);
+                            break;
+                        }
+                    }
+                }
+                else {
+
+                    // Check for in frame indels:
+                    if ( variant.getReference().length() < altAllele.length() ) {
+                        gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.IN_FRAME_INS);
+                    }
+                    else if ( variant.getReference().length() < altAllele.length() ) {
+                        gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.IN_FRAME_DEL);
+                    }
+                    else {
+                        // We know the sequences are equal.
+                        if ( sequenceComparison.getReferenceAminoAcidSequence().equals(sequenceComparison.getAlternateAminoAcidSequence())) {
+                            gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.SILENT);
+                            if (FuncotatorUtils.isSpliceSiteVariant(variant, transcript.getExons())) {
+                                gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.SPLICE_SITE);
+                            }
+                        }
+                        else {
+                            //Now we check the sequence itself for problems:
+                            if ( (exon.getStartCodon() != null) && (new SimpleInterval(exon.getStartCodon()).overlaps(
+                                    new SimpleInterval(variant.getContig(), variant.getStart(), variant.getStart() + altAllele.length() - 1))) ) {
+                                // Start codon mutation!
+                                if ( variant.getReference().length() < altAllele.length() ) {
+                                    gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.START_CODON_INS);
+                                }
+                                else if ( variant.getReference().length() > altAllele.length() ) {
+                                    gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.START_CODON_DEL);
+                                }
+                                else {
+                                    // TODO: Strictly speaking, this is not correct - we need to make sure that we have only a single codon changed:
+                                    gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.START_CODON_SNP);
+                                }
+                            }
+                            else if ( (exon.getStopCodon() != null) && (new SimpleInterval(exon.getStopCodon()).overlaps(
+                                    new SimpleInterval(variant.getContig(), variant.getStart(), variant.getStart() + altAllele.length() - 1))) ) {
+                                // Stop codon mutation!
+                                if ( variant.getReference().length() < altAllele.length() ) {
+                                    gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.STOP_CODON_INS);
+                                }
+                                else if ( variant.getReference().length() > altAllele.length() ) {
+                                    gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.STOP_CODON_DEL);
+                                }
+                                else {
+                                    // TODO: Strictly speaking, this is not correct - we need to make sure that we have only a single codon changed:
+                                    gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.STOP_CODON_SNP);
+                                }
+                            }
+
+                            // check for de novo start in frame and missense:
+                            for ( int i = 0 ; i < sequenceComparison.getAlternateAminoAcidSequence().length(); ++i) {
+                                final char altAa = sequenceComparison.getAlternateAminoAcidSequence().charAt(i);
+                                final char refAa = sequenceComparison.getReferenceAminoAcidSequence().charAt(i);
+                                if ( altAa == AminoAcid.METHIONINE.getLetter().charAt(0) ) {
+                                    gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.DE_NOVO_START_IN_FRAME);
+                                }
+                                if ( altAa != refAa ) {
+                                    // Missense trumps De novo start in frame, so if we get one we can get out:
+                                    gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.MISSENSE);
+                                    break;
+                                }
+                            }
+
+                            // Check for nonsense:
+                            if ( altAminoAcidSequence.contains(AminoAcid.NONSENSE.getLetter()) ) {
+                                gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.NONSENSE);
+                            }
+                        }
+                    }
+                }
+
+                // check for non-stop here since it's the worst of the worst:
+                if ( FuncotatorUtils.isNonStopMutant(altAminoAcidSequence) ) {
+                    gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.NONSTOP);
+                }
+
+                hasBeenAnnotated = true;
+                break;
+            }
+        }
+
+        if ( !hasBeenAnnotated ) {
+            // We know that this must be an intron or in the UTR because we know we are within the bounds of a GencodeGtfGeneFeature
+            // and that we did not fall inside any of the exons:
+
+            // Check for UTRs:
+            for ( final GencodeGtfUTRFeature utr : transcript.getUtrs() ) {
+                if ( new SimpleInterval(utr).overlaps(variant) ) {
+                    if ( is3PrimeUtr(utr, transcript) ) {
+                        gencodeFuncotation.setVariantClassification( GencodeFuncotation.VariantClassification.THREE_PRIME_UTR );
+                    }
+                    else {
+                        gencodeFuncotation.setVariantClassification( GencodeFuncotation.VariantClassification.FIVE_PRIME_UTR );
+                    }
+                    hasBeenAnnotated = true;
+                }
+            }
+
+            // Check for introns:
+            if ( !hasBeenAnnotated ) {
+                gencodeFuncotation.setVariantClassification( GencodeFuncotation.VariantClassification.INTRON );
+            }
+        }
 
         gencodeFuncotations.add(gencodeFuncotation);
         return gencodeFuncotations;
+    }
+
+    /**
+     * Determines if the given UTR is 3' or 5' of the given transcript.
+     * Assumes the UTR is part of the given transcript.
+     * @param utr The {@link GencodeGtfUTRFeature} to check for relative location in the given {@link GencodeGtfTranscriptFeature}.
+     * @param transcript The {@link GencodeGtfTranscriptFeature} in which to check for the given {@code utr}.
+     * @return {@code true} if the given {@code utr} is 3' for the given {@code transcript}; {@code false} otherwise.
+     */
+    private boolean is3PrimeUtr(final GencodeGtfUTRFeature utr, final GencodeGtfTranscriptFeature transcript) {
+        boolean isBefore = true;
+        if ( transcript.getGenomicStrand() == GencodeGtfFeature.GenomicStrand.FORWARD ) {
+            for ( final GencodeGtfExonFeature exon : transcript.getExons() ) {
+                if ( exon.getStart() < utr.getStart()) {
+                    isBefore = false;
+                    break;
+                }
+            }
+        }
+        else {
+            for ( final GencodeGtfExonFeature exon : transcript.getExons() ) {
+                if ( exon.getStart() > utr.getStart()) {
+                    isBefore = false;
+                    break;
+                }
+            }
+        }
+
+        return isBefore;
     }
 
     /**
@@ -323,7 +403,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         // Determine if we're an IGR or a DE_NOVO_START:
         GencodeFuncotation.VariantClassification classification = GencodeFuncotation.VariantClassification.IGR;
 
-        if ( newSequence.contains(AminoAcid.START_CODON.getCodons()[0])) {
+        if ( newSequence.contains(AminoAcid.METHIONINE.getCodons()[0])) {
             classification = GencodeFuncotation.VariantClassification.DE_NOVO_START_OUT_FRAME;
         }
 
@@ -340,7 +420,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @param altAllele The alternate {@link Allele} for this variant.
      * @return A {@link GencodeFuncotation.VariantType} representing the variation type between the given reference and alternate {@link Allele}.
      */
-    private GencodeFuncotation.VariantType getVariantType(final Allele refAllele, final Allele altAllele ) {
+    private GencodeFuncotation.VariantType getVariantType( final Allele refAllele, final Allele altAllele ) {
 
         if ( altAllele.length() > refAllele.length() ) {
             return GencodeFuncotation.VariantType.INS;
@@ -371,49 +451,5 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         }
 
         return ((variant.getStart() - transcript.getStart()) % 3);
-    }
-
-    /**
-     * Gets a {@link GencodeFuncotation.VariantClassification} based on a given {@code variant} and contextual information.
-     * @param variant The {@link VariantContext} to classify.
-     * @param allele The {@link Allele} of the {@link VariantContext} to classify.
-     * @param reference The {@link ReferenceContext} against which to classify the {@link VariantContext}.
-     * @param transcript The transcript against which to classify the {@link VariantContext}.
-     * @return A {@link GencodeFuncotation.VariantClassification} corresponding to the given {@code variant} and contextual information.
-     */
-    private GencodeFuncotation.VariantClassification getVariantClassificationSnp(final VariantContext variant,
-                                                                                 final Allele allele,
-                                                                                 final ReferenceContext reference,
-                                                                                 final GencodeGtfTranscriptFeature transcript) {
-        final GencodeFuncotation.VariantClassification variantClass;
-
-        // the reference is aligned exactly to the variant.
-        // We need to line up the reference and the variant to the transcript.
-        final int variantStartOffset = calculateOffsetToTranscriptAlignment(variant, transcript);
-
-        // TODO: This is insufficient because of splice sites:
-        reference.setWindow(variant.getStart() - variantStartOffset, 3);
-        final byte[] rawBases = reference.getBases();
-        final byte[] bases = new byte[] { rawBases[0], rawBases[1], rawBases[2] };
-
-        final byte[] variantBases = bases.clone();
-        variantBases[-variantStartOffset] = allele.getBases()[0];
-
-        final AminoAcid referenceAminoAcid = FuncotatorUtils.getEukaryoticAminoAcidByCodon( new String(bases) );
-        final AminoAcid variantAminoAcid = FuncotatorUtils.getEukaryoticAminoAcidByCodon( new String(variantBases) );
-
-        if ( variantAminoAcid == null ) {
-            variantClass = GencodeFuncotation.VariantClassification.NONSENSE;
-        }
-        else {
-            if ( referenceAminoAcid == variantAminoAcid ) {
-                variantClass = GencodeFuncotation.VariantClassification.SILENT;
-            }
-            else {
-                variantClass = GencodeFuncotation.VariantClassification.MISSENSE;
-            }
-        }
-
-        return variantClass;
     }
 }

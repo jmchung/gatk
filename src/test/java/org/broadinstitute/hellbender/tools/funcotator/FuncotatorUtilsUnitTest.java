@@ -4,6 +4,7 @@ import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.Allele;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceFileSource;
+import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.Assert;
@@ -104,9 +105,57 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                         ),
                         "CAGAGACGGGAGGGGCAGAGCCGCAGGCACAGCCAAGAGGGCTGAAGAAATGGTAGAACGGAGCAGCTGGTGATGTGTGGGCCCACCGGCCCCAGGCTCCT"
                 },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
+                        Arrays.asList(
+                                new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 500),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 501, TEST_REFERENCE_START + 501),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 502, TEST_REFERENCE_START + 502),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 503, TEST_REFERENCE_START + 503),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 504, TEST_REFERENCE_START + 504),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 505, TEST_REFERENCE_START + 505),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 506, TEST_REFERENCE_START + 506),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 507, TEST_REFERENCE_START + 507),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 508, TEST_REFERENCE_START + 508),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 509, TEST_REFERENCE_START + 509)
+                        ),
+                        "CAGAGACGGG"
+                },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
+                        Collections.singletonList(
+                                new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 500)
+                        ),
+                        "C"
+                },
         };
     }
 
+    @DataProvider
+    Object[][] provideReferenceAndExonListForGatkExceptions() {
+
+        return new Object[][] {
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
+                        Collections.singletonList(
+                                new SimpleInterval("2", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 550)
+                        ),
+                },
+        };
+    }
+
+    @DataProvider
+    Object[][] provideReferenceAndExonListForIllegalArgumentExceptions() {
+
+        return new Object[][] {
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
+                        Collections.singletonList(
+                                new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START)
+                        ),
+                },
+        };
+    }
 
     @DataProvider
     Object[][] provideAllelesAndFrameshiftResults() {
@@ -205,5 +254,22 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @Test(dataProvider = "provideReferenceAndExonListAndExpected")
     void testGetCodingSequence(final ReferenceContext reference, final List<Locatable> exonList, final String expected) {
         Assert.assertEquals( FuncotatorUtils.getCodingSequence(reference, exonList), expected );
+    }
+
+    @Test(dataProvider = "provideReferenceAndExonListForGatkExceptions",
+            expectedExceptions = GATKException.class)
+    void testGetCodingSequenceWithGatkExceptions(final ReferenceContext reference, final List<Locatable> exonList) {
+        FuncotatorUtils.getCodingSequence(reference, exonList);
+    }
+
+    @Test(dataProvider = "provideReferenceAndExonListForIllegalArgumentExceptions",
+            expectedExceptions = IllegalArgumentException.class)
+    void testGetCodingSequenceWithIllegalArgumentExceptions(final ReferenceContext reference, final List<Locatable> exonList) {
+        FuncotatorUtils.getCodingSequence(reference, exonList);
+    }
+
+    @Test
+    void testGetStartPositionInTranscript() {
+        throw new GATKException("Method not implemented!");
     }
 }

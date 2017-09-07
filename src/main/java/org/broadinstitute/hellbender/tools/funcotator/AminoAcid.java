@@ -68,12 +68,12 @@ public enum AminoAcid {
     PHENYLALANINE("Phenylalanine","Phe","F",new String[]{"TTC","TTT"}),
     PROLINE("Proline","Pro","P",new String[]{"CCA","CCC","CCG","CCT"}),
     SERINE("Serine","Ser","S",new String[]{"AGC","AGT","TCA","TCC","TCG","TCT"}),
-    START_CODON("Start_codon", "Start", "+", new String[]{"ATG"}),
     STOP_CODON("Stop codon","Stop","*",new String[]{"TAA","TAG","TGA"}),
     THREONINE("Threonine","Thr","T",new String[]{"ACA","ACC","ACG","ACT"}),
     TRYPTOPHAN("Tryptophan","Trp","W",new String[]{"TGG"}),
     TYROSINE("Tyrosine","Tyr","Y",new String[]{"TAC","TAT"}),
-    VALINE("Valine","Val","V",new String[]{"GTA","GTC","GTG","GTT"});
+    VALINE("Valine","Val","V",new String[]{"GTA","GTC","GTG","GTT"}),
+    NONSENSE("Nonsense Acid", "NONSENSE", "!", new String[] {});
 
     String[] codons;
     String fullName;
@@ -101,9 +101,6 @@ public enum AminoAcid {
 
     public boolean isStop() {
         return this == STOP_CODON;
-    }
-    public boolean isStart() {
-        return (this == START_CODON) || (this == METHIONINE);
     }
 
     public String toString() {
