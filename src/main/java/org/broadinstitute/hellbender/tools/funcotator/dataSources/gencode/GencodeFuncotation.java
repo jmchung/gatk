@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 public class GencodeFuncotation extends Funcotation {
 
     private static final String FIELD_DELIMITER = "|";
+    private static final String OTHER_TRANSCRIPT_DELIMITER = ";";
 
     //==================================================================================================================
 
@@ -91,7 +92,7 @@ public class GencodeFuncotation extends Funcotation {
                 (cDnaChange != null ? cDnaChange : "") + FIELD_DELIMITER +
                 (codonChange != null ? codonChange : "") + FIELD_DELIMITER +
                 (proteinChange != null ? proteinChange : "") + FIELD_DELIMITER +
-                (otherTranscripts != null ? otherTranscripts.stream().map(Object::toString).collect(Collectors.joining(",")) : "");
+                (otherTranscripts != null ? otherTranscripts.stream().map(Object::toString).collect(Collectors.joining(OTHER_TRANSCRIPT_DELIMITER)) : "");
     }
 
     //==================================================================================================================

@@ -1,8 +1,10 @@
 package org.broadinstitute.hellbender.tools.funcotator;
 
+import lombok.Data;
 import org.broadinstitute.hellbender.CommandLineProgramTest;
 import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
 import org.broadinstitute.hellbender.utils.test.BaseTest;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -16,30 +18,41 @@ import java.util.List;
  */
 public class FuncotatorIntegrationTest extends CommandLineProgramTest {
 
-//    ./gatk-launch Funcotator \
-//            -gtf /Users/jonn/Downloads/gencode.v19.chr_patch_hapl_scaff.annotation.fixed.truncated.gtf \
-//            -O   test_funcotator_out.vcf \
-//            -R   /Users/jonn/Development/references/GRCh37.p13.genome.fasta \
-//            -V   /Users/jonn/Development/gatk/src/test/resources/org/broadinstitute/hellbender/tools/funcotator/singleSnpTest_chr2_hg19.vcf \
-//            -- \
-//            --javaOptions '-DGATK_STACKTRACE_ON_USER_EXCEPTION=true'
+    private final String GTF_FILE_NAME = "/Users/jonn/Downloads/gencode.v19.chr_patch_hapl_scaff.annotation.fixed.truncated.gtf";
+    private final String HG19_REFERENCE_FILE_NAME =  "/Users/jonn/Development/references/GRCh37.p13.genome.fasta";
+
+    private final String VARIANT_FILE_HG19_CHR1 = "/Users/jonn/Development/gatk/src/test/resources/org/broadinstitute/hellbender/tools/funcotator/singleSnpTest_chr1_hg19.vcf";
+    private final String VARIANT_FILE_HG19_CHR2 = "/Users/jonn/Development/gatk/src/test/resources/org/broadinstitute/hellbender/tools/funcotator/singleSnpTest_chr2_hg19.vcf";
+
+    //==================================================================================================================
+
+    @DataProvider
+    Object[][] provideDataForIntegrationTest() {
+        return new Object[][] {
+                {GTF_FILE_NAME, HG19_REFERENCE_FILE_NAME, VARIANT_FILE_HG19_CHR1},
+//                {GTF_FILE_NAME, HG19_REFERENCE_FILE_NAME, VARIANT_FILE_HG19_CHR2},
+        };
+    }
+
+    //==================================================================================================================
 
     // TODO: REFACTOR ALL THIS:
 
-    @Test
-    public void testRun() throws IOException {
+    @Test(dataProvider = "provideDataForIntegrationTest")
+    public void testRun(final String gtfFileName, final String referenceFileName, final String variantFileName) throws IOException {
 //        final File outputFile = BaseTest.createTempFile("funcotator_tmp_out", ".vcf");
         final File outputFile = new File("funcotator_tmp_out" + ".vcf");
         final List<String> arguments = new ArrayList<>();
 
         arguments.add("-" + Funcotator.GTF_FILE_SHORT_NAME);
-        arguments.add("/Users/jonn/Downloads/gencode.v19.chr_patch_hapl_scaff.annotation.fixed.truncated.gtf");
+        arguments.add(gtfFileName);
         arguments.add("-" + StandardArgumentDefinitions.REFERENCE_SHORT_NAME);
-        arguments.add("/Users/jonn/Development/references/GRCh37.p13.genome.fasta");
+        arguments.add(referenceFileName);
         arguments.add("-" + StandardArgumentDefinitions.VARIANT_SHORT_NAME);
-        arguments.add("/Users/jonn/Development/gatk/src/test/resources/org/broadinstitute/hellbender/tools/funcotator/singleSnpTest_chr2_hg19.vcf");
+        arguments.add(variantFileName);
         arguments.add("-" + StandardArgumentDefinitions.OUTPUT_SHORT_NAME);
         arguments.add(outputFile.getAbsolutePath());
+
         runCommandLine(arguments);
     }
 }

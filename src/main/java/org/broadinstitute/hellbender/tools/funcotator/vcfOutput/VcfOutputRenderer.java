@@ -74,7 +74,6 @@ public class VcfOutputRenderer extends OutputRenderer {
         );
 
         // Add our new annotation and render the VariantContext:
-        System.out.println(funcotatorAnnotationStringBuilder.toString());
         variantContextBuilder.attribute(FUNCOTATOR_VCF_FIELD_NAME, funcotatorAnnotationStringBuilder.toString());
 
         vcfWriter.add( variantContextBuilder.make() );

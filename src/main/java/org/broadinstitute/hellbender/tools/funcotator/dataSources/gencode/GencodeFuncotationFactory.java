@@ -1,5 +1,6 @@
 package org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode;
 
+import com.sun.xml.bind.Locatable;
 import htsjdk.tribble.Feature;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
@@ -105,11 +106,25 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         // These fields can all be set without knowing the alternate allele:
         final FuncotatorUtils.SequenceComparison sequenceComparison = new FuncotatorUtils.SequenceComparison();
         sequenceComparison.setContig(variant.getContig());
-        sequenceComparison.setWholeReferenceSequence(FuncotatorUtils.getCodingSequence(reference, transcript.getExons()));
+
+        // TODO: MUST MAKE SURE WE ONLY USE THE CODING REGIONS OF EXONS!
+        // TODO: OTHERWISE WE END UP WITH BAD MATH!
+        // TODO: THIS MIGHT BE WRONG!  CHECK WITH LEE
+
+        // Get the list of exons by their locations so we can use them to determine our location in the transcript and get
+        // the transcript code itself:
+//        final List<? extends htsjdk.samtools.util.Locatable> exonPositionList = transcript.getExons();
+        final List<? extends htsjdk.samtools.util.Locatable> exonPositionList =
+                transcript.getExons().stream()
+                        .filter(e -> (e.getCds() != null))
+                        .map(GencodeGtfExonFeature::getCds)
+                        .collect(Collectors.toList());
+
+        sequenceComparison.setWholeReferenceSequence(FuncotatorUtils.getCodingSequence(reference, exonPositionList));
         sequenceComparison.setReferenceAllele(variant.getReference().getBaseString());
         sequenceComparison.setAlleleStart(variant.getStart());
         sequenceComparison.setTranscriptAlleleStart(variant.getStart() - transcript.getStart());
-        sequenceComparison.setCodingSequenceAlleleStart(FuncotatorUtils.getStartPositionInTranscript(variant, transcript.getExons()));
+        sequenceComparison.setCodingSequenceAlleleStart(FuncotatorUtils.getStartPositionInTranscript(variant, exonPositionList));
         sequenceComparison.setAlignedCodingSequenceAlleleStart(FuncotatorUtils.getAlignedPosition(sequenceComparison.getCodingSequenceAlleleStart()));
         sequenceComparison.setAlignedReferenceAlleleStop(FuncotatorUtils.getAlignedEndPosition(sequenceComparison.getAlignedCodingSequenceAlleleStart(), variant.getReference().length() ));
         sequenceComparison.setAlignedReferenceAllele(
@@ -135,14 +150,23 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 gencodeFuncotation.setTranscriptExon( exon.getExonNumber() );
 
                 sequenceComparison.setAlignedAlternateAlleleStop(
-                        FuncotatorUtils.getAlignedEndPosition(sequenceComparison.getAlignedCodingSequenceAlleleStart(),
-                                altAllele.length() )
+                        FuncotatorUtils.getAlignedEndPosition(
+                                sequenceComparison.getAlignedCodingSequenceAlleleStart(),
+                                altAllele.length()
+                        )
                 );
 
+                final String altCodingSequence = FuncotatorUtils.getAlternateCodingSequence(
+                        sequenceComparison.getWholeReferenceSequence(), sequenceComparison.getCodingSequenceAlleleStart(),
+                        variant.getReference(), altAllele );
+
+                final String altAminoAcidSequence = FuncotatorUtils.createAminoAcidSequence(altCodingSequence);
+
+                // Note we add 1 because substring ends are EXCLUSIVE:
                 sequenceComparison.setAlignedAlternateAllele(
-                        sequenceComparison.getWholeReferenceSequence().substring(
+                        altCodingSequence.substring(
                                 sequenceComparison.getAlignedCodingSequenceAlleleStart(),
-                                sequenceComparison.getAlignedAlternateAlleleStop()
+                                sequenceComparison.getAlignedAlternateAlleleStop() + 1
                         )
                 );
 
@@ -157,11 +181,6 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 gencodeFuncotation.setCodonChange( FuncotatorUtils.getCodonChangeString(sequenceComparison) );
                 gencodeFuncotation.setProteinChange( FuncotatorUtils.getProteinChangeString(sequenceComparison) );
                 gencodeFuncotation.setcDnaChange( FuncotatorUtils.getCodingSequenceChangeString(sequenceComparison) );
-
-                final String altCodingSequence = FuncotatorUtils.getAlternateCodingSequence(
-                        sequenceComparison.getWholeReferenceSequence(), sequenceComparison.getCodingSequenceAlleleStart(),
-                        variant.getReference(), altAllele );
-                final String altAminoAcidSequence = FuncotatorUtils.createAminoAcidSequence(altCodingSequence);
 
 //        TODO: FIVE_PRIME_FLANK(15),
 //        TODO: THREE_PRIME_FLANK(15),
@@ -203,7 +222,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                         // We know the sequences are equal.
                         if ( sequenceComparison.getReferenceAminoAcidSequence().equals(sequenceComparison.getAlternateAminoAcidSequence())) {
                             gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.SILENT);
-                            if (FuncotatorUtils.isSpliceSiteVariant(variant, transcript.getExons())) {
+                            if (FuncotatorUtils.isSpliceSiteVariant(variant, exonPositionList)) {
                                 gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.SPLICE_SITE);
                             }
                         }

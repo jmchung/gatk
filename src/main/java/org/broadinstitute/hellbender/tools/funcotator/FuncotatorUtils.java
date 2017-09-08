@@ -53,6 +53,7 @@ package org.broadinstitute.hellbender.tools.funcotator;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
+import org.apache.log4j.Logger;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
@@ -63,6 +64,8 @@ import java.util.HashMap;
 import java.util.List;
 
 public class FuncotatorUtils {
+
+    private final static Logger logger = Logger.getLogger(FuncotatorUtils.class);
 
     /**
      * PRIVATE CONSTRUCTOR
@@ -164,6 +167,7 @@ public class FuncotatorUtils {
 
     /**
      * Gets the position describing where the given allele and variant lie inside the given transcript using transcript-based coordinates.
+     * The index will be calculated even if the given variant ends outside the bounds of the given transcript.
      * @param variant A {@link Locatable} to locate inside the given {@code transcript}.
      * @param transcript A {@link List} of {@link Locatable} that describe the transcript to use for locating the given {@code allele}.
      * @return The index describing where the given {@code allele} lies in the given {@code transcript}.  If the variant is not in the given {@code transcript}, then this returns -1.
@@ -177,22 +181,26 @@ public class FuncotatorUtils {
 
         boolean foundPosition = false;
 
+        final SimpleInterval variantStartLocus = new SimpleInterval(variant.getContig(), variant.getStart(), variant.getStart());
+
         for (final Locatable exon : transcript) {
-            if (!exon.getContig().equals(variant.getContig())) {
+            if (!exon.getContig().equals(variantStartLocus.getContig())) {
                 throw new GATKException("Variant and transcript contigs are not equal: "
-                        + variant.getContig() + " != " + exon.getContig());
+                        + variantStartLocus.getContig() + " != " + exon.getContig());
             }
 
-            if (new SimpleInterval(exon).contains(variant)) {
-                position += variant.getStart() - exon.getStart();
+            if (new SimpleInterval(exon).contains(variantStartLocus)) {
+                position += variantStartLocus.getStart() - exon.getStart();
                 foundPosition = true;
                 break;
             } else {
-                position += exon.getEnd() - exon.getStart();
+                // Add 1 because of inclusive positions / indexing starting at 1
+                position += exon.getEnd() - exon.getStart() + 1;
             }
         }
 
         if ( foundPosition ) {
+            // Subtract 1 because we're using position as an index into the transcript:
             return position;
         }
 
@@ -235,7 +243,7 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getAlignedAlternateAllele());
 
         return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + "-" +
-                (seqComp.getAlignedReferenceAlleleStop()-1) + ")" +
+                seqComp.getAlignedReferenceAlleleStop() + ")" +
                 seqComp.getAlignedReferenceAllele() + ">" + seqComp.getAlignedAlternateAllele();
     }
 
@@ -349,7 +357,15 @@ public class FuncotatorUtils {
         Utils.nonNull(codingSequence);
 
         final StringBuilder sb = new StringBuilder();
-        for ( int i = 0; (i+3) < codingSequence.length(); i += 3 ) {
+
+        // Ensure that we don't have remainder bases:
+        int maxIndex = codingSequence.length();
+        if ( maxIndex % 3 != 0 ) {
+            maxIndex = (int)Math.floor(maxIndex / 3) * 3;
+            logger.warn("createAminoAcidSequence given a coding sequence of length not divisible by 3.  Dropping bases from the end: " + (codingSequence.length() % 3));
+        }
+
+        for ( int i = 0; i < maxIndex; i += 3 ) {
             final AminoAcid aa = getEukaryoticAminoAcidByCodon(codingSequence.substring(i, i+3));
             if ( aa == null ) {
                 sb.append(AminoAcid.NONSENSE.getLetter());
@@ -384,6 +400,7 @@ public class FuncotatorUtils {
     /**
      * Creates and returns the coding sequence given a {@link ReferenceContext} and a {@link List} of {@link Locatable} representing a set of Exons.
      * Locatables start and end values are inclusive.
+     * Assumes {@code exonList} ranges are indexed by 1.
      * @param reference A {@link ReferenceContext} from which to construct the coding region.
      * @param exonList A {@link List} of {@link Locatable} representing a set of Exons to be concatenated together to create the coding sequence.
      * @return A string of bases for the given {@code exonList} concatenated together.
@@ -434,15 +451,21 @@ public class FuncotatorUtils {
         // Go through and grab our sequences based on our exons:
         for ( final Locatable exon : exonList ) {
 
-            final int exonStartArrayCoords = exon.getStart() - refWindow.getStart();
+            // Subtract 1 from start because positions are indexed by 1.
+            int exonStartArrayCoord = exon.getStart() - refWindow.getStart() - 1;
 
-            // Because copyOfRange has an exclusive end range spec, we add 1 to get all the bases:
-            final int exonEndArrayCoords = exonStartArrayCoords + (exon.getEnd() - exon.getStart() + 1);
+            // Sanity check just in case the exon and ref window start at the same place:
+            if ( exonStartArrayCoord == -1 ) {
+                exonStartArrayCoord = 0;
+            }
+
+            // Add 1 to end because end range in copyOfRange is exclusive
+            final int exonEndArrayCoord = exonStartArrayCoord + (exon.getEnd() - exon.getStart()) + 1;
 
             // TODO: find a better / faster way to do this:
             sb.append(
                     new String(
-                            Arrays.copyOfRange(bases, exonStartArrayCoords, exonEndArrayCoords)
+                            Arrays.copyOfRange(bases, exonStartArrayCoord, exonEndArrayCoord)
                     )
             );
         }

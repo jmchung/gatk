@@ -3,6 +3,7 @@ package org.broadinstitute.hellbender.tools.funcotator;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.Allele;
 import lombok.Data;
+import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceFileSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
@@ -12,7 +13,7 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import java.io.File;
+import java.io.*;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -43,43 +44,90 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
      * 000000000000000000000
      * 000000000000000000000
      * 000000000011111111112
-     * 012345678901234567890
+     * 123456789012345678901
      * TCATCTGCAGGTGTCTGACTT
      *
      */
     private void printReferenceBases() {
-        final ReferenceContext ref = new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, 12000, 16000));
+        printReferenceBases(TEST_REFERENCE, TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END);
+    }
+
+    /**
+     * Writes the bases of the {@link FuncotatorUtilsUnitTest#TEST_REFERENCE} from {@link FuncotatorUtilsUnitTest#TEST_REFERENCE_START} to {@link FuncotatorUtilsUnitTest#TEST_REFERENCE_END} to a file.
+     * The print out has each base numbered - the results must be interpreted vertically (i.e. read the numbers from top to bottom to get the index of the base).
+     * For example, the first 21 bases are as follows (with labels for the example):
+     *
+     *   Base 5       Base 19
+     *     |             |
+     * 000000000000000000000
+     * 000000000000000000000
+     * 000000000011111111112
+     * 012345678901234567890
+     * TCATCTGCAGGTGTCTGACTT
+     *
+     * @param contig Contig from which to print bases.
+     * @param start Start point in contig from which to print bases.
+     * @param end End point in contig to which to print bases.
+     */
+    private void printReferenceBases(final File refFile, final String contig, final int start, final int end) {
+        final ReferenceContext ref = new ReferenceContext(new ReferenceFileSource(refFile), new SimpleInterval(contig, start, end));
 
         // Ones place:
         final StringBuilder sb_o = new StringBuilder();
-        for( int i = 0 ; i < ref.getBases().length ; i+=10 ) {
-            sb_o.append("0123456789");
+        for( int i = 1 ; i < ref.getBases().length + 1; ++i ) {
+            sb_o.append(i % 10);
         }
         // Tens place:
         final StringBuilder sb_t = new StringBuilder();
-        for( int i = 0 ; i < ref.getBases().length ; ++i ) {
+        for( int i = 1 ; i < ref.getBases().length + 1; ++i ) {
             sb_t.append((int)(i / 10.0) % 10);
         }
         // Hundreds place:
         final StringBuilder sb_h = new StringBuilder();
-        for( int i = 0 ; i < ref.getBases().length ; ++i ) {
+        for( int i = 1 ; i < ref.getBases().length + 1; ++i ) {
             sb_h.append((int)(i / 100.0) % 10);
         }
         // Thousands place:
         final StringBuilder sb_th = new StringBuilder();
-        for( int i = 0 ; i < ref.getBases().length ; ++i ) {
+        for( int i = 1 ; i < ref.getBases().length + 1; ++i ) {
             sb_th.append((int)(i / 1000.0) % 10);
+        }
+        // Ten Thousands place:
+        final StringBuilder sb_tth = new StringBuilder();
+        for( int i = 1 ; i < ref.getBases().length + 1; ++i ) {
+            sb_tth.append((int)(i / 10000.0) % 10);
+        }
+
+        try (Writer writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("refBases_"+contig+"_"+start+"-"+end+".txt")))) {
+            writer.write("Location: " + contig + ":" + start + ":" + end + "\n");
+            writer.write("=================================================================================\n");
+            writer.write( sb_tth.toString() + "\n");
+            writer.write( sb_th.toString() + "\n");
+            writer.write( sb_h.toString() + "\n" );
+            writer.write( sb_t.toString() + "\n" );
+            writer.write( sb_o.toString() + "\n" );
+            writer.write( new String(ref.getBases()) + "\n\n" );
+        }
+        catch ( final IOException ex ) {
+            throw new GATKException("Could not create an output file!", ex);
         }
 
         System.out.println();
-        System.out.println("Location: " + TEST_REFERENCE_CONTIG + ":" + TEST_REFERENCE_START + ":" + TEST_REFERENCE_END);
+        System.out.println("Location: " + contig + ":" + start + ":" + end);
         System.out.println("=================================================================================");
+        System.out.println( sb_tth.toString() );
         System.out.println( sb_th.toString() );
         System.out.println( sb_h.toString() );
         System.out.println( sb_t.toString() );
         System.out.println( sb_o.toString() );
         System.out.println( new String(ref.getBases()) );
     }
+
+//    @Test
+//    void createRefBaseFile() {
+//        printReferenceBases(new File("/Users/jonn/Development/references/GRCh37.p13.genome.fasta"), "chr1", 860000,  880000);
+//        printReferenceBases();
+//    }
 
     //==================================================================================================================
     // Data Providers:
@@ -96,7 +144,7 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                 {
                         new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
                         Collections.singletonList(new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 550)),
-                        "CAGAGACGGGAGGGGCAGAGCCGCAGGCACAGCCAAGAGGGCTGAAGAAAT"
+                        "GCAGAGACGGGAGGGGCAGAGCCGCAGGCACAGCCAAGAGGGCTGAAGAAA"
                 },
                 {
                         new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
@@ -104,7 +152,7 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                                 new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 550),
                                 new SimpleInterval("1", TEST_REFERENCE_START + 551, TEST_REFERENCE_START + 600)
                         ),
-                        "CAGAGACGGGAGGGGCAGAGCCGCAGGCACAGCCAAGAGGGCTGAAGAAATGGTAGAACGGAGCAGCTGGTGATGTGTGGGCCCACCGGCCCCAGGCTCCT"
+                        "GCAGAGACGGGAGGGGCAGAGCCGCAGGCACAGCCAAGAGGGCTGAAGAAATGGTAGAACGGAGCAGCTGGTGATGTGTGGGCCCACCGGCCCCAGGCTCC"
                 },
                 {
                         new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
@@ -120,14 +168,21 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                                 new SimpleInterval("1", TEST_REFERENCE_START + 508, TEST_REFERENCE_START + 508),
                                 new SimpleInterval("1", TEST_REFERENCE_START + 509, TEST_REFERENCE_START + 509)
                         ),
-                        "CAGAGACGGG"
+                        "GCAGAGACGG"
                 },
                 {
                         new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
                         Collections.singletonList(
                                 new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 500)
                         ),
-                        "C"
+                        "G"
+                },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, 1, 10)),
+                        Collections.singletonList(
+                                new SimpleInterval("1", 1, 1)
+                        ),
+                        "N"
                 },
         };
     }
@@ -160,18 +215,22 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
 
     @DataProvider
     Object[][] provideDataForGetStartPositionInTranscript() {
-        return new Object[][] {
-                {
-                    new SimpleInterval("chr1", 0, 1),
-                    Arrays.asList(
-                            new SimpleInterval("chr1", 10,19),
-                            new SimpleInterval("chr1", 30,39),
-                            new SimpleInterval("chr1", 50,59),
-                            new SimpleInterval("chr1", 70,79),
-                            new SimpleInterval("chr1", 90,99)
-                    ),
 
-                },
+        final List<? extends Locatable> exons = Arrays.asList(
+                new SimpleInterval("chr1", 10,19),
+                new SimpleInterval("chr1", 30,39),
+                new SimpleInterval("chr1", 50,59),
+                new SimpleInterval("chr1", 70,79),
+                new SimpleInterval("chr1", 90,99)
+        );
+
+        return new Object[][] {
+                { new SimpleInterval("chr1", 1, 1), exons, -1 },
+                { new SimpleInterval("chr1", 25, 67), exons, -1 },
+                { new SimpleInterval("chr1", 105, 392), exons, -1 },
+                { new SimpleInterval("chr1", 10, 10), exons, 0 },
+                { new SimpleInterval("chr1", 99, 99), exons, 49 },
+                { new SimpleInterval("chr1", 50, 67), exons, 20 },
         };
     }
 
