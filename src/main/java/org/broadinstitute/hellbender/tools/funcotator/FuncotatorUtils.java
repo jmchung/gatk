@@ -492,11 +492,21 @@ public class FuncotatorUtils {
         return new ReferenceSequence(name, index, bases.getBytes());
     }
 
+    /** Region type of a genome in which a variant occurs. */
+    public enum VariantGenomeRegionType {
+        IGR,
+        INTRON,
+        UTR,
+        EXON
+    }
+
     /**
      * A simple data object to hold a comparison between a reference sequence and an alternate allele.
      */
     public static class SequenceComparison {
         private ReferenceSequence wholeReferenceSequence = null;
+
+        private VariantGenomeRegionType regionType       = null;
 
         private String  contig                           = null;
         private Integer alleleStart                      = null;
@@ -525,6 +535,14 @@ public class FuncotatorUtils {
 
         public void setWholeReferenceSequence(final ReferenceSequence wholeReferenceSequence) {
             this.wholeReferenceSequence = wholeReferenceSequence;
+        }
+
+        public VariantGenomeRegionType getRegionType() {
+            return regionType;
+        }
+
+        public void setRegionType(final VariantGenomeRegionType regionType) {
+            this.regionType = regionType;
         }
 
         public String getContig() {
