@@ -12,6 +12,12 @@ import java.util.List;
  * Created by jonn on 8/30/17.
  */
 public abstract class DataSourceFuncotationFactory {
+
+    /**
+     * Perform cleanup tasks for this {@link DataSourceFuncotationFactory}.
+     */
+    public void cleanup() {}
+
     /**
      * @return An ordered list of the names of annotations that this Data Source supports.
      */

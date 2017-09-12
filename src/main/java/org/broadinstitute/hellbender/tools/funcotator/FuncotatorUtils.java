@@ -50,6 +50,7 @@ package org.broadinstitute.hellbender.tools.funcotator;
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+import htsjdk.samtools.reference.ReferenceSequence;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
@@ -200,7 +201,6 @@ public class FuncotatorUtils {
         }
 
         if ( foundPosition ) {
-            // Subtract 1 because we're using position as an index into the transcript:
             return position;
         }
 
@@ -380,7 +380,7 @@ public class FuncotatorUtils {
     /**
      * Get the full alternate coding sequence given a reference coding sequence, and two alleles.
      * @param referenceCodingSequence The reference sequence on which to base the resulting alternate coding sequence.
-     * @param alleleStartPos Starting position for the ref and alt alleles in the given {@code referenceCodingSequence}.
+     * @param alleleStartPos Starting position (1-indexed) for the ref and alt alleles in the given {@code referenceCodingSequence}.
      * @param refAllele Reference Allele.
      * @param altAllele Alternate Allele.
      * @return The coding sequence that includes the given alternate allele in place of the given reference allele.
@@ -392,9 +392,11 @@ public class FuncotatorUtils {
         Utils.nonNull(refAllele);
         Utils.nonNull(altAllele);
 
-        return referenceCodingSequence.substring(0, alleleStartPos) +
+        // We have to subtract 1 here because we need to account for the 1-based indexing of
+        // the start and end of the coding region:
+        return referenceCodingSequence.substring(0, alleleStartPos - 1) +
                 altAllele.getBaseString() +
-                referenceCodingSequence.substring(alleleStartPos + refAllele.length());
+                referenceCodingSequence.substring(alleleStartPos - 1 + refAllele.length());
     }
 
     /**
@@ -421,7 +423,8 @@ public class FuncotatorUtils {
         int end = Integer.MIN_VALUE;
 
         // Start by sorting our list of exons.
-        // This is very important to ensure that we have all sequences in the right order at the end.
+        // This is very important to ensure that we have all sequences in the right order at the end
+        // and so we can support different read directions:
         exonList.sort((lhs, rhs) -> lhs.getStart() < rhs.getStart() ? -1 : (lhs.getStart() > rhs.getStart() ) ? 1 : 0 );
 
         for ( final Locatable exon : exonList ) {
@@ -474,10 +477,26 @@ public class FuncotatorUtils {
     }
 
     /**
+     * Create a {@link ReferenceSequence} representing the given bases, name, and index.
+     * @param bases The genetic bases contained within the resulting {@link ReferenceSequence}.
+     * @param name Name for the resulting {@link ReferenceSequence}.
+     * @param index Zero-based location in the parent contig.
+     * @return a {@link ReferenceSequence} representing the given bases, name, and index.
+     */
+    public static ReferenceSequence createReferenceSequence(final String bases, final String name, final int index) {
+
+        Utils.nonNull(bases);
+        Utils.nonNull(name);
+        Utils.nonNull(index);
+
+        return new ReferenceSequence(name, index, bases.getBytes());
+    }
+
+    /**
      * A simple data object to hold a comparison between a reference sequence and an alternate allele.
      */
     public static class SequenceComparison {
-        private String wholeReferenceSequence            = null;
+        private ReferenceSequence wholeReferenceSequence = null;
 
         private String  contig                           = null;
         private Integer alleleStart                      = null;
@@ -500,11 +519,11 @@ public class FuncotatorUtils {
 
         // =============================================================================================================
 
-        public String getWholeReferenceSequence() {
+        public ReferenceSequence getWholeReferenceSequence() {
             return wholeReferenceSequence;
         }
 
-        public void setWholeReferenceSequence(final String wholeReferenceSequence) {
+        public void setWholeReferenceSequence(final ReferenceSequence wholeReferenceSequence) {
             this.wholeReferenceSequence = wholeReferenceSequence;
         }
 

@@ -1,10 +1,6 @@
 package org.broadinstitute.hellbender.tools.funcotator;
 
-import org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation;
 import org.broadinstitute.hellbender.utils.test.BaseTest;
-import org.testng.Assert;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
 
 /**
  * Unit tests for the {@link org.broadinstitute.hellbender.tools.funcotator}.

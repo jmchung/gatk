@@ -360,34 +360,53 @@ public class GencodeFuncotation extends Funcotation {
     }
 
     /**
-     * Represents the type of variant found.
+     * Represents the type and severity of a variant.
+     * The lower the {@link VariantClassification#relativeSeverity}, the more severe the variant.
+     * Descriptions taken from:
+     *     https://gatkforums.broadinstitute.org/gatk/discussion/8815/oncotator-variant-classification-and-secondary-variant-classification
      */
     public enum VariantClassification {
+        /** Variant lies between exons within the bounds of the chosen transcript. */
         INTRON(10),
+        /** Variant is on the 5'UTR for the chosen transcript. */
         FIVE_PRIME_UTR(6),
+        /** Variant is on the 3'UTR for the chosen transcript */
         THREE_PRIME_UTR(6),
+        /** Intergenic region. Does not overlap any transcript. */
         IGR(20),
+        /** The variant is upstream of the chosen transcript (within 3kb) */
         FIVE_PRIME_FLANK(15),
-        THREE_PRIME_FLANK(15),
+        /** The point mutation alters the protein structure by one amino acid. */
         MISSENSE(1),
+        /** A premature stop codon is created by the variant. */
         NONSENSE(0),
+        /** Variant removes stop codon. */
         NONSTOP(0),
+        /** Variant is in coding region of the chosen transcript, but protein structure is identical (i.e. a synonymous mutation). */
         SILENT(5),
+        /** The variant is within a configurable number of bases (default=2) of a splice site. See the secondary classification to determine if it lies on the exon or intron side. */
         SPLICE_SITE(4),
+        /** Deletion that keeps the sequence in frame (i.e. deletion of a length evenly divisible by 3). */
         IN_FRAME_DEL(1),
+        /** Insertion that keeps the sequence in frame (i.e. insertion of a length evenly divisible by 3). */
         IN_FRAME_INS(1),
+        /** Insertion that moves the coding sequence out of frame (i.e. insertion of a length not evenly divisible by 3). */
         FRAME_SHIFT_INS(2),
+        /** Deletion that moves the sequence out of frame (i.e. deletion of a length not evenly divisible by 3). */
         FRAME_SHIFT_DEL(2),
-        FRAME_SHIFT_SUB(2),
+        /** Point mutation that overlaps the start codon. */
         START_CODON_SNP(3),
+        /** Insertion that overlaps the start codon. */
         START_CODON_INS(3),
+        /** Deletion that overlaps the start codon. */
         START_CODON_DEL(3),
-        STOP_CODON_INS(3),
-        STOP_CODON_DEL(3),
-        STOP_CODON_SNP(3),
+        /** New start codon is created by the given variant using the chosen transcript. However, it is in frame relative to the coded protein. */
         DE_NOVO_START_IN_FRAME(1),
+        /** New start codon is created by the given variant using the chosen transcript. However, it is out of frame relative to the coded protein. */
         DE_NOVO_START_OUT_FRAME(0),
+        /** Variant lies on one of the RNA transcripts. */
         RNA(4),
+        /** Variant lies on one of the lincRNAs. */
         LINCRNA(4);
 
         /**

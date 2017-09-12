@@ -83,7 +83,7 @@ public class GencodeFuncotationUnitTest extends BaseTest {
                     "TESTGENE" + D + "BUILD1" + D + "chr1" + D + 1 + D + 100 + D +
                             GencodeFuncotation.VariantClassification.NONSENSE + D + GencodeFuncotation.VariantType.SNP + D +
                             "A" + D + "T" + D + "T" + D + "big changes" + D + "T1" + D +
-                            "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE,TWO,THREE"
+                            "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE;TWO;THREE"
                 },
                 {
                         createFuncotation("TESTGENE", "BUILD1", "chr1", 1, 100,
@@ -105,7 +105,7 @@ public class GencodeFuncotationUnitTest extends BaseTest {
                         D + "BUILD1" + D + "chr1" + D + 1 + D + 100 + D +
                                 GencodeFuncotation.VariantClassification.NONSENSE + D + GencodeFuncotation.VariantType.SNP + D +
                                 "A" + D + "T" + D + "T" + D + "big changes" + D + "T1" + D +
-                                "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE,TWO,THREE"
+                                "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE;TWO;THREE"
                 },
                 {
                         createFuncotation("TESTGENE", null, "chr1", 1, 100,
@@ -116,7 +116,7 @@ public class GencodeFuncotationUnitTest extends BaseTest {
                         "TESTGENE" + D + D + "chr1" + D + 1 + D + 100 + D +
                                 GencodeFuncotation.VariantClassification.NONSENSE + D + GencodeFuncotation.VariantType.SNP + D +
                                 "A" + D + "T" + D + "T" + D + "big changes" + D + "T1" + D +
-                                "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE,TWO,THREE"
+                                "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE;TWO;THREE"
                 },
                 {
                         createFuncotation("TESTGENE", "BUILD1", null, 50, 60,
@@ -127,7 +127,7 @@ public class GencodeFuncotationUnitTest extends BaseTest {
                         "TESTGENE" + D + "BUILD1" + D + D + 50 + D + 60 + D +
                                 GencodeFuncotation.VariantClassification.NONSENSE + D + GencodeFuncotation.VariantType.SNP + D +
                                 "A" + D + "T" + D + "T" + D + "big changes" + D + "T1" + D +
-                                "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE,TWO,THREE"
+                                "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE;TWO;THREE"
                 },
                 {
                         createFuncotation("TESTGENE", "BUILD1", "chr1", 1, 100,
@@ -138,7 +138,7 @@ public class GencodeFuncotationUnitTest extends BaseTest {
                         "TESTGENE" + D + "BUILD1" + D + "chr1" + D + 1 + D + 100 + D +
                                 D + GencodeFuncotation.VariantType.SNP + D +
                                 "A" + D + "T" + D + "T" + D + "big changes" + D + "T1" + D +
-                                "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE,TWO,THREE"
+                                "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE;TWO;THREE"
                 },
                 {
                         createFuncotation("TESTGENE", "BUILD1", "chr1", 1, 100,
@@ -149,7 +149,7 @@ public class GencodeFuncotationUnitTest extends BaseTest {
                         "TESTGENE" + D + "BUILD1" + D + "chr1" + D + 1 + D + 100 + D +
                                 GencodeFuncotation.VariantClassification.NONSENSE + D + D +
                                 "A" + D + "T" + D + "T" + D + "big changes" + D + "T1" + D +
-                                "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE,TWO,THREE"
+                                "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE;TWO;THREE"
                 },
                 {
                         createFuncotation("TESTGENE", "BUILD1", "chr1", 1, 100,
@@ -160,7 +160,7 @@ public class GencodeFuncotationUnitTest extends BaseTest {
                         "TESTGENE" + D + "BUILD1" + D + "chr1" + D + 1 + D + 100 + D +
                                 GencodeFuncotation.VariantClassification.NONSENSE + D + GencodeFuncotation.VariantType.SNP + D +
                                 "G" + D + "C" + D + "C" + D + D + "T1" + D +
-                                "3'" + D + "1" + D + 1 + D + "A" + D + "ACC" + D + "Lys" + D + "ONE,TWO,THREE"
+                                "3'" + D + "1" + D + 1 + D + "A" + D + "ACC" + D + "Lys" + D + "ONE;TWO;THREE"
                 },
                 {
                         createFuncotation("TESTGENE", "BUILD1", "chr1", 1, 100,
@@ -171,7 +171,7 @@ public class GencodeFuncotationUnitTest extends BaseTest {
                         "TESTGENE" + D + "BUILD1" + D + "chr1" + D + 1 + D + 100 + D +
                                 GencodeFuncotation.VariantClassification.NONSENSE + D + GencodeFuncotation.VariantType.SNP + D +
                                 "A" + D + "T" + D + "T" + D + "big changes" + D + D +
-                                D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE,TWO,THREE"
+                                D + "1" + D + 1 + D + "A" + D + "ATC" + D + "Lys" + D + "ONE;TWO;THREE"
                 },
                 {
                         createFuncotation("TESTGENE", "BUILD1", "chr1", 1, 100,
@@ -182,7 +182,7 @@ public class GencodeFuncotationUnitTest extends BaseTest {
                         "TESTGENE" + D + "BUILD1" + D + "chr1" + D + 1 + D + 100 + D +
                                 GencodeFuncotation.VariantClassification.NONSENSE + D + GencodeFuncotation.VariantType.SNP + D +
                                 "A" + D + "T" + D + "T" + D + "big changes" + D + "T1" + D +
-                                "3'" + D + D + D + "A" + D + "ATC" + D + "Lys" + D + "ONE,TWO,THREE"
+                                "3'" + D + D + D + "A" + D + "ATC" + D + "Lys" + D + "ONE;TWO;THREE"
                 },
                 {
                         createFuncotation("TESTGENE", "BUILD1", "chr1", 1, 100,
@@ -193,7 +193,7 @@ public class GencodeFuncotationUnitTest extends BaseTest {
                         "TESTGENE" + D + "BUILD1" + D + "chr1" + D + 1 + D + 100 + D +
                                 GencodeFuncotation.VariantClassification.NONSENSE + D + GencodeFuncotation.VariantType.SNP + D +
                                 "A" + D + "T" + D + "T" + D + "big changes" + D + "T1" + D +
-                                "3'" + D + "1" + D + 1 + D + D + "ATC" + D + "Lys" + D + "ONE,TWO,THREE"
+                                "3'" + D + "1" + D + 1 + D + D + "ATC" + D + "Lys" + D + "ONE;TWO;THREE"
                 },
                 {
                         createFuncotation("TESTGENE", "BUILD1", "chr1", 1, 100,
@@ -204,7 +204,7 @@ public class GencodeFuncotationUnitTest extends BaseTest {
                         "TESTGENE" + D + "BUILD1" + D + "chr1" + D + 1 + D + 100 + D +
                                 GencodeFuncotation.VariantClassification.NONSENSE + D + GencodeFuncotation.VariantType.SNP + D +
                                 "A" + D + "T" + D + "T" + D + "big changes" + D + "T1" + D +
-                                "3'" + D + "1" + D + 1 + D + "A" + D + D + "Lys" + D + "ONE,TWO,THREE"
+                                "3'" + D + "1" + D + 1 + D + "A" + D + D + "Lys" + D + "ONE;TWO;THREE"
                 },
                 {
                         createFuncotation("TESTGENE", "BUILD1", "chr1", 1, 100,
@@ -215,7 +215,7 @@ public class GencodeFuncotationUnitTest extends BaseTest {
                         "TESTGENE" + D + "BUILD1" + D + "chr1" + D + 1 + D + 100 + D +
                                 GencodeFuncotation.VariantClassification.NONSENSE + D + GencodeFuncotation.VariantType.SNP + D +
                                 "A" + D + "T" + D + "T" + D + "big changes" + D + "T1" + D +
-                                "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + D + "ONE,TWO,THREE"
+                                "3'" + D + "1" + D + 1 + D + "A" + D + "ATC" + D + D + "ONE;TWO;THREE"
                 },
         };
     }

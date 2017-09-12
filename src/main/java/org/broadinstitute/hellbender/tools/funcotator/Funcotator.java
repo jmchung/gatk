@@ -35,20 +35,27 @@ import java.util.*;
 @BetaFeature
 public class Funcotator extends VariantWalker {
 
-    public static final String GTF_FILE_LONG_NAME = "gtfFile";
-    public static final String GTF_FILE_SHORT_NAME = "gtf";
+    public static final String GTF_FILE_ARG_LONG_NAME = "gtfFile";
+    public static final String GTF_FILE_ARG_SHORT_NAME = "gtf";
+    public static final String GENCODE_FASTA_ARG_NAME = "fasta";
 
     //==================================================================================================================
 
     @Argument(
             shortName = StandardArgumentDefinitions.OUTPUT_SHORT_NAME,
-            fullName = StandardArgumentDefinitions.OUTPUT_LONG_NAME,
+            fullName  = StandardArgumentDefinitions.OUTPUT_LONG_NAME,
             doc = "Output VCF File.")
     protected File outputFile;
 
     @Argument(
-            fullName = GTF_FILE_LONG_NAME,
-            shortName = GTF_FILE_SHORT_NAME,
+            shortName = GENCODE_FASTA_ARG_NAME,
+            fullName  = GENCODE_FASTA_ARG_NAME,
+            doc = "GENCODE Transcript FASTA File.")
+    protected File gencodeTranscriptFastaFile;
+
+    @Argument(
+            fullName = GTF_FILE_ARG_LONG_NAME,
+            shortName = GTF_FILE_ARG_SHORT_NAME,
             doc = "A GENCODE GTF file containing annotated genes."
     )
     private FeatureInput<GencodeGtfFeature> gtfVariants;
@@ -71,7 +78,7 @@ public class Funcotator extends VariantWalker {
 
         // Set up our data source factories:
         // TODO: this should be set up based on the input CLI arguments.
-        dataSourceFactories.add(new GencodeFuncotationFactory());
+        dataSourceFactories.add(new GencodeFuncotationFactory(gencodeTranscriptFastaFile));
 
         // Set up our output renderer:
         // TODO: in the future this should be encapsulated into a factory for output renderers based on an input argument.
@@ -98,7 +105,12 @@ public class Funcotator extends VariantWalker {
 
     @Override
     public void closeTool() {
+
+        for(final DataSourceFuncotationFactory factory : dataSourceFactories) {
+            factory.cleanup();
+        }
         outputRenderer.close();
+
     }
 
     //==================================================================================================================

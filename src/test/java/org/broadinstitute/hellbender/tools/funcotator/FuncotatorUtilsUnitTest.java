@@ -74,27 +74,27 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
 
         // Ones place:
         final StringBuilder sb_o = new StringBuilder();
-        for( int i = 1 ; i < ref.getBases().length + 1; ++i ) {
+        for( int i = 0 ; i < ref.getBases().length; ++i ) {
             sb_o.append(i % 10);
         }
         // Tens place:
         final StringBuilder sb_t = new StringBuilder();
-        for( int i = 1 ; i < ref.getBases().length + 1; ++i ) {
+        for( int i = 0 ; i < ref.getBases().length; ++i ) {
             sb_t.append((int)(i / 10.0) % 10);
         }
         // Hundreds place:
         final StringBuilder sb_h = new StringBuilder();
-        for( int i = 1 ; i < ref.getBases().length + 1; ++i ) {
+        for( int i = 0 ; i < ref.getBases().length; ++i ) {
             sb_h.append((int)(i / 100.0) % 10);
         }
         // Thousands place:
         final StringBuilder sb_th = new StringBuilder();
-        for( int i = 1 ; i < ref.getBases().length + 1; ++i ) {
+        for( int i = 0 ; i < ref.getBases().length; ++i ) {
             sb_th.append((int)(i / 1000.0) % 10);
         }
         // Ten Thousands place:
         final StringBuilder sb_tth = new StringBuilder();
-        for( int i = 1 ; i < ref.getBases().length + 1; ++i ) {
+        for( int i = 0 ; i < ref.getBases().length; ++i ) {
             sb_tth.append((int)(i / 10000.0) % 10);
         }
 
@@ -351,19 +351,25 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     Object[][] provideDataForGetAlternateCodingSequence() {
         return new Object[][] {
                 {
-                    "01234567890A1234567890123456789", 11, Allele.create((byte)'A'), Allele.create((byte)'A'), "01234567890A1234567890123456789"
+                    "01234567890A1234567890123456789", 12, Allele.create((byte)'A'), Allele.create((byte)'A'), "01234567890A1234567890123456789"
                 },
                 {
-                    "01234567890A1234567890123456789", 11, Allele.create((byte)'A'), Allele.create("ATGCATGC".getBytes()), "01234567890ATGCATGC1234567890123456789"
+                    "01234567890A1234567890123456789", 11, Allele.create((byte)'A'), Allele.create((byte)'A'), "0123456789AA1234567890123456789"
                 },
                 {
-                    "A", 0, Allele.create((byte)'A'), Allele.create("ATGCATGC".getBytes()), "ATGCATGC"
+                    "01234567890A1234567890123456789", 12, Allele.create((byte)'A'), Allele.create("ATGCATGC".getBytes()), "01234567890ATGCATGC1234567890123456789"
                 },
                 {
-                    "BA", 1, Allele.create((byte)'A'), Allele.create("ATGCATGC".getBytes()), "BATGCATGC"
+                    "AAAAATTTTTGGGGGCCCCCAAAAATTTTTGGGGGCCCCC", 12, Allele.create("GGGGCCC".getBytes()), Allele.create((byte)'T'), "AAAAATTTTTGTCCAAAAATTTTTGGGGGCCCCC"
                 },
                 {
-                    "AB", 0, Allele.create((byte)'A'), Allele.create("ATGCATGC".getBytes()), "ATGCATGCB"
+                    "A", 1, Allele.create((byte)'A'), Allele.create("ATGCATGC".getBytes()), "ATGCATGC"
+                },
+                {
+                    "BA", 2, Allele.create((byte)'A'), Allele.create("ATGCATGC".getBytes()), "BATGCATGC"
+                },
+                {
+                    "AB", 1, Allele.create((byte)'A'), Allele.create("ATGCATGC".getBytes()), "ATGCATGCB"
                 },
         };
     }

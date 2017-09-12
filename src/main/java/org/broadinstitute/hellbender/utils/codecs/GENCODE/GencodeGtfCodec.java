@@ -148,7 +148,6 @@ final public class GencodeGtfCodec extends AbstractFeatureCodec<GencodeGtfFeatur
 
     @SuppressWarnings( "deprecation" )
     @Override
-    @SuppressWarnings( "deprecation" )
     public LocationAware makeIndexableSourceFromStream(final InputStream bufferedInputStream) {
         final PositionalBufferedStream pbs;
         if (bufferedInputStream instanceof PositionalBufferedStream) {
