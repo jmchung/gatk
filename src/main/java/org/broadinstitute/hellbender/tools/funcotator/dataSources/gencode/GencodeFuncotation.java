@@ -19,26 +19,27 @@ public class GencodeFuncotation extends Funcotation {
 
     //==================================================================================================================
 
-    private String                  hugoSymbol;
-    private String                  ncbiBuild;
-    private String                  chromosome;
-    private int                     start;
-    private int                     end;
-    private VariantClassification   variantClassification;
-    private VariantType             variantType;
-    private String                  refAllele;
-    private String                  tumorSeqAllele1;
-    private String                  tumorSeqAllele2;
+    private String                  hugoSymbol;                         // TRIVIAL (i.e. by the time we match to a transcript, we have this info regardless to where in the transcript the variant lies)
+    private String                  ncbiBuild;                          // TRIVIAL
+    private String                  chromosome;                         // TRIVIAL
+    private int                     start;                              // TRIVIAL
+    private int                     end;                                // TRIVIAL
+    private VariantClassification   variantClassification;              //          CDS / UTR / INTRON / IGR
+    private VariantClassification   secondaryVariantClassification;     //          CDS / INTRON
+    private VariantType             variantType;                        // TRIVIAL
+    private String                  refAllele;                          // TRIVIAL
+    private String                  tumorSeqAllele1;                    // TRIVIAL
+    private String                  tumorSeqAllele2;                    // TRIVIAL
 
-    private String                  genomeChange;
-    private String                  annotationTranscript;
-    private String                  transcriptStrand;
-    private Integer                 transcriptExon;
-    private Integer                 transcriptPos;
-    private String                  cDnaChange;
-    private String                  codonChange;
-    private String                  proteinChange;
-    private List<String>            otherTranscripts;
+    private String                  genomeChange;                       // TRIVIAL
+    private String                  annotationTranscript;               // TRIVIAL
+    private String                  transcriptStrand;                   // TRIVIAL
+    private Integer                 transcriptExon;                     //           CDS / UTRs
+    private Integer                 transcriptPos;                      // TRIVIAL
+    private String                  cDnaChange;                         //           CDS
+    private String                  codonChange;                        //           CDS
+    private String                  proteinChange;                      //           CDS
+    private List<String>            otherTranscripts;                   // TRIVIAL
 
     //==================================================================================================================
 
@@ -80,6 +81,7 @@ public class GencodeFuncotation extends Funcotation {
                 start + FIELD_DELIMITER +
                 end + FIELD_DELIMITER +
                 (variantClassification != null ? variantClassification : "") + FIELD_DELIMITER +
+                (secondaryVariantClassification != null ? secondaryVariantClassification : "") + FIELD_DELIMITER +
                 (variantType != null ? variantType : "") + FIELD_DELIMITER +
                 (refAllele != null ? refAllele : "") + FIELD_DELIMITER +
                 (tumorSeqAllele1 != null ? tumorSeqAllele1 : "") + FIELD_DELIMITER +
@@ -97,7 +99,6 @@ public class GencodeFuncotation extends Funcotation {
 
     //==================================================================================================================
 
-
     @Override
     public boolean equals(final Object o) {
         if (this == o) return true;
@@ -111,6 +112,7 @@ public class GencodeFuncotation extends Funcotation {
         if (ncbiBuild != null ? !ncbiBuild.equals(that.ncbiBuild) : that.ncbiBuild != null) return false;
         if (chromosome != null ? !chromosome.equals(that.chromosome) : that.chromosome != null) return false;
         if (variantClassification != that.variantClassification) return false;
+        if (secondaryVariantClassification != that.secondaryVariantClassification) return false;
         if (variantType != that.variantType) return false;
         if (refAllele != null ? !refAllele.equals(that.refAllele) : that.refAllele != null) return false;
         if (tumorSeqAllele1 != null ? !tumorSeqAllele1.equals(that.tumorSeqAllele1) : that.tumorSeqAllele1 != null)
@@ -141,6 +143,7 @@ public class GencodeFuncotation extends Funcotation {
         result = 31 * result + start;
         result = 31 * result + end;
         result = 31 * result + (variantClassification != null ? variantClassification.hashCode() : 0);
+        result = 31 * result + (secondaryVariantClassification != null ? secondaryVariantClassification.hashCode() : 0);
         result = 31 * result + (variantType != null ? variantType.hashCode() : 0);
         result = 31 * result + (refAllele != null ? refAllele.hashCode() : 0);
         result = 31 * result + (tumorSeqAllele1 != null ? tumorSeqAllele1.hashCode() : 0);
@@ -166,6 +169,7 @@ public class GencodeFuncotation extends Funcotation {
                 ", start=" + start +
                 ", end=" + end +
                 ", variantClassification=" + variantClassification +
+                ", secondaryVariantClassification=" + secondaryVariantClassification +
                 ", variantType=" + variantType +
                 ", refAllele='" + refAllele + '\'' +
                 ", tumorSeqAllele1='" + tumorSeqAllele1 + '\'' +
@@ -230,6 +234,14 @@ public class GencodeFuncotation extends Funcotation {
 
     public void setVariantClassification(final VariantClassification variantClassification) {
         this.variantClassification = variantClassification;
+    }
+
+    public VariantClassification getSecondaryVariantClassification() {
+        return secondaryVariantClassification;
+    }
+
+    public void setSecondaryVariantClassification(final VariantClassification secondaryVariantClassification) {
+        this.secondaryVariantClassification = secondaryVariantClassification;
     }
 
     public VariantType getVariantType() {
@@ -366,16 +378,23 @@ public class GencodeFuncotation extends Funcotation {
      *     https://gatkforums.broadinstitute.org/gatk/discussion/8815/oncotator-variant-classification-and-secondary-variant-classification
      */
     public enum VariantClassification {
+        // Only for Introns:
         /** Variant lies between exons within the bounds of the chosen transcript. */
         INTRON(10),
+
+        // Only for UTRs:
         /** Variant is on the 5'UTR for the chosen transcript. */
         FIVE_PRIME_UTR(6),
         /** Variant is on the 3'UTR for the chosen transcript */
         THREE_PRIME_UTR(6),
+
+        // Only for IGRs:
         /** Intergenic region. Does not overlap any transcript. */
         IGR(20),
         /** The variant is upstream of the chosen transcript (within 3kb) */
         FIVE_PRIME_FLANK(15),
+
+        // These can be in Coding regions or Introns (only SPLICE_SITE):
         /** The point mutation alters the protein structure by one amino acid. */
         MISSENSE(1),
         /** A premature stop codon is created by the variant. */
@@ -400,10 +419,14 @@ public class GencodeFuncotation extends Funcotation {
         START_CODON_INS(3),
         /** Deletion that overlaps the start codon. */
         START_CODON_DEL(3),
+
+        // These can only be in 5' UTRs:
         /** New start codon is created by the given variant using the chosen transcript. However, it is in frame relative to the coded protein. */
         DE_NOVO_START_IN_FRAME(1),
         /** New start codon is created by the given variant using the chosen transcript. However, it is out of frame relative to the coded protein. */
         DE_NOVO_START_OUT_FRAME(0),
+
+        // These are special / catch-all cases:
         /** Variant lies on one of the RNA transcripts. */
         RNA(4),
         /** Variant lies on one of the lincRNAs. */

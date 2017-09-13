@@ -171,7 +171,7 @@ public class FuncotatorUtils {
      * The index will be calculated even if the given variant ends outside the bounds of the given transcript.
      * @param variant A {@link Locatable} to locate inside the given {@code transcript}.
      * @param transcript A {@link List} of {@link Locatable} that describe the transcript to use for locating the given {@code allele}.
-     * @return The index describing where the given {@code allele} lies in the given {@code transcript}.  If the variant is not in the given {@code transcript}, then this returns -1.
+     * @return The position (1-based) describing where the given {@code allele} lies in the given {@code transcript}.  If the variant is not in the given {@code transcript}, then this returns -1.
      */
     public static int getStartPositionInTranscript(final Locatable variant,
                                                    final List<? extends Locatable> transcript) {
@@ -227,6 +227,16 @@ public class FuncotatorUtils {
      */
     public static int getAlignedPosition(final int position) {
         return position - (position % 3);
+    }
+
+    /**
+     * Calculates whether the given {@code startPosition} is in frame relative to the end of the region.
+     * @param startPosition The position relative to the start of a region to check for frame alignment.
+     * @param regionLength The length of the region containing {@code startPosition}.
+     * @return {@code true} if the given {@code startPosition} is in frame relative to the given {@code regionLength} ; {@code false} otherwise.
+     */
+    public static boolean isInFrameWithEndOfRegion(final int startPosition, final int regionLength) {
+        return (((regionLength - startPosition + 1) % 3) == 0);
     }
 
     /**
@@ -492,21 +502,11 @@ public class FuncotatorUtils {
         return new ReferenceSequence(name, index, bases.getBytes());
     }
 
-    /** Region type of a genome in which a variant occurs. */
-    public enum VariantGenomeRegionType {
-        IGR,
-        INTRON,
-        UTR,
-        EXON
-    }
-
     /**
      * A simple data object to hold a comparison between a reference sequence and an alternate allele.
      */
     public static class SequenceComparison {
         private ReferenceSequence wholeReferenceSequence = null;
-
-        private VariantGenomeRegionType regionType       = null;
 
         private String  contig                           = null;
         private Integer alleleStart                      = null;
@@ -535,14 +535,6 @@ public class FuncotatorUtils {
 
         public void setWholeReferenceSequence(final ReferenceSequence wholeReferenceSequence) {
             this.wholeReferenceSequence = wholeReferenceSequence;
-        }
-
-        public VariantGenomeRegionType getRegionType() {
-            return regionType;
-        }
-
-        public void setRegionType(final VariantGenomeRegionType regionType) {
-            this.regionType = regionType;
         }
 
         public String getContig() {

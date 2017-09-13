@@ -411,6 +411,46 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
         };
     }
 
+    @DataProvider
+    Object[][] provideDataForIsInFrameWithEndOfRegion() {
+        return new Object[][] {
+
+                // Starting position checks:
+                { 1, 1, false },
+                { 1, 2, false },
+                { 1, 3, true  },
+                { 1, 4, false },
+                { 1, 5, false },
+                { 1, 6, true  },
+                { 1, 7, false },
+                { 1, 8, false },
+                { 1, 9, true  },
+                { 1, 10, false },
+
+                // Middle position checks:
+                { 1, 10, false },
+                { 2, 10, true },
+                { 3, 10, false },
+                { 4, 10, false },
+                { 5, 10, true },
+                { 6, 10, false },
+                { 7, 10, false },
+                { 8, 10, true },
+                { 9, 10, false },
+                { 10, 10, false },
+                { 56, 473, false },
+                { 57, 473, true },
+                { 58, 473, false },
+
+                // Last position should always be out of frame.
+                { 10, 10, false },
+                { 11, 11, false },
+                { 12, 12, false },
+                { 100, 100, false },
+                { 1000, 1000, false },
+        };
+    }
+
     //==================================================================================================================
     // Tests:
 
@@ -524,5 +564,10 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                          "NONSENSE",
                 }
         );
+    }
+
+    @Test (dataProvider = "provideDataForIsInFrameWithEndOfRegion")
+    void testIsInFrameWithEndOfRegion(final int pos, final int length, final boolean expected) {
+        Assert.assertEquals( FuncotatorUtils.isInFrameWithEndOfRegion(pos, length), expected );
     }
 }
