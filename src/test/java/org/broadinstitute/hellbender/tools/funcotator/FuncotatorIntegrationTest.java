@@ -29,8 +29,8 @@ public class FuncotatorIntegrationTest extends CommandLineProgramTest {
     @DataProvider
     Object[][] provideDataForIntegrationTest() {
         return new Object[][] {
-//                {GTF_FILE_NAME, HG19_REFERENCE_FILE_NAME, GENCODE_TRANSCRIPT_FASTA_FILE_NAME, VARIANT_FILE_HG19_CHR1},
-                {GTF_FILE_NAME, HG19_REFERENCE_FILE_NAME, GENCODE_TRANSCRIPT_FASTA_FILE_NAME, VARIANT_FILE_HG19_CHR2},
+                {GTF_FILE_NAME, HG19_REFERENCE_FILE_NAME, GENCODE_TRANSCRIPT_FASTA_FILE_NAME, VARIANT_FILE_HG19_CHR1},
+//                {GTF_FILE_NAME, HG19_REFERENCE_FILE_NAME, GENCODE_TRANSCRIPT_FASTA_FILE_NAME, VARIANT_FILE_HG19_CHR2},
         };
     }
 

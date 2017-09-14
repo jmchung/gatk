@@ -167,11 +167,28 @@ public class FuncotatorUtils {
     }
 
     /**
+     * Determines whether the given reference and alternate alleles constitute a frameshift mutation.
+     * @param startPos Genomic start position (1-based, inclusive) of the variant.
+     * @param refEnd Genomic end position (1-based, inclusive) of the reference allele.
+     * @param altEnd Genomic end position (1-based, inclusive) of the alternate allele.
+     * @return {@code true} if replacing the reference with the alternate results in a frameshift.  {@code false} otherwise.
+     */
+    public static boolean isFrameshift(final int startPos, final int refEnd, final int altEnd) {
+
+        final int refLength = refEnd - startPos + 1;
+        final int altLength = altEnd - startPos + 1;
+
+        // We know it's a frameshift if we have a replacement that is not of a
+        // length evenly divisible by 3 because that's how many bases are read at once:
+        return ((Math.abs( refLength - altLength ) % 3) != 0);
+    }
+
+    /**
      * Gets the position describing where the given allele and variant lie inside the given transcript using transcript-based coordinates.
      * The index will be calculated even if the given variant ends outside the bounds of the given transcript.
      * @param variant A {@link Locatable} to locate inside the given {@code transcript}.
      * @param transcript A {@link List} of {@link Locatable} that describe the transcript to use for locating the given {@code allele}.
-     * @return The position (1-based) describing where the given {@code allele} lies in the given {@code transcript}.  If the variant is not in the given {@code transcript}, then this returns -1.
+     * @return The position (1-based, inclusive) describing where the given {@code allele} lies in the given {@code transcript}.  If the variant is not in the given {@code transcript}, then this returns -1.
      */
     public static int getStartPositionInTranscript(final Locatable variant,
                                                    final List<? extends Locatable> transcript) {
@@ -201,7 +218,7 @@ public class FuncotatorUtils {
         }
 
         if ( foundPosition ) {
-            return position;
+            return position + 1;
         }
 
         return -1;

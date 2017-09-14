@@ -228,9 +228,9 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                 { new SimpleInterval("chr1", 1, 1), exons, -1 },
                 { new SimpleInterval("chr1", 25, 67), exons, -1 },
                 { new SimpleInterval("chr1", 105, 392), exons, -1 },
-                { new SimpleInterval("chr1", 10, 10), exons, 0 },
-                { new SimpleInterval("chr1", 99, 99), exons, 49 },
-                { new SimpleInterval("chr1", 50, 67), exons, 20 },
+                { new SimpleInterval("chr1", 10, 10), exons, 1 },
+                { new SimpleInterval("chr1", 99, 99), exons, 50 },
+                { new SimpleInterval("chr1", 50, 67), exons, 21 },
         };
     }
 
@@ -321,6 +321,24 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     }
 
     @DataProvider
+    Object[][] providePositionsAndFrameshiftResults() {
+        return new Object[][] {
+                { 1,1,1, false },
+                { 1,3,1, true },
+                { 1,3,2, true },
+                { 1,3,3, false },
+                { 1,3,233, true },
+                { 1,3,234, false },
+                { 1,3,235, true },
+                { 8,9,8, true },
+                { 8,9,9, false },
+                { 8,9,10, true },
+                { 8,9,11, true },
+                { 8,9,12, false },
+        };
+    }
+
+    @DataProvider
     Object[][] providePositionAndExpectedAlignedPosition() {
         return new Object[][] {
                 {0,0},
@@ -370,6 +388,9 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                 },
                 {
                     "AB", 1, Allele.create((byte)'A'), Allele.create("ATGCATGC".getBytes()), "ATGCATGCB"
+                },
+                {
+                    "ATGCATGC", 2, Allele.create((byte)'T'), Allele.create((byte)'G'), "AGGCATGC"
                 },
         };
     }
@@ -457,6 +478,11 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @Test(dataProvider = "provideAllelesAndFrameshiftResults")
     void testIsFrameshift(final Allele ref, final Allele alt, final boolean expected) {
         Assert.assertEquals( FuncotatorUtils.isFrameshift(ref, alt), expected );
+    }
+
+    @Test(dataProvider = "providePositionsAndFrameshiftResults")
+    void testIsFrameshiftByPositions(final int refStart, final int refEnd, final int altEnd, final boolean expected) {
+        Assert.assertEquals( FuncotatorUtils.isFrameshift(refStart, refEnd, altEnd), expected );
     }
 
     @Test(dataProvider = "provideReferenceAndExonListAndExpected")
