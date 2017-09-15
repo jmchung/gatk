@@ -76,6 +76,7 @@ public class FuncotatorUtils {
 
     private static final HashMap<String,AminoAcid> tableByCodon = new HashMap<>(AminoAcid.values().length);
     private static final HashMap<String,AminoAcid> tableByCode = new HashMap<>(AminoAcid.values().length);
+    private static final HashMap<String,AminoAcid> tableByLetter = new HashMap<>(AminoAcid.values().length);
 
     /**
      * Initialize our hashmaps of lookup tables:
@@ -83,6 +84,7 @@ public class FuncotatorUtils {
     static {
         for ( final AminoAcid acid : AminoAcid.values() ) {
             tableByCode.put(acid.getCode(),acid);
+            tableByLetter.put(acid.getLetter(), acid);
             for ( final String codon : acid.codons ) {
                 tableByCodon.put(codon,acid);
             }
@@ -124,6 +126,28 @@ public class FuncotatorUtils {
         } else {
             return tableByCodon.get(upperCodon);
         }
+    }
+
+    /**
+     * Returns the {@link AminoAcid} corresponding to the given single-letter abbreviation.
+     * @param letter The one-letter abbreviation representing an {@link AminoAcid}
+     * @return The {@link AminoAcid} corresponding to the given {@code letter}.  Returns {@code null} if the given {@code letter} does not code for an {@link AminoAcid}.
+     */
+    public static AminoAcid getAminoAcidByLetter(final String letter) {
+        if ( letter == null ) {
+            return null;
+        }
+
+        return tableByLetter.get(letter);
+    }
+
+    /**
+     * Returns the {@link AminoAcid} corresponding to the given single-letter abbreviation.
+     * @param letter The one-letter abbreviation representing an {@link AminoAcid}
+     * @return The {@link AminoAcid} corresponding to the given {@code letter}.  Returns {@code null} if the given {@code letter} does not code for an {@link AminoAcid}.
+     */
+    public static AminoAcid getAminoAcidByLetter(final char letter) {
+        return tableByLetter.get(String.valueOf(letter));
     }
 
     /**
@@ -226,29 +250,29 @@ public class FuncotatorUtils {
 
     /**
      * Get the sequence-aligned end position for the given allele and start position.
-     * @param seqAlignedStart The sequence-aligned starting position from which to calculate the end position.
-     * @param alleleLength The length of the allele for this end position.
-     * @return An aligned end position (inclusive) for the given codon start and allele length.
+     * @param seqAlignedStart The sequence-aligned starting position (1-based, inclusive) from which to calculate the end position.
+     * @param alleleLength The length of the allele in bases.
+     * @return An aligned end position (1-based, inclusive) for the given codon start and allele length.
      */
     public static int getAlignedEndPosition(final int seqAlignedStart, final int alleleLength) {
         // We subtract 1 because the start and end positions must be inclusive.
-        return seqAlignedStart + ((int)Math.ceil(alleleLength / 3.0) * 3) - 1;
+        return (int)(Math.ceil((seqAlignedStart + alleleLength - 1) / 3.0) * 3);
     }
 
     /**
-     * Gets the sequence aligned position for the given coding sequence position.
+     * Gets the sequence aligned position (1-based, inclusive) for the given coding sequence position.
      * This will produce the next lowest position evenly divisible by 3, such that a codon starting at this returned
      * position would include the given position.
      * @param position A sequence starting coordinate for which to produce an coding-aligned position.
-     * @return A coding-aligned position corresponding to the given {@code position}
+     * @return A coding-aligned position (1-based, inclusive) corresponding to the given {@code position}
      */
     public static int getAlignedPosition(final int position) {
-        return position - (position % 3);
+        return position - ((position - 1) % 3);
     }
 
     /**
-     * Calculates whether the given {@code startPosition} is in frame relative to the end of the region.
-     * @param startPosition The position relative to the start of a region to check for frame alignment.
+     * Calculates whether the given {@code startPosition} (1-based, inclusive) is in frame relative to the end of the region.
+     * @param startPosition The position (1-based, inclusive) relative to the start of a region to check for frame alignment.
      * @param regionLength The length of the region containing {@code startPosition}.
      * @return {@code true} if the given {@code startPosition} is in frame relative to the given {@code regionLength} ; {@code false} otherwise.
      */
@@ -268,10 +292,20 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getAlignedReferenceAlleleStop());
         Utils.nonNull(seqComp.getAlignedReferenceAllele());
         Utils.nonNull(seqComp.getAlignedAlternateAllele());
+        Utils.nonNull(seqComp.getCodingSequenceAlleleStart());
+        
+        final String ref = seqComp.getAlignedReferenceAllele();
+        final String alt = seqComp.getAlignedAlternateAllele();
 
-        return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + "-" +
-                seqComp.getAlignedReferenceAlleleStop() + ")" +
-                seqComp.getAlignedReferenceAllele() + ">" + seqComp.getAlignedAlternateAllele();
+        if ( seqComp.getAlignedCodingSequenceAlleleStart() == seqComp.getAlignedReferenceAlleleStop() ) {
+            return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + ")" +
+                    ref + ">" + alt;
+        }
+        else {
+            return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + "-" +
+                    seqComp.getAlignedReferenceAlleleStop() + ")" +
+                    ref + ">" + alt;
+        }
     }
 
     /**
@@ -302,7 +336,7 @@ public class FuncotatorUtils {
      * @param seqComp {@link SequenceComparison} from which to construct the coding sequence change string.
      * @return A {@link String} representing the coding sequence change between the ref and alt alleles in {@code seqComp}.
      */
-    public static String getCodingSequenceChangeString(final SequenceComparison seqComp ) {
+    public static String getCodingSequenceChangeString( final SequenceComparison seqComp ) {
 
         Utils.nonNull(seqComp);
         Utils.nonNull(seqComp.getCodingSequenceAlleleStart());
@@ -310,67 +344,7 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getAlternateAminoAcidSequence());
 
         return "c." + seqComp.getCodingSequenceAlleleStart() +
-                seqComp.getReferenceAminoAcidSequence() + ">" + seqComp.getAlternateAminoAcidSequence();
-    }
-
-    /**
-     * Gets the protein change between the given reference and alternate alleles.
-     * @param refAllele Reference {@link Allele} to compare.
-     * @param altAllele Alternate {@link Allele} to compare.
-     * @param startPosInCodingSeq Position in the given transcript of the start of the alleles.
-     * @param referenceTranscriptSequence The transcript sequence taken from the reference genome.
-     * @return A string representing the protein change between the given reference and alternate alleles.
-     */
-    public static String getProteinChange( final Allele refAllele, final Allele altAllele, final int startPosInCodingSeq, final String referenceTranscriptSequence ) {
-
-        final int proteinPos = (int)Math.floor(startPosInCodingSeq / 3.0);
-
-        final int codonStartPos = getAlignedPosition(startPosInCodingSeq);
-        final int refCodonEndPos = getAlignedEndPosition(codonStartPos, refAllele.length());
-        final int altCodonEndPos = getAlignedEndPosition(codonStartPos, altAllele.length());
-
-        final String refCodingSequence = referenceTranscriptSequence.substring(codonStartPos, refCodonEndPos);
-        final String altCodingSequence =
-                referenceTranscriptSequence.substring(codonStartPos, startPosInCodingSeq) +
-                        altAllele.getBaseString() +
-                        referenceTranscriptSequence.substring(startPosInCodingSeq + refAllele.length(), altCodonEndPos);
-
-        final String refAaSeq = createAminoAcidSequence( refCodingSequence );
-        final String altAaSeq = createAminoAcidSequence( altCodingSequence );
-
-        return "p." + refAaSeq + proteinPos + altAaSeq;
-    }
-
-    /**
-     * Determines whether the given variant is a splice site variant.
-     * @param var The {@link VariantContext} to check for proximity to a splice site.
-     * @param exons The list of exons in the transcript to check for proximity to the variant.
-     * @return {@code true} if {@code var} is a splice site variant, {@code false} otherwise.
-     */
-    public static boolean isSpliceSiteVariant( final VariantContext var, final List<? extends Locatable> exons ) {
-        for ( final Locatable exon : exons ) {
-            if (new SimpleInterval(exon).overlaps(var)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Determines whether the given amino acid sequence string is a non-stop mutant.
-     * @param altAminoAcidSequence {@link String} representation of an amino acid sequence to check for stop codons.
-     * @return {@code true} if the given amino acid sequence contains a stop codon; {@code false} otherwise.
-     */
-    public static boolean isNonStopMutant(final String altAminoAcidSequence) {
-
-        Utils.nonNull(altAminoAcidSequence);
-
-        for ( int i = 0; i < altAminoAcidSequence.length(); ++i) {
-            if ( altAminoAcidSequence.charAt(i) == AminoAcid.STOP_CODON.getLetter().charAt(0) ) {
-                return true;
-            }
-        }
-        return false;
+                seqComp.getReferenceAllele() + ">" + seqComp.getAlternateAllele();
     }
 
     /**
@@ -407,7 +381,7 @@ public class FuncotatorUtils {
     /**
      * Get the full alternate coding sequence given a reference coding sequence, and two alleles.
      * @param referenceCodingSequence The reference sequence on which to base the resulting alternate coding sequence.
-     * @param alleleStartPos Starting position (1-indexed) for the ref and alt alleles in the given {@code referenceCodingSequence}.
+     * @param alleleStartPos Starting position (1-based, inclusive) for the ref and alt alleles in the given {@code referenceCodingSequence}.
      * @param refAllele Reference Allele.
      * @param altAllele Alternate Allele.
      * @return The coding sequence that includes the given alternate allele in place of the given reference allele.
@@ -501,22 +475,6 @@ public class FuncotatorUtils {
         }
 
         return sb.toString();
-    }
-
-    /**
-     * Create a {@link ReferenceSequence} representing the given bases, name, and index.
-     * @param bases The genetic bases contained within the resulting {@link ReferenceSequence}.
-     * @param name Name for the resulting {@link ReferenceSequence}.
-     * @param index Zero-based location in the parent contig.
-     * @return a {@link ReferenceSequence} representing the given bases, name, and index.
-     */
-    public static ReferenceSequence createReferenceSequence(final String bases, final String name, final int index) {
-
-        Utils.nonNull(bases);
-        Utils.nonNull(name);
-        Utils.nonNull(index);
-
-        return new ReferenceSequence(name, index, bases.getBytes());
     }
 
     /**

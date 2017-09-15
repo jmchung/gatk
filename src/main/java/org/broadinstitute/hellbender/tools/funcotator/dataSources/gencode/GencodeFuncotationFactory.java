@@ -1,13 +1,12 @@
 package org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode;
 
-import htsjdk.samtools.SAMSequenceRecord;
+import com.google.common.annotations.VisibleForTesting;
 import htsjdk.samtools.reference.ReferenceSequence;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.tribble.Feature;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
-import org.broadinstitute.hellbender.engine.ReferenceDataSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.funcotator.*;
 import org.broadinstitute.hellbender.utils.codecs.GENCODE.*;
@@ -30,7 +29,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     /**
      * The window around splice sites to mark variants as {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#SPLICE_SITE}.
      */
-    private int spliceSiteVariantWindowBases = 2;
+    final private int spliceSiteVariantWindowBases = 2;
 
     //==================================================================================================================
 
@@ -71,29 +70,6 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     }
 
     //==================================================================================================================
-
-    /**
-     * Creates a map of Transcript IDs for use in looking up transcripts from the FASTA dictionary for the GENCODE Transcripts.
-     * @param fastaReference The {@link ReferenceDataSource} corresponding to the Transcript FASTA file for this GENCODE dataset.
-     * @return A {@link Map} of {@link String} -> {@link String} which maps real transcript IDs to the string of all transcript IDs for a given transcript sequence as it appears in the FASTA Transcript file.
-     */
-    private static Map<String, String> createTranscriptIdMap(final ReferenceDataSource fastaReference) {
-
-        final Map<String, String> idMap = new HashMap<>();
-
-        for ( final SAMSequenceRecord sequence : fastaReference.getSequenceDictionary().getSequences() ) {
-            final String seqName = sequence.getSequenceName();
-
-            // The names in the file are actually in a list with | between each sequence name.
-            // We need to split the names and add them to the dictionary so we can resolve them to the full
-            // sequence name as it appears in the file:
-            for ( final String transcriptId : seqName.split("\\|") ) {
-                idMap.put(transcriptId, seqName);
-            }
-        }
-
-        return idMap;
-    }
 
     /**
      * Creates a {@link List} of {@link GencodeFuncotation}s based on the given {@link VariantContext}, {@link Allele}, and {@link GencodeGtfGeneFeature}.
@@ -141,7 +117,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
             if (containingSubfeature == null) {
 
                 // We have an IGR variant
-                gencodeFuncotations.add( createIgrFuncotation(altAllele, reference) );
+                gencodeFuncotations.add( createIgrFuncotation(altAllele) );
 
             } else if (GencodeGtfExonFeature.class.isAssignableFrom(containingSubfeature.getClass())) {
 
@@ -224,14 +200,11 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 variant.getReference(),
                 altAllele);
 
-        // Get our alternate allele amino acid sequence:
-        final String altAminoAcidSequence = FuncotatorUtils.createAminoAcidSequence(altCodingSequence);
-
         // Note we add 1 because substring ends are EXCLUSIVE:
         sequenceComparison.setAlignedAlternateAllele(
                 altCodingSequence.substring(
-                        sequenceComparison.getAlignedCodingSequenceAlleleStart(),
-                        sequenceComparison.getAlignedAlternateAlleleStop() + 1
+                        sequenceComparison.getAlignedCodingSequenceAlleleStart() - 1, // We subtract 1 because we're 1-based.
+                        sequenceComparison.getAlignedAlternateAlleleStop()
                 )
         );
 
@@ -242,7 +215,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Set our protein end position:
         sequenceComparison.setProteinChangeEndPosition(
-                sequenceComparison.getProteinChangeStartPosition() + (sequenceComparison.getAlignedAlternateAllele().length() / 3)
+                sequenceComparison.getProteinChangeStartPosition() + (sequenceComparison.getAlignedAlternateAllele().length() / 3) - 1 // We subtract 1 because we're 1-based.
         );
 
         // OK, now that we have our SequenceComparison object set up we can continue the annotation:
@@ -254,36 +227,13 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Now all we have to do is decide what the variant classification type should be.
 
-        // Determine variant classification in order of severity:
-        GencodeFuncotation.VariantClassification varClass = classifyNonstop(variant, exon, sequenceComparison);
+        gencodeFuncotation.setVariantClassification(
+                getVariantClassification( variant, altAllele, gencodeFuncotation.getVariantType(), exon, sequenceComparison )
+        );
 
-        if ( varClass == null ) {
-            varClass = classifyNonsense(variant, exon, sequenceComparison);
-        }
-        if ( varClass == null ) {
-            varClass = classifyMissense(variant, exon, sequenceComparison);
-        }
-        if ( varClass == null ) {
-            varClass = classifyIndel(variant, exon, sequenceComparison);
-        }
-        if ( varClass == null ) {
-            varClass = classifyStartCodonVariant(variant, exon, sequenceComparison);
-        }
-        if ( varClass == null ) {
-            varClass = classifyCodingRegionSpliceSite(variant, exon, sequenceComparison);
-        }
-        if ( varClass == null ) {
-            // If we did not classify it as anything above, it must be a SILENT variant.
-            varClass = GencodeFuncotation.VariantClassification.SILENT;
-        }
-
-        // Set our variant classification:
-        gencodeFuncotation.setVariantClassification( varClass );
-
-        // Check for secondary classification from splice site:
-        if ( varClass == GencodeFuncotation.VariantClassification.SPLICE_SITE) {
+        if ( gencodeFuncotation.getVariantClassification() == GencodeFuncotation.VariantClassification.SPLICE_SITE ) {
             gencodeFuncotation.setSecondaryVariantClassification(
-                    classifyCodingRegionSpliceSiteSecondaryClassification(variant, exon, sequenceComparison)
+                    getVariantClassificationForCodingRegion(variant, altAllele, gencodeFuncotation.getVariantType(), sequenceComparison )
             );
         }
 
@@ -291,22 +241,30 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     }
 
     /**
-     * Attempts to classify the given {@code variant} as a {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#NONSTOP}.
-     * Returns null if the given {@code variant} is not.
-     * @param variant A {@link VariantContext} to attempt to classify.
+     * Gets the {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification} of the given {@code altAllele} for the given {@code variant}.
+     * @param variant The {@link VariantContext} to classify.
+     * @param altAllele The {@link Allele} of the given {@code variant} to classify.
+     * @param variantType The {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantType} of the given {@code variant}.
      * @param exon The {@link GencodeGtfExonFeature} in which the given {@code variant} occurs.
-     * @param sequenceComparison A {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} for the given {@code variant}.
-     * @return {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#NONSTOP} or {@code null}.
+     * @param sequenceComparison The {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} for the given {@code variant}.
+     * @return A {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification} based on the given {@code allele}, {@code variant}, {@code exon}, and {@code sequenceComparison}.
      */
-    private GencodeFuncotation.VariantClassification classifyNonstop(final VariantContext variant,
-                                                                     final GencodeGtfExonFeature exon,
-                                                                     final FuncotatorUtils.SequenceComparison sequenceComparison) {
+    @VisibleForTesting
+    GencodeFuncotation.VariantClassification getVariantClassification(final VariantContext variant,
+                                                                      final Allele altAllele,
+                                                                      final GencodeFuncotation.VariantType variantType,
+                                                                      final GencodeGtfExonFeature exon,
+                                                                      final FuncotatorUtils.SequenceComparison sequenceComparison ){
+
+        final int startPos = sequenceComparison.getAlleleStart();
+        final int endPos = sequenceComparison.getAlleleStart() + altAllele.length() - 1;
+
         GencodeFuncotation.VariantClassification varClass = null;
 
-        if ( (exon.getStopCodon() != null) && (exon.getStopCodon().overlaps(variant)) ) {
+        boolean hasBeenClassified = false;
 
-            // Now we know that we overlap the stop codon.
-            // So we must check for non-stop and non-sense:
+        // Check for non-stop first:
+        if ( (exon.getStopCodon() != null) && (exon.getStopCodon().overlaps(variant)) ) {
 
             boolean foundStop = false;
 
@@ -320,182 +278,106 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
             if ( !foundStop ) {
                 varClass = GencodeFuncotation.VariantClassification.NONSTOP;
+                hasBeenClassified = true;
             }
         }
+
+        // Now check all other cases:
+        if ( !hasBeenClassified ) {
+
+            if ((Math.abs(startPos - exon.getStart()) < spliceSiteVariantWindowBases) ||
+                    (Math.abs(endPos - exon.getStart()) < spliceSiteVariantWindowBases) ||
+                    (Math.abs(startPos - exon.getEnd()) < spliceSiteVariantWindowBases) ||
+                    (Math.abs(endPos - exon.getEnd()) < spliceSiteVariantWindowBases)) {
+                varClass = GencodeFuncotation.VariantClassification.SPLICE_SITE;
+            }
+            else if ((exon.getStartCodon() != null) && (exon.getStartCodon().overlaps(variant))) {
+                switch (variantType) {
+                    case INS:
+                        varClass = GencodeFuncotation.VariantClassification.START_CODON_INS;
+                        break;
+                    case DEL:
+                        varClass = GencodeFuncotation.VariantClassification.START_CODON_DEL;
+                        break;
+                    default:
+                        varClass = GencodeFuncotation.VariantClassification.START_CODON_SNP;
+                        break;
+                }
+            }
+            else {
+                varClass = getVariantClassificationForCodingRegion(variant, altAllele, variantType, sequenceComparison);
+            }
+        }
+
         return varClass;
     }
 
     /**
-     * Attempts to classify the given {@code variant} as a {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#NONSENSE}.
-     * Returns null if the given {@code variant} is not.
-     * @param variant A {@link VariantContext} to attempt to classify.
-     * @param exon The {@link GencodeGtfExonFeature} in which the given {@code variant} occurs.
-     * @param sequenceComparison A {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} for the given {@code variant}.
-     * @return {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#NONSENSE} or {@code null}.
+     * Get the {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification} for a given {@code variant}/{@code allele} in a coding region.
+     * @param variant The {@link VariantContext} to classify.
+     * @param altAllele The {@link Allele} of the given {@code variant} to classify.
+     * @param variantType The {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantType} of the given {@code variant}.
+     * @param sequenceComparison The {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} for the given {@code variant}.
+     * @return A {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification} based on the given {@code allele}, {@code variant}, {@code exon}, and {@code sequenceComparison}.
      */
-    private GencodeFuncotation.VariantClassification classifyNonsense(final VariantContext variant,
-                                                                     final GencodeGtfExonFeature exon,
-                                                                     final FuncotatorUtils.SequenceComparison sequenceComparison) {
-        GencodeFuncotation.VariantClassification varClass = null;
+    private GencodeFuncotation.VariantClassification getVariantClassificationForCodingRegion(final VariantContext variant,
+                                                                                             final Allele altAllele,
+                                                                                             final GencodeFuncotation.VariantType variantType,
+                                                                                             final FuncotatorUtils.SequenceComparison sequenceComparison) {
+        final GencodeFuncotation.VariantClassification varClass;
+
+        if (variantType == GencodeFuncotation.VariantType.INS) {
+            if (FuncotatorUtils.isFrameshift(variant.getReference(), altAllele)) {
+                varClass = GencodeFuncotation.VariantClassification.FRAME_SHIFT_INS;
+            }
+            else {
+                varClass = GencodeFuncotation.VariantClassification.IN_FRAME_INS;
+            }
+        }
+        else if (variantType == GencodeFuncotation.VariantType.DEL) {
+            if (FuncotatorUtils.isFrameshift(variant.getReference(), altAllele)) {
+                varClass = GencodeFuncotation.VariantClassification.FRAME_SHIFT_DEL;
+            }
+            else {
+                varClass = GencodeFuncotation.VariantClassification.IN_FRAME_DEL;
+            }
+        }
+        else {
+            // This is a SNP/MNP
+            // We just check to see what the protein change is to check for MISSENSE/NONSENSE/SILENT:
+            varClass = getVarClassFromEqualLengthCodingRegions( sequenceComparison );
+        }
+
+        return varClass;
+    }
+
+    /**
+     * Gets the {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification} for a {@code variant} where the reference and alternate
+     * alleles are the same length and the variant appears in a coding region.
+     * This essentially compares the amino acid sequences of both alleles and returns a value based on the differences between them.
+     * @return The {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification} corresponding to the given variant / reference allele / alternate allele.
+     */
+    private GencodeFuncotation.VariantClassification getVarClassFromEqualLengthCodingRegions(final FuncotatorUtils.SequenceComparison sequenceComparison) {
+
+        GencodeFuncotation.VariantClassification varClass = GencodeFuncotation.VariantClassification.SILENT;
 
         boolean foundStop = false;
 
-        for (int i = 0 ; i < sequenceComparison.getAlignedAlternateAllele().length(); i+=3 ){
-            final String codon = sequenceComparison.getAlignedAlternateAllele().substring(i, i+3);
-            if (FuncotatorUtils.getEukaryoticAminoAcidByCodon(codon) == AminoAcid.STOP_CODON) {
+        for ( int i = 0; i < sequenceComparison.getAlternateAminoAcidSequence().length(); ++i ) {
+            final char altAminoAcid = sequenceComparison.getAlternateAminoAcidSequence().charAt(i);
+
+            if ( FuncotatorUtils.getAminoAcidByLetter(altAminoAcid) == AminoAcid.STOP_CODON ) {
                 foundStop = true;
                 break;
+            }
+            else if ( altAminoAcid != sequenceComparison.getReferenceAminoAcidSequence().charAt(i) ) {
+                varClass = GencodeFuncotation.VariantClassification.MISSENSE;
             }
         }
 
         if ( foundStop ) {
             varClass = GencodeFuncotation.VariantClassification.NONSENSE;
         }
-
-        return varClass;
-    }
-
-    /**
-     * Attempts to classify the given {@code variant} as a {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#MISSENSE}.
-     * Returns null if the given {@code variant} is not.
-     * @param variant A {@link VariantContext} to attempt to classify.
-     * @param exon The {@link GencodeGtfExonFeature} in which the given {@code variant} occurs.
-     * @param sequenceComparison A {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} for the given {@code variant}.
-     * @return {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#MISSENSE} or {@code null}.
-     */
-    private GencodeFuncotation.VariantClassification classifyMissense(final VariantContext variant,
-                                                                      final GencodeGtfExonFeature exon,
-                                                                      final FuncotatorUtils.SequenceComparison sequenceComparison) {
-        GencodeFuncotation.VariantClassification varClass = null;
-
-        if ( sequenceComparison.getAlternateAminoAcidSequence().length() == sequenceComparison.getReferenceAminoAcidSequence().length()) {
-            for ( int i = 0; i < sequenceComparison.getAlternateAminoAcidSequence().length(); ++i ) {
-                if ( sequenceComparison.getAlternateAminoAcidSequence().charAt(i) != sequenceComparison.getReferenceAminoAcidSequence().charAt(i) ) {
-                    varClass = GencodeFuncotation.VariantClassification.MISSENSE;
-                    break;
-                }
-            }
-        }
-
-        return varClass;
-    }
-
-    /**
-     * Attempts to classify the given {@code variant} as one of the following:
-     *      {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#IN_FRAME_DEL}
-     *      {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#IN_FRAME_INS}
-     *      {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#FRAME_SHIFT_DEL}
-     *      {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#FRAME_SHIFT_INS}
-     * Returns null if the given {@code variant} is none of the above.
-     * @param variant A {@link VariantContext} to attempt to classify.
-     * @param exon The {@link GencodeGtfExonFeature} in which the given {@code variant} occurs.
-     * @param sequenceComparison A {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} for the given {@code variant}.
-     * @return {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#IN_FRAME_DEL} {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#IN_FRAME_INS} {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#FRAME_SHIFT_DEL} {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#FRAME_SHIFT_INS} or {@code null}.
-     */
-    private GencodeFuncotation.VariantClassification classifyIndel(final VariantContext variant,
-                                                                   final GencodeGtfExonFeature exon,
-                                                                   final FuncotatorUtils.SequenceComparison sequenceComparison) {
-        GencodeFuncotation.VariantClassification varClass = null;
-
-        final int startPos = sequenceComparison.getAlleleStart();
-        final int refEnd = startPos + sequenceComparison.getReferenceAllele().length() - 1;
-        final int altEnd = startPos + sequenceComparison.getAlternateAllele().length() - 1;
-
-        if ( FuncotatorUtils.isFrameshift(startPos, refEnd, altEnd) ) {
-            if ( sequenceComparison.getReferenceAllele().length() < sequenceComparison.getAlternateAllele().length()) {
-                varClass = GencodeFuncotation.VariantClassification.FRAME_SHIFT_INS;
-            }
-            else if ( sequenceComparison.getReferenceAllele().length() > sequenceComparison.getAlternateAllele().length()) {
-                varClass = GencodeFuncotation.VariantClassification.FRAME_SHIFT_DEL;
-            }
-        }
-        else {
-            if ( sequenceComparison.getReferenceAllele().length() < sequenceComparison.getAlternateAllele().length()) {
-                varClass = GencodeFuncotation.VariantClassification.IN_FRAME_INS;
-            }
-            else if ( sequenceComparison.getReferenceAllele().length() > sequenceComparison.getAlternateAllele().length()) {
-                varClass = GencodeFuncotation.VariantClassification.IN_FRAME_DEL;
-            }
-        }
-
-        return varClass;
-    }
-
-    /**
-     * Attempts to classify the given {@code variant} as one of the following:
-     *      {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#START_CODON_SNP}
-     *      {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#START_CODON_INS}
-     *      {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#START_CODON_DEL}
-     * Returns null if the given {@code variant} is none of the above.
-     * @param variant A {@link VariantContext} to attempt to classify.
-     * @param exon The {@link GencodeGtfExonFeature} in which the given {@code variant} occurs.
-     * @param sequenceComparison A {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} for the given {@code variant}.
-     * @return {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#START_CODON_SNP} {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#START_CODON_INS} {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#START_CODON_DEL} or null.
-     */
-    private GencodeFuncotation.VariantClassification classifyStartCodonVariant(final VariantContext variant,
-                                                                               final GencodeGtfExonFeature exon,
-                                                                               final FuncotatorUtils.SequenceComparison sequenceComparison) {
-        GencodeFuncotation.VariantClassification varClass = null;
-
-        if ( (exon.getStartCodon() != null) && (exon.getStartCodon().overlaps(variant)) ) {
-
-            // Now we know that we overlap the start codon.
-            // So we must check for SNP / INS / DEL:
-
-            if ( sequenceComparison.getReferenceAllele().length() < sequenceComparison.getAlternateAllele().length()) {
-                varClass = GencodeFuncotation.VariantClassification.START_CODON_INS;
-            }
-            else if ( sequenceComparison.getReferenceAllele().length() > sequenceComparison.getAlternateAllele().length()) {
-                varClass = GencodeFuncotation.VariantClassification.START_CODON_DEL;
-            }
-            else {
-                varClass = GencodeFuncotation.VariantClassification.START_CODON_SNP;
-            }
-        }
-
-        return varClass;
-    }
-
-    /**
-     * Attempts to classify the given {@code variant} as a {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#SPLICE_SITE}.
-     * Returns null if the given {@code variant} is not.
-     * @param variant A {@link VariantContext} to attempt to classify.
-     * @param exon The {@link GencodeGtfExonFeature} in which the given {@code variant} occurs.
-     * @param sequenceComparison A {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} for the given {@code variant}.
-     * @return {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#SPLICE_SITE} or {@code null}.
-     */
-    private GencodeFuncotation.VariantClassification classifyCodingRegionSpliceSite(final VariantContext variant,
-                                                                                    final GencodeGtfExonFeature exon,
-                                                                                    final FuncotatorUtils.SequenceComparison sequenceComparison) {
-        GencodeFuncotation.VariantClassification varClass = null;
-
-        final int startPos = sequenceComparison.getAlleleStart();
-        final int endPos = sequenceComparison.getAlleleStart() + sequenceComparison.getAlternateAllele().length() - 1;
-
-        // Is our allele's start OR end position within spliceSiteVariantWindowBases of the end of our exon (i.e. the splice site):
-        if ((Math.abs(startPos - exon.getStart()) < spliceSiteVariantWindowBases) ||
-            (Math.abs(endPos - exon.getStart()) < spliceSiteVariantWindowBases ) ||
-            (Math.abs(startPos - exon.getEnd()) < spliceSiteVariantWindowBases) ||
-            (Math.abs(endPos - exon.getEnd()) < spliceSiteVariantWindowBases )) {
-
-            varClass = GencodeFuncotation.VariantClassification.SPLICE_SITE;
-        }
-
-        return varClass;
-    }
-
-    /**
-     * Classifies the given Splice Site {@code variant}.
-     * Assumes the given {@code variant} is a SPLICE_SITE variant in a coding region.
-     * @param variant A {@link VariantContext} to attempt to classify.
-     * @param exon The {@link GencodeGtfExonFeature} in which the given {@code variant} occurs.
-     * @param sequenceComparison A {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} for the given {@code variant}.
-     * @return {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification} for the given {@code variant}.
-     */
-    private GencodeFuncotation.VariantClassification classifyCodingRegionSpliceSiteSecondaryClassification(final VariantContext variant,
-                                                                                                           final GencodeGtfExonFeature exon,
-                                                                                                           final FuncotatorUtils.SequenceComparison sequenceComparison) {
-        GencodeFuncotation.VariantClassification varClass = null;
 
         return varClass;
     }
@@ -681,8 +563,8 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         // Get the in-frame/codon-aligned region containing the reference allele:
         sequenceComparison.setAlignedReferenceAllele(
                 sequenceComparison.getWholeReferenceSequence().getBaseString().substring(
-                        sequenceComparison.getAlignedCodingSequenceAlleleStart(),
-                        sequenceComparison.getAlignedReferenceAlleleStop() + 1 // Add 1 because the stop position is inclusive
+                        sequenceComparison.getAlignedCodingSequenceAlleleStart() - 1, // Subtract 1 because we're 1-based.
+                        sequenceComparison.getAlignedReferenceAlleleStop()
                 )
         );
 
@@ -693,7 +575,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Get the starting protein position of this variant.
         sequenceComparison.setProteinChangeStartPosition(
-                sequenceComparison.getAlignedCodingSequenceAlleleStart() / 3
+                (sequenceComparison.getAlignedCodingSequenceAlleleStart() / 3) + 1 // Add 1 because we're 1-based.
         );
 
         return sequenceComparison;
@@ -817,7 +699,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         final List<GencodeFuncotation> gencodeFuncotations = new ArrayList<>();
 
         for ( final Allele allele : variant.getAlternateAlleles() ) {
-            gencodeFuncotations.add( createIgrFuncotation(allele, reference) );
+            gencodeFuncotations.add( createIgrFuncotation(allele) );
         }
 
         return gencodeFuncotations;
@@ -827,10 +709,9 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * Creates a {@link GencodeFuncotation}s based on the given {@link Allele} with type
      * {@link GencodeFuncotation.VariantClassification#IGR}.
      * @param altAllele The alternate allele to use for this funcotation.
-     * @param reference The reference against which to compare the given variant.
      * @return An IGR funcotation for the given allele.
      */
-    private GencodeFuncotation createIgrFuncotation(final Allele altAllele, final ReferenceContext reference){
+    private GencodeFuncotation createIgrFuncotation(final Allele altAllele){
         final GencodeFuncotation gencodeFuncotation = new GencodeFuncotation();
 
         gencodeFuncotation.setVariantClassification( GencodeFuncotation.VariantClassification.IGR );
@@ -863,19 +744,5 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 default: return GencodeFuncotation.VariantType.ONP;
             }
         }
-    }
-
-     /**
-     * Calculates the offset required to get the aligned codon start for the given variant.
-     * @param variant {@link VariantContext} to align.
-     * @param transcript {@link GencodeGtfTranscriptFeature} against which to align the given {@link VariantContext}
-     * @return An offset which when subtracted from the variant start position will give the start of the codon containing the first base of the variant.
-     */
-    private int calculateOffsetToTranscriptAlignment(final VariantContext variant, final GencodeGtfTranscriptFeature transcript) {
-        if ( !transcript.getGenomicPosition().overlaps(variant) ) {
-            return 0;
-        }
-
-        return ((variant.getStart() - transcript.getStart()) % 3);
     }
 }

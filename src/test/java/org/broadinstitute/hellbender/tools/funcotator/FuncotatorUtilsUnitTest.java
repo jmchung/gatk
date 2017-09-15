@@ -341,27 +341,27 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @DataProvider
     Object[][] providePositionAndExpectedAlignedPosition() {
         return new Object[][] {
-                {0,0},
-                {1,0},
-                {2,0},
-                {3,3},
-                {4,3},
-                {5,3},
-                {1635,1635},
-                {1636,1635},
-                {1637,1635},
+                {1,1},
+                {2,1},
+                {3,1},
+                {4,4},
+                {5,4},
+                {6,4},
+                {1635,1633},
+                {1636,1636},
+                {1637,1636},
         };
     }
 
     @DataProvider
     Object[][] providePositionAndExpectedAlignedEndPosition() {
         return new Object[][] {
-                {0,1,2},
-                {0,2,2},
-                {0,3,2},
-                {0,4,5},
-                {0,5,5},
-                {0,6,5},
+                {1,1,3},
+                {1,2,3},
+                {1,3,3},
+                {1,4,6},
+                {1,5,6},
+                {1,6,6},
         };
     }
 
@@ -469,6 +469,72 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                 { 12, 12, false },
                 { 100, 100, false },
                 { 1000, 1000, false },
+        };
+    }
+    
+    @DataProvider
+    Object[][] provideStringDataForGetAminoAcidByLetter() {
+        return new Object[][] {
+                { "A", AminoAcid.ALANINE },
+                { "R", AminoAcid.ARGANINE },
+                { "N", AminoAcid.ASPARAGINE },
+                { "D", AminoAcid.ASPARTIC_ACID },
+                { "C", AminoAcid.CYSTEINE },
+                { "E", AminoAcid.GLUTAMIC_ACID },
+                { "Q", AminoAcid.GLUTAMINE },
+                { "G", AminoAcid.GLYCINE },
+                { "H", AminoAcid.HISTIDINE },
+                { "I", AminoAcid.ISOLEUCINE },
+                { "L", AminoAcid.LEUCINE },
+                { "K", AminoAcid.LYSINE },
+                { "M", AminoAcid.METHIONINE },
+                { "F", AminoAcid.PHENYLALANINE },
+                { "P", AminoAcid.PROLINE },
+                { "S", AminoAcid.SERINE },
+                { "*", AminoAcid.STOP_CODON },
+                { "T", AminoAcid.THREONINE },
+                { "W", AminoAcid.TRYPTOPHAN },
+                { "Y", AminoAcid.TYROSINE },
+                { "V", AminoAcid.VALINE },
+                { "!", AminoAcid.NONSENSE },
+                { "ahuewifaef", null },
+                { "", null },
+                { "X", null },
+                { "x", null },
+                { "7", null },
+        };
+    }
+
+    @DataProvider
+    Object[][] provideCharDataForGetAminoAcidByLetter() {
+        return new Object[][] {
+                { 'A', AminoAcid.ALANINE },
+                { 'R', AminoAcid.ARGANINE },
+                { 'N', AminoAcid.ASPARAGINE },
+                { 'D', AminoAcid.ASPARTIC_ACID },
+                { 'C', AminoAcid.CYSTEINE },
+                { 'E', AminoAcid.GLUTAMIC_ACID },
+                { 'Q', AminoAcid.GLUTAMINE },
+                { 'G', AminoAcid.GLYCINE },
+                { 'H', AminoAcid.HISTIDINE },
+                { 'I', AminoAcid.ISOLEUCINE },
+                { 'L', AminoAcid.LEUCINE },
+                { 'K', AminoAcid.LYSINE },
+                { 'M', AminoAcid.METHIONINE },
+                { 'F', AminoAcid.PHENYLALANINE },
+                { 'P', AminoAcid.PROLINE },
+                { 'S', AminoAcid.SERINE },
+                { '*', AminoAcid.STOP_CODON },
+                { 'T', AminoAcid.THREONINE },
+                { 'W', AminoAcid.TRYPTOPHAN },
+                { 'Y', AminoAcid.TYROSINE },
+                { 'V', AminoAcid.VALINE },
+                { '!', AminoAcid.NONSENSE },
+                { 'a', null },
+                { '\0', null },
+                { 'X', null },
+                { 'x', null },
+                { '7', null },
         };
     }
 
@@ -595,5 +661,15 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @Test (dataProvider = "provideDataForIsInFrameWithEndOfRegion")
     void testIsInFrameWithEndOfRegion(final int pos, final int length, final boolean expected) {
         Assert.assertEquals( FuncotatorUtils.isInFrameWithEndOfRegion(pos, length), expected );
+    }
+
+    @Test (dataProvider = "provideStringDataForGetAminoAcidByLetter")
+    void testGetAminoAcidByLetter(final String letter, final AminoAcid expected) {
+        Assert.assertEquals( FuncotatorUtils.getAminoAcidByLetter(letter), expected );
+    }
+
+    @Test (dataProvider = "provideCharDataForGetAminoAcidByLetter")
+    void testGetAminoAcidByLetter(final char letter, final AminoAcid expected) {
+        Assert.assertEquals( FuncotatorUtils.getAminoAcidByLetter(letter), expected );
     }
 }
