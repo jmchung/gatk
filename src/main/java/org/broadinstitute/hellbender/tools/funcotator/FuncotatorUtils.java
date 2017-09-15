@@ -294,8 +294,24 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getAlignedAlternateAllele());
         Utils.nonNull(seqComp.getCodingSequenceAlleleStart());
 
-        final String ref = seqComp.getAlignedReferenceAllele();
-        final String alt = seqComp.getAlignedAlternateAllele();
+        String ref = "";
+        String alt = "";
+
+        // Capitalize the right parts of each string if they're of equal length:
+        if (seqComp.getAlignedReferenceAllele().length() == seqComp.getAlignedAlternateAllele().length()) {
+            for ( int i = 0 ; i < seqComp.getAlignedReferenceAllele().length(); ++i ) {
+                if ( seqComp.getAlignedReferenceAllele().charAt(i) !=
+                        seqComp.getAlignedAlternateAllele().charAt(i) ) {
+                    ref += Character.toUpperCase( seqComp.getAlignedReferenceAllele().charAt(i) );
+                    alt += Character.toUpperCase( seqComp.getAlignedAlternateAllele().charAt(i) );
+                }
+                else {
+                    final char c = Character.toLowerCase( seqComp.getAlignedReferenceAllele().charAt(i) );
+                    ref += c;
+                    alt += c;
+                }
+            }
+        }
 
         if ( seqComp.getAlignedCodingSequenceAlleleStart().equals(seqComp.getAlignedReferenceAlleleStop()) ) {
             return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + ")" +
