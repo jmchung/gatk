@@ -293,11 +293,11 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getAlignedReferenceAllele());
         Utils.nonNull(seqComp.getAlignedAlternateAllele());
         Utils.nonNull(seqComp.getCodingSequenceAlleleStart());
-        
+
         final String ref = seqComp.getAlignedReferenceAllele();
         final String alt = seqComp.getAlignedAlternateAllele();
 
-        if ( seqComp.getAlignedCodingSequenceAlleleStart() == seqComp.getAlignedReferenceAlleleStop() ) {
+        if ( seqComp.getAlignedCodingSequenceAlleleStart().equals(seqComp.getAlignedReferenceAlleleStop()) ) {
             return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + ")" +
                     ref + ">" + alt;
         }
