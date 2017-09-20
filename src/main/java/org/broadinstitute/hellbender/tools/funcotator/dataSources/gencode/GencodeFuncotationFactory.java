@@ -1,6 +1,7 @@
 package org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode;
 
 import com.google.common.annotations.VisibleForTesting;
+import htsjdk.samtools.SAMSequenceRecord;
 import htsjdk.samtools.reference.ReferenceSequence;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.tribble.Feature;
@@ -8,10 +9,12 @@ import htsjdk.tribble.annotation.Strand;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
+import org.broadinstitute.hellbender.engine.ReferenceDataSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.funcotator.*;
 import org.broadinstitute.hellbender.utils.codecs.GENCODE.*;
 
+import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -23,7 +26,37 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
     //==================================================================================================================
 
-    public GencodeFuncotationFactory() {}
+    /**
+     * ReferenceSequenceFile for the transcript reference file.
+     */
+    private final File fastaTranscriptFile;
+
+    /**
+     * ReferenceSequenceFile for the transcript reference file.
+     */
+    private final ReferenceDataSource fastaTranscriptReferenceSequenceFile;
+
+    /**
+     * Map between transcript IDs and the IDs from the FASTA file to look up the transcript.
+     * This is necessary because of the way the FASTA file contigs are named.
+     */
+    private final Map<String, String> transcriptIdMap;
+
+    //==================================================================================================================
+
+    public GencodeFuncotationFactory(final File gencodeTranscriptFastaFile) {
+        fastaTranscriptFile = gencodeTranscriptFastaFile;
+        fastaTranscriptReferenceSequenceFile = ReferenceDataSource.of(gencodeTranscriptFastaFile);
+
+        transcriptIdMap = createTranscriptIdMap(fastaTranscriptReferenceSequenceFile);
+    }
+
+    //==================================================================================================================
+
+    @Override
+    public void cleanup() {
+        fastaTranscriptReferenceSequenceFile.close();
+    }
 
     //==================================================================================================================
 
@@ -71,6 +104,41 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     }
 
     //==================================================================================================================
+
+    /**
+     * Creates a map of Transcript IDs for use in looking up transcripts from the FASTA dictionary for the GENCODE Transcripts.
+     * @param fastaReference The {@link ReferenceDataSource} corresponding to the Transcript FASTA file for this GENCODE dataset.
+     * @return A {@link Map} of {@link String} -> {@link String} which maps real transcript IDs to the string of all transcript IDs for a given transcript sequence as it appears in the FASTA Transcript file.
+     */
+    private static Map<String, String> createTranscriptIdMap(final ReferenceDataSource fastaReference) {
+
+        final Map<String, String> idMap = new HashMap<>();
+
+        for ( final SAMSequenceRecord sequence : fastaReference.getSequenceDictionary().getSequences() ) {
+            final String seqName = sequence.getSequenceName();
+
+            // The names in the file are actually in a list with | between each sequence name.
+            // We need to split the names and add them to the dictionary so we can resolve them to the full
+            // sequence name as it appears in the file:
+            for ( final String transcriptId : seqName.split("\\|") ) {
+                idMap.put(transcriptId, seqName);
+            }
+        }
+
+        return idMap;
+    }
+
+    /**
+     * Get the coding sequence from the GENCODE Transcript FASTA file for a given {@code transcriptId}.
+     * This will get ONLY the coding sequence for the given {@code transcriptId} and will not include any UTRs.
+     * @param transcriptId The ID of the transcript to get from the FASTA file.
+     * @return The coding sequence for the given {@code transcriptId} as represented in the GENCODE transcript FASTA file.
+     */
+    private static String getCodingSequenceFromTranscriptFasta( final String transcriptId ) {
+        String codingSequence = "";
+
+        return codingSequence;
+    }
 
     /**
      * Creates a {@link List} of {@link GencodeFuncotation}s based on the given {@link VariantContext}, {@link Allele}, and {@link GencodeGtfGeneFeature}.
@@ -509,8 +577,10 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
 
+        final String referenceCodingSequence = FuncotatorUtils.getCodingSequence(reference, exonPositionList, strand);
+
         // Get the reference sequence in the coding region as described by the given exonPositionList:
-        sequenceComparison.setWholeReferenceSequence(new ReferenceSequence(transcript.getTranscriptId(),transcript.getStart(),FuncotatorUtils.getCodingSequence(reference, exonPositionList, strand).getBytes()));
+        sequenceComparison.setWholeReferenceSequence(new ReferenceSequence(transcript.getTranscriptId(),transcript.getStart(),referenceCodingSequence.getBytes()));
 
         // Get the ref allele:
         sequenceComparison.setReferenceAllele(variant.getReference().getBaseString());

@@ -78,7 +78,7 @@ public class Funcotator extends VariantWalker {
 
         // Set up our data source factories:
         // TODO: this should be set up based on the input CLI arguments.
-        dataSourceFactories.add(new GencodeFuncotationFactory());
+        dataSourceFactories.add(new GencodeFuncotationFactory(gencodeTranscriptFastaFile));
 
         // Set up our output renderer:
         // TODO: in the future this should be encapsulated into a factory for output renderers based on an input argument.
