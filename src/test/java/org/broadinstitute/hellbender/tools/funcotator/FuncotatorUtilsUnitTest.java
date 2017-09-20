@@ -1,6 +1,7 @@
 package org.broadinstitute.hellbender.tools.funcotator;
 
 import htsjdk.samtools.util.Locatable;
+import htsjdk.tribble.annotation.Strand;
 import htsjdk.variant.variantcontext.Allele;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceFileSource;
@@ -137,11 +138,13 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                 {
                         new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
                         Collections.emptyList(),
+                        Strand.POSITIVE,
                         ""
                 },
                 {
                         new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
                         Collections.singletonList(new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 550)),
+                        Strand.POSITIVE,
                         "GCAGAGACGGGAGGGGCAGAGCCGCAGGCACAGCCAAGAGGGCTGAAGAAA"
                 },
                 {
@@ -150,6 +153,7 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                                 new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 550),
                                 new SimpleInterval("1", TEST_REFERENCE_START + 551, TEST_REFERENCE_START + 600)
                         ),
+                        Strand.POSITIVE,
                         "GCAGAGACGGGAGGGGCAGAGCCGCAGGCACAGCCAAGAGGGCTGAAGAAATGGTAGAACGGAGCAGCTGGTGATGTGTGGGCCCACCGGCCCCAGGCTCC"
                 },
                 {
@@ -166,6 +170,7 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                                 new SimpleInterval("1", TEST_REFERENCE_START + 508, TEST_REFERENCE_START + 508),
                                 new SimpleInterval("1", TEST_REFERENCE_START + 509, TEST_REFERENCE_START + 509)
                         ),
+                        Strand.POSITIVE,
                         "GCAGAGACGG"
                 },
                 {
@@ -173,6 +178,7 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                         Collections.singletonList(
                                 new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 500)
                         ),
+                        Strand.POSITIVE,
                         "G"
                 },
                 {
@@ -180,6 +186,94 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                         Collections.singletonList(
                                 new SimpleInterval("1", 1, 1)
                         ),
+                        Strand.POSITIVE,
+                        "N"
+                },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
+                        Collections.emptyList(),
+                        Strand.NEGATIVE,
+                        ""
+                },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 550)),
+                        Collections.singletonList(new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 550)),
+                        Strand.NEGATIVE,
+                        "TTTCTTCAGCCCTCTTGGCTGTGCCTGCGGCTCTGCCCCTCCCGTCTCTGC"
+                },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 600)),
+                        Arrays.asList(
+                                new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 550),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 551, TEST_REFERENCE_START + 600)
+                        ),
+                        Strand.NEGATIVE,
+                        "GGAGCCTGGGGCCGGTGGGCCCACACATCACCAGCTGCTCCGTTCTACCATTTCTTCAGCCCTCTTGGCTGTGCCTGCGGCTCTGCCCCTCCCGTCTCTGC"
+                },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
+                        Arrays.asList(
+                                new SimpleInterval("1", TEST_REFERENCE_START + 509, TEST_REFERENCE_START + 509),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 508, TEST_REFERENCE_START + 508),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 507, TEST_REFERENCE_START + 507),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 506, TEST_REFERENCE_START + 506),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 505, TEST_REFERENCE_START + 505),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 504, TEST_REFERENCE_START + 504),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 503, TEST_REFERENCE_START + 503),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 502, TEST_REFERENCE_START + 502),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 501, TEST_REFERENCE_START + 501),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 500)
+                        ),
+                        Strand.NEGATIVE,
+                        "TGGTCAGCCACTGCAGCC"
+                },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
+                        Arrays.asList(
+                                new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 500),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 501, TEST_REFERENCE_START + 501),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 502, TEST_REFERENCE_START + 502),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 503, TEST_REFERENCE_START + 503),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 504, TEST_REFERENCE_START + 504),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 505, TEST_REFERENCE_START + 505),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 506, TEST_REFERENCE_START + 506),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 507, TEST_REFERENCE_START + 507),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 508, TEST_REFERENCE_START + 508),
+                                new SimpleInterval("1", TEST_REFERENCE_START + 509, TEST_REFERENCE_START + 509)
+                        ),
+                        Strand.NEGATIVE,
+                        "TGGTCAGCCACTGCAGCC"
+                },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START + 500, TEST_REFERENCE_END + 500)),
+                        Collections.singletonList(
+                                new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 500)
+                        ),
+                        Strand.NEGATIVE,
+                        "C"
+                },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
+                        Collections.singletonList(
+                                new SimpleInterval("1", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 500)
+                        ),
+                        Strand.NEGATIVE,
+                        "T"
+                },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
+                        Collections.singletonList(
+                                new SimpleInterval("1", TEST_REFERENCE_START, TEST_REFERENCE_START)
+                        ),
+                        Strand.NEGATIVE,
+                        "C"
+                },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, 1, 10)),
+                        Collections.singletonList(
+                                new SimpleInterval("1", 1, 1)
+                        ),
+                        Strand.NEGATIVE,
                         "N"
                 },
         };
@@ -194,6 +288,21 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                         Collections.singletonList(
                                 new SimpleInterval("2", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 550)
                         ),
+                        Strand.POSITIVE
+                },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
+                        Collections.singletonList(
+                                new SimpleInterval("2", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 550)
+                        ),
+                        Strand.NEGATIVE
+                },
+                {
+                        new ReferenceContext(new ReferenceFileSource(TEST_REFERENCE), new SimpleInterval(TEST_REFERENCE_CONTIG, TEST_REFERENCE_START, TEST_REFERENCE_END)),
+                        Collections.singletonList(
+                                new SimpleInterval("2", TEST_REFERENCE_START + 500, TEST_REFERENCE_START + 550)
+                        ),
+                        Strand.NONE
                 },
         };
     }
@@ -536,6 +645,63 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
         };
     }
 
+    @DataProvider
+    Object[][] provideDataForGetProteinChangePosition() {
+        return new Object[][] {
+                { 1, 1 },
+                { 2, 1 },
+                { 3, 1 },
+                { 4, 2 },
+                { 5, 2 },
+                { 6, 2 },
+                { 300, 100 },
+                { 301, 101 },
+                { 302, 101 },
+                { 303, 101 },
+                { 304, 102 },
+        };
+    }
+
+    @DataProvider
+    Object[][] provideDataForGetProteinChangeEndPosition() {
+        return new Object[][] {
+                {1,  3, 1},
+                {1,  6, 2},
+                {1,  9, 3},
+                {1, 12, 4},
+                {1, 15, 5},
+                {1, 18, 6},
+                {1, 21, 7},
+                {1, 24, 8},
+        };
+    }
+
+    @DataProvider
+    Object[][] provideDataForGetAlignedAllele() {
+
+        final String seq = "ATGAAAGGGGTGCCTATGCTAGATAGACAGATAGTGTGTGTGTGTGTGCGCGCGCGCGCGCGTTGTTAG";
+
+        return new Object[][] {
+                { seq,  1, 3, "ATG" },
+                { seq,  4, 6, "AAA" },
+                { seq,  7, 9, "GGG" },
+                { seq, 10, 12, "GTG" },
+                { seq, 13, 15, "CCT" },
+                { seq, 16, 18, "ATG" },
+                { seq, 19, 21, "CTA" },
+
+                { seq,  1,  6, "ATGAAA" },
+                { seq,  4,  9, "AAAGGG" },
+                { seq,  7, 12, "GGGGTG" },
+                { seq, 10, 15, "GTGCCT" },
+                { seq, 13, 18, "CCTATG" },
+                { seq, 16, 21, "ATGCTA" },
+                { seq, 19, 24, "CTAGAT" },
+
+                { seq, 1, seq.length(), seq },
+        };
+    }
+
     //==================================================================================================================
     // Tests:
 
@@ -550,14 +716,15 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     }
 
     @Test(dataProvider = "provideReferenceAndExonListAndExpected")
-    void testGetCodingSequence(final ReferenceContext reference, final List<Locatable> exonList, final String expected) {
-        Assert.assertEquals( FuncotatorUtils.getCodingSequence(reference, exonList), expected );
+    void testGetCodingSequence(final ReferenceContext reference, final List<Locatable> exonList, final Strand strand, final String expected) {
+        final String codingSequence = FuncotatorUtils.getCodingSequence(reference, exonList, strand);
+        Assert.assertEquals( codingSequence, expected );
     }
 
     @Test(dataProvider = "provideReferenceAndExonListForGatkExceptions",
             expectedExceptions = GATKException.class)
-    void testGetCodingSequenceWithGatkExceptions(final ReferenceContext reference, final List<Locatable> exonList) {
-        FuncotatorUtils.getCodingSequence(reference, exonList);
+    void testGetCodingSequenceWithGatkExceptions(final ReferenceContext reference, final Strand strand, final List<Locatable> exonList) {
+        FuncotatorUtils.getCodingSequence(reference, exonList, strand);
     }
 
 //    @Test(dataProvider = "provideReferenceAndExonListForIllegalArgumentExceptions",
@@ -669,5 +836,23 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @Test (dataProvider = "provideCharDataForGetAminoAcidByLetter")
     void testGetAminoAcidByLetter(final char letter, final AminoAcid expected) {
         Assert.assertEquals( FuncotatorUtils.getAminoAcidByLetter(letter), expected );
+    }
+
+    @Test (dataProvider = "provideDataForGetProteinChangePosition")
+    void testGetProteinChangePosition(final Integer alignedCodingSequenceStartPos, final int expected) {
+        Assert.assertEquals( FuncotatorUtils.getProteinChangePosition(alignedCodingSequenceStartPos) , expected );
+    }
+
+    @Test (dataProvider = "provideDataForGetProteinChangeEndPosition")
+    void testGetProteinChangeEndPosition(final Integer proteinChangeStartPosition, final Integer alignedAlternateAlleleLength, final int expected) {
+        Assert.assertEquals( FuncotatorUtils.getProteinChangeEndPosition(proteinChangeStartPosition, alignedAlternateAlleleLength) , expected );
+    }
+
+    @Test (dataProvider = "provideDataForGetAlignedAllele")
+    void testGetAlignedAllele(  final String refSequence,
+                                final Integer alignedAlleleStart,
+                                final Integer alignedAlleleStop,
+                                final String expected) {
+        Assert.assertEquals( FuncotatorUtils.getAlignedAllele(refSequence, alignedAlleleStart, alignedAlleleStop), expected );
     }
 }

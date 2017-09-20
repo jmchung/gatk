@@ -4,6 +4,7 @@ import com.google.common.annotations.VisibleForTesting;
 import htsjdk.samtools.reference.ReferenceSequence;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.tribble.Feature;
+import htsjdk.tribble.annotation.Strand;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
@@ -29,7 +30,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     /**
      * The window around splice sites to mark variants as {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#SPLICE_SITE}.
      */
-    final private int spliceSiteVariantWindowBases = 2;
+    final static private int spliceSiteVariantWindowBases = 2;
 
     //==================================================================================================================
 
@@ -180,43 +181,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Set up our SequenceComparison object so we can calculate some useful fields more easily
         // These fields can all be set without knowing the alternate allele:
-        final FuncotatorUtils.SequenceComparison sequenceComparison = createSequenceComparisonWithTrivialFieldsPopulated(variant, reference, transcript, exonPositionList);
-
-        // Set our alternate allele:
-        sequenceComparison.setAlternateAllele( altAllele.getBaseString() );
-
-        // Set our stop position:
-        sequenceComparison.setAlignedAlternateAlleleStop(
-                FuncotatorUtils.getAlignedEndPosition(
-                        sequenceComparison.getAlignedCodingSequenceAlleleStart(),
-                        altAllele.length()
-                )
-        );
-
-        // Get our alternate allele coding sequence:
-        final String altCodingSequence = FuncotatorUtils.getAlternateCodingSequence(
-                sequenceComparison.getWholeReferenceSequence().getBaseString(),
-                sequenceComparison.getCodingSequenceAlleleStart(),
-                variant.getReference(),
-                altAllele);
-
-        // Note we add 1 because substring ends are EXCLUSIVE:
-        sequenceComparison.setAlignedAlternateAllele(
-                altCodingSequence.substring(
-                        sequenceComparison.getAlignedCodingSequenceAlleleStart() - 1, // We subtract 1 because we're 1-based.
-                        sequenceComparison.getAlignedAlternateAlleleStop()
-                )
-        );
-
-        // Set our alternate amino acid sequence:
-        sequenceComparison.setAlternateAminoAcidSequence(
-                FuncotatorUtils.createAminoAcidSequence(sequenceComparison.getAlignedAlternateAllele())
-        );
-
-        // Set our protein end position:
-        sequenceComparison.setProteinChangeEndPosition(
-                sequenceComparison.getProteinChangeStartPosition() + (sequenceComparison.getAlignedAlternateAllele().length() / 3) - 1 // We subtract 1 because we're 1-based.
-        );
+        final FuncotatorUtils.SequenceComparison sequenceComparison = createSequenceComparison(variant, altAllele, reference, transcript, exonPositionList);
 
         // OK, now that we have our SequenceComparison object set up we can continue the annotation:
 
@@ -250,7 +215,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @return A {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification} based on the given {@code allele}, {@code variant}, {@code exon}, and {@code sequenceComparison}.
      */
     @VisibleForTesting
-    GencodeFuncotation.VariantClassification getVariantClassification(final VariantContext variant,
+    static GencodeFuncotation.VariantClassification getVariantClassification(final VariantContext variant,
                                                                       final Allele altAllele,
                                                                       final GencodeFuncotation.VariantType variantType,
                                                                       final GencodeGtfExonFeature exon,
@@ -320,7 +285,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @param sequenceComparison The {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} for the given {@code variant}.
      * @return A {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification} based on the given {@code allele}, {@code variant}, {@code exon}, and {@code sequenceComparison}.
      */
-    private GencodeFuncotation.VariantClassification getVariantClassificationForCodingRegion(final VariantContext variant,
+    private static GencodeFuncotation.VariantClassification getVariantClassificationForCodingRegion(final VariantContext variant,
                                                                                              final Allele altAllele,
                                                                                              final GencodeFuncotation.VariantType variantType,
                                                                                              final FuncotatorUtils.SequenceComparison sequenceComparison) {
@@ -357,7 +322,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * This essentially compares the amino acid sequences of both alleles and returns a value based on the differences between them.
      * @return The {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification} corresponding to the given variant / reference allele / alternate allele.
      */
-    private GencodeFuncotation.VariantClassification getVarClassFromEqualLengthCodingRegions(final FuncotatorUtils.SequenceComparison sequenceComparison) {
+    private static GencodeFuncotation.VariantClassification getVarClassFromEqualLengthCodingRegions(final FuncotatorUtils.SequenceComparison sequenceComparison) {
 
         GencodeFuncotation.VariantClassification varClass = GencodeFuncotation.VariantClassification.SILENT;
 
@@ -417,7 +382,8 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
             // Get our coding sequence for this region:
             final List<Locatable> activeRegions = Collections.singletonList(utr);
-            final String codingSequence = FuncotatorUtils.getCodingSequence(reference, activeRegions);
+            final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
+            final String codingSequence = FuncotatorUtils.getCodingSequence(reference, activeRegions, strand);
             final int codingStartPos = FuncotatorUtils.getStartPositionInTranscript(variant, activeRegions);
 
             //Check for de novo starts:
@@ -521,25 +487,30 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     }
 
     /**
-     * Creates a {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} object with the trivial fields populated.
+     * Creates a {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} object with the fields populated.
      * @param variant The {@link VariantContext} for the current variant.
+     * @param altAllele The current alternate {@link Allele} for the variant.
      * @param reference The {@link ReferenceContext} for the current sample set.
      * @param transcript The {@link GencodeGtfTranscriptFeature} for the current gene feature / alt allele.
      * @param exonPositionList A {@link List} of {@link htsjdk.samtools.util.Locatable} objects representing exon positions in the transcript.
-     * @return A trivially populated {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} object.
+     * @return A populated {@link org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils.SequenceComparison} object.
      */
-    private FuncotatorUtils.SequenceComparison createSequenceComparisonWithTrivialFieldsPopulated(final VariantContext variant,
-                                                                                                  final ReferenceContext reference,
-                                                                                                  final GencodeGtfTranscriptFeature transcript,
-                                                                                                  final List<? extends htsjdk.samtools.util.Locatable> exonPositionList) {
+    @VisibleForTesting
+    static FuncotatorUtils.SequenceComparison createSequenceComparison(final VariantContext variant,
+                                                                       final Allele altAllele,
+                                                                       final ReferenceContext reference,
+                                                                       final GencodeGtfTranscriptFeature transcript,
+                                                                       final List<? extends htsjdk.samtools.util.Locatable> exonPositionList) {
 
         final FuncotatorUtils.SequenceComparison sequenceComparison = new FuncotatorUtils.SequenceComparison();
 
         // Get the contig:
         sequenceComparison.setContig(variant.getContig());
 
+        final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
+
         // Get the reference sequence in the coding region as described by the given exonPositionList:
-        sequenceComparison.setWholeReferenceSequence(new ReferenceSequence(transcript.getTranscriptId(),transcript.getStart(),FuncotatorUtils.getCodingSequence(reference, exonPositionList).getBytes()));
+        sequenceComparison.setWholeReferenceSequence(new ReferenceSequence(transcript.getTranscriptId(),transcript.getStart(),FuncotatorUtils.getCodingSequence(reference, exonPositionList, strand).getBytes()));
 
         // Get the ref allele:
         sequenceComparison.setReferenceAllele(variant.getReference().getBaseString());
@@ -562,10 +533,9 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Get the in-frame/codon-aligned region containing the reference allele:
         sequenceComparison.setAlignedReferenceAllele(
-                sequenceComparison.getWholeReferenceSequence().getBaseString().substring(
-                        sequenceComparison.getAlignedCodingSequenceAlleleStart() - 1, // Subtract 1 because we're 1-based.
-                        sequenceComparison.getAlignedReferenceAlleleStop()
-                )
+                FuncotatorUtils.getAlignedAllele(sequenceComparison.getWholeReferenceSequence().getBaseString(),
+                        sequenceComparison.getAlignedCodingSequenceAlleleStart(),
+                        sequenceComparison.getAlignedReferenceAlleleStop() )
         );
 
         // Get the amino acid sequence of the reference allele:
@@ -575,7 +545,52 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Get the starting protein position of this variant.
         sequenceComparison.setProteinChangeStartPosition(
-                (sequenceComparison.getAlignedCodingSequenceAlleleStart() / 3) + 1 // Add 1 because we're 1-based.
+                FuncotatorUtils.getProteinChangePosition( sequenceComparison.getAlignedCodingSequenceAlleleStart() )
+        );
+
+
+        // Set our alternate allele:
+        sequenceComparison.setAlternateAllele( altAllele.getBaseString() );
+
+        // Set our stop position:
+        sequenceComparison.setAlignedAlternateAlleleStop(
+                FuncotatorUtils.getAlignedEndPosition(
+                        sequenceComparison.getAlignedCodingSequenceAlleleStart(),
+                        altAllele.length()
+                )
+        );
+
+//        // Get our alternate allele coding sequence:
+//        final String altCodingSequence = FuncotatorUtils.getAlternateCodingSequence(
+//                sequenceComparison.getWholeReferenceSequence().getBaseString(),
+//                sequenceComparison.getCodingSequenceAlleleStart(),
+//                variant.getReference(),
+//                altAllele);
+
+        // Get the aligned alternate allele:
+        final int alignedRefAlleleStartPos = 1+sequenceComparison.getAlignedCodingSequenceAlleleStart() - sequenceComparison.getCodingSequenceAlleleStart();
+
+        sequenceComparison.setAlignedAlternateAllele(
+
+                FuncotatorUtils.getAlternateCodingSequence(
+                        sequenceComparison.getAlignedReferenceAllele(),
+                        alignedRefAlleleStartPos,
+                        variant.getReference(),
+                        altAllele)
+
+//                FuncotatorUtils.getAlignedAllele( altCodingSequence,
+//                        sequenceComparison.getAlignedCodingSequenceAlleleStart(),
+//                        sequenceComparison.getAlignedAlternateAlleleStop())
+        );
+
+        // Set our alternate amino acid sequence:
+        sequenceComparison.setAlternateAminoAcidSequence(
+                FuncotatorUtils.createAminoAcidSequence(sequenceComparison.getAlignedAlternateAllele())
+        );
+
+        // Set our protein end position:
+        sequenceComparison.setProteinChangeEndPosition(
+                FuncotatorUtils.getProteinChangeEndPosition(sequenceComparison.getProteinChangeStartPosition(), sequenceComparison.getAlignedAlternateAllele().length())
         );
 
         return sequenceComparison;
@@ -589,7 +604,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @param transcript The current {@link GencodeGtfTranscriptFeature} containing our {@code altAllele}.
      * @return A trivially populated {@link GencodeFuncotation} object.
      */
-    private GencodeFuncotation createGencodeFuncotationWithTrivialFieldsPopulated(final VariantContext variant,
+     private static GencodeFuncotation createGencodeFuncotationWithTrivialFieldsPopulated(final VariantContext variant,
                                                                                   final Allele altAllele,
                                                                                   final GencodeGtfGeneFeature gtfFeature,
                                                                                   final GencodeGtfTranscriptFeature transcript) {
@@ -628,7 +643,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @param transcript The {@link GencodeGtfTranscriptFeature} in which to check for the given {@code utr}.
      * @return {@code true} if the given {@code utr} is 5' for the given {@code transcript}; {@code false} otherwise.
      */
-    private boolean is5PrimeUtr(final GencodeGtfUTRFeature utr, final GencodeGtfTranscriptFeature transcript) {
+    private static boolean is5PrimeUtr(final GencodeGtfUTRFeature utr, final GencodeGtfTranscriptFeature transcript) {
         boolean isBefore = true;
         if ( transcript.getGenomicStrand() == GencodeGtfFeature.GenomicStrand.FORWARD ) {
             for ( final GencodeGtfExonFeature exon : transcript.getExons() ) {
@@ -657,7 +672,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @param gtfFeature {@link GencodeGtfGeneFeature} corresponding to this variant.
      * @return A short {@link String} representation of the genomic change for the given variant, allele, and feature.
      */
-    private String getGenomeChangeString(final VariantContext variant, final Allele altAllele, final GencodeGtfGeneFeature gtfFeature) {
+    private static String getGenomeChangeString(final VariantContext variant, final Allele altAllele, final GencodeGtfGeneFeature gtfFeature) {
         return "g." + gtfFeature.getChromosomeName() +
                 ":" + variant.getStart() +
                 variant.getReference().getBaseString() + ">" + altAllele.getBaseString();
@@ -669,7 +684,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @param variant The {@link VariantContext} for which we want to get the best index.
      * @return The index of the "best" {@link GencodeGtfTranscriptFeature} in the given {@link GencodeGtfGeneFeature}.  Returns -1 if no transcript is present.
      */
-    private int getBestTranscriptIndex(final GencodeGtfGeneFeature geneFeature, final VariantContext variant) {
+    private static int getBestTranscriptIndex(final GencodeGtfGeneFeature geneFeature, final VariantContext variant) {
         if ( geneFeature.getTranscripts().size() == 0 ) {
             return -1;
         }
@@ -691,7 +706,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @param reference The reference against which to compare the given variant.
      * @return A list of IGR annotations for the given variant.
      */
-    private List<GencodeFuncotation> createIgrFuncotations(final VariantContext variant, final ReferenceContext reference) {
+    private static List<GencodeFuncotation> createIgrFuncotations(final VariantContext variant, final ReferenceContext reference) {
         // for each allele, create an annotation.
 
         // TODO: NEED TO FIX THIS LOGIC TO INCLUDE MORE INFO!
@@ -711,7 +726,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @param altAllele The alternate allele to use for this funcotation.
      * @return An IGR funcotation for the given allele.
      */
-    private GencodeFuncotation createIgrFuncotation(final Allele altAllele){
+    private static GencodeFuncotation createIgrFuncotation(final Allele altAllele){
         final GencodeFuncotation gencodeFuncotation = new GencodeFuncotation();
 
         gencodeFuncotation.setVariantClassification( GencodeFuncotation.VariantClassification.IGR );
@@ -727,7 +742,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @param altAllele The alternate {@link Allele} for this variant.
      * @return A {@link GencodeFuncotation.VariantType} representing the variation type between the given reference and alternate {@link Allele}.
      */
-    private GencodeFuncotation.VariantType getVariantType( final Allele refAllele, final Allele altAllele ) {
+    private static GencodeFuncotation.VariantType getVariantType( final Allele refAllele, final Allele altAllele ) {
 
         if ( altAllele.length() > refAllele.length() ) {
             return GencodeFuncotation.VariantType.INS;

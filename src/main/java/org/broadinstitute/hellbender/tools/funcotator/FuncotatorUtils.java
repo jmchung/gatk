@@ -52,8 +52,9 @@ package org.broadinstitute.hellbender.tools.funcotator;
 
 import htsjdk.samtools.reference.ReferenceSequence;
 import htsjdk.samtools.util.Locatable;
+import htsjdk.samtools.util.SequenceUtil;
+import htsjdk.tribble.annotation.Strand;
 import htsjdk.variant.variantcontext.Allele;
-import htsjdk.variant.variantcontext.VariantContext;
 import org.apache.log4j.Logger;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.exceptions.GATKException;
@@ -395,6 +396,50 @@ public class FuncotatorUtils {
     }
 
     /**
+     * Gets the coding sequence for the allele with given start and stop positions, codon-aligned to the start of the reference sequence.
+     * @param codingSequence The whole coding sequence for this transcript.
+     * @param alignedAlleleStart The codon-aligned position (1-based, inclusive) of the allele start.
+     * @param alignedAlleleStop The codon-aligned position (1-based, inclusive) of the allele stop.
+     * @return A {@link String} containing the reference allele coding sequence.
+     */
+    public static String getAlignedAllele(final String codingSequence,
+                                          final Integer alignedAlleleStart,
+                                          final Integer alignedAlleleStop) {
+        Utils.nonNull(codingSequence);
+        Utils.nonNull(alignedAlleleStart);
+        Utils.nonNull(alignedAlleleStop);
+
+        // Subtract 1 because we're 1-based.
+        return codingSequence.substring(alignedAlleleStart - 1, alignedAlleleStop);
+    }
+
+    /**
+     * Get the Protein change start position (1-based, inclusive) given the aligned position of the coding sequence.
+     * @param alignedCodingSequenceAlleleStart Position (1-based, inclusive) of the start of the allele in the coding sequence.
+     * @return The position (1-based, inclusive) of the protein change in the amino acid sequence.
+     */
+    public static int getProteinChangePosition(final Integer alignedCodingSequenceAlleleStart) {
+
+        Utils.nonNull(alignedCodingSequenceAlleleStart);
+        return ((alignedCodingSequenceAlleleStart-1) / 3) + 1; // Add 1 because we're 1-based.
+    }
+
+    /**
+     * Get the Protein change end position (1-based, inclusive) given the protein change start position and aligned alternate allele length.
+     * @param proteinChangeStartPosition Position (1-based, inclusive) of the start of the protein change in the amino acid sequence.
+     * @param alignedAlternateAlleleLength Length of the aligned alternate allele in bases.
+     * @return The position (1-based, inclusive) of the end of the protein change in the amino acid sequence.
+     */
+    public static int getProteinChangeEndPosition(final Integer proteinChangeStartPosition, final Integer alignedAlternateAlleleLength) {
+
+        Utils.nonNull(proteinChangeStartPosition);
+        Utils.nonNull(alignedAlternateAlleleLength);
+
+        // We subtract 1 because we're 1-based.
+        return proteinChangeStartPosition + getProteinChangePosition(alignedAlternateAlleleLength) - 1;
+    }
+
+    /**
      * Get the full alternate coding sequence given a reference coding sequence, and two alleles.
      * @param referenceCodingSequence The reference sequence on which to base the resulting alternate coding sequence.
      * @param alleleStartPos Starting position (1-based, inclusive) for the ref and alt alleles in the given {@code referenceCodingSequence}.
@@ -411,9 +456,11 @@ public class FuncotatorUtils {
 
         // We have to subtract 1 here because we need to account for the 1-based indexing of
         // the start and end of the coding region:
-        return referenceCodingSequence.substring(0, alleleStartPos - 1) +
+        final int alleleIndex = alleleStartPos - 1;
+
+        return referenceCodingSequence.substring(0, alleleIndex) +
                 altAllele.getBaseString() +
-                referenceCodingSequence.substring(alleleStartPos - 1 + refAllele.length());
+                referenceCodingSequence.substring(alleleIndex + refAllele.length());
     }
 
     /**
@@ -422,16 +469,21 @@ public class FuncotatorUtils {
      * Assumes {@code exonList} ranges are indexed by 1.
      * @param reference A {@link ReferenceContext} from which to construct the coding region.
      * @param exonList A {@link List} of {@link Locatable} representing a set of Exons to be concatenated together to create the coding sequence.
+     * @param strand The {@link Strand} from which the exons are to be read.
      * @return A string of bases for the given {@code exonList} concatenated together.
      */
-    public static String getCodingSequence(final ReferenceContext reference, final List<? extends Locatable> exonList) {
+    public static String getCodingSequence(final ReferenceContext reference, final List<? extends Locatable> exonList, final Strand strand) {
 
         Utils.nonNull(reference);
         Utils.nonNull(exonList);
+        Utils.nonNull(strand);
 
-        // Sanity check:
+        // Sanity checks:
         if (exonList.size() == 0) {
             return "";
+        }
+        if ( strand == Strand.NONE ) {
+            throw new GATKException("Invalid genomic strand: " + strand.toString() + " - Cannot generate coding sequence.");
         }
 
         final StringBuilder sb = new StringBuilder();
@@ -467,6 +519,16 @@ public class FuncotatorUtils {
         // Get the window so we can convert to reference coordinates from genomic coordinates of the exons:
         final SimpleInterval refWindow = reference.getWindow();
         final byte[] bases = reference.getBases();
+
+        // If we're going in the opposite direction, we must reverse this reference base array
+        // and complement it.
+        if ( strand == Strand.NEGATIVE ) {
+            for( int i = 0; i < bases.length / 2; i++) {
+                final byte b = SequenceUtil.complement( bases[i] );
+                bases[i] = SequenceUtil.complement( bases[bases.length - 1 - i] );
+                bases[bases.length - 1 - i] = b;
+            }
+        }
 
         // Go through and grab our sequences based on our exons:
         for ( final Locatable exon : exonList ) {
