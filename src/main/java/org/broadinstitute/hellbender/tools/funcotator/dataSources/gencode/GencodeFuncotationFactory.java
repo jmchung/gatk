@@ -329,7 +329,8 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @param transcript A {@link GencodeGtfTranscriptFeature} from which to pull the exons.
      * @return A list of {@link Locatable} objects representing the exons in the given {@code transcript} in the order in which the appear in the expressed protein.
      */
-    static private List<? extends Locatable> getSortedExonPositions(final GencodeGtfTranscriptFeature transcript) {
+    @VisibleForTesting
+    static List<? extends Locatable> getSortedExonPositions(final GencodeGtfTranscriptFeature transcript) {
         return transcript.getExons().stream()
                 .filter(e -> (e.getCds() != null))
                 .map(GencodeGtfExonFeature::getCds)
@@ -642,6 +643,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         sequenceComparison.setContig(variant.getContig());
 
         final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
+
         final Allele refAllele;
         if ( strand == Strand.POSITIVE ) {
             refAllele = variant.getReference();
@@ -662,7 +664,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         sequenceComparison.setWholeReferenceSequence(new ReferenceSequence(transcript.getTranscriptId(),transcript.getStart(),referenceCodingSequence.getBytes()));
 
         // Get the ref allele:
-        sequenceComparison.setReferenceAllele(variant.getReference().getBaseString());
+        sequenceComparison.setReferenceAllele(refAllele.getBaseString());
 
         // Get the allele genomic start position:
         sequenceComparison.setAlleleStart(variant.getStart());
@@ -687,7 +689,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 FuncotatorUtils.getAlignedAllele(sequenceComparison.getWholeReferenceSequence().getBaseString(),
                         sequenceComparison.getAlignedCodingSequenceAlleleStart(),
                         sequenceComparison.getAlignedReferenceAlleleStop(),
-                        strand )
+                        Strand.POSITIVE )
         );
 
         // Get the amino acid sequence of the reference allele:
@@ -716,7 +718,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 //        final String altCodingSequence = FuncotatorUtils.getAlternateCodingSequence(
 //                sequenceComparison.getWholeReferenceSequence().getBaseString(),
 //                sequenceComparison.getCodingSequenceAlleleStart(),
-//                variant.getReference(),
+//                refAllele,
 //                altAllele);
 
         // Get the aligned alternate allele:
@@ -727,7 +729,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 FuncotatorUtils.getAlternateCodingSequence(
                         sequenceComparison.getAlignedReferenceAllele(),
                         alignedRefAlleleStartPos,
-                        variant.getReference(),
+                        refAllele,
                         altAllele )
 
 //                FuncotatorUtils.getAlignedAllele( altCodingSequence,
