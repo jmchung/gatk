@@ -19,10 +19,7 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -35,10 +32,11 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
     // Static Variables:
 
     private static final String FUNCOTATOR_TEST_DIR = toolsTestDir + "funcotator" + File.separator;
-    private static final String HG19_CHR19_REFERENCE_FILE_NAME =  "/Users/jonn/Development/references/GRCh37.p13.chr19.fasta";
+    private static final String HG19_CHR19_REFERENCE_FILE_NAME = "/Users/jonn/Development/references/GRCh37.p13.chr19.fasta";
     private static final String MUC16_GENCODE_ANNOTATIONS_FILE_NAME = FUNCOTATOR_TEST_DIR + "gencode.v19.MUC16.gtf";
-
+    private static final String MUC16_GENCODE_TRANSCRIPT_FASTA_FILE = FUNCOTATOR_TEST_DIR + "gencode.v19.MUC16_transcript.fasta";
     private static final String MUC_16_TRANSCRIPT = "ENST00000397910.4";
+
     private static final FeatureReader<GencodeGtfFeature> muc16FeatureReader;
     private static final ReferenceDataSource refDataSource;
 
@@ -149,13 +147,18 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
                             .map(GencodeGtfExonFeature::getCds)
                             .collect(Collectors.toList());
 
+            final ReferenceDataSource muc16TranscriptDataSource = ReferenceDataSource.of(new File(MUC16_GENCODE_TRANSCRIPT_FASTA_FILE));
+            final Map<String, GencodeFuncotationFactory.MappedTranscriptIdInfo> muc16TranscriptIdMap = GencodeFuncotationFactory.createTranscriptIdMap(muc16TranscriptDataSource);
+
             final FuncotatorUtils.SequenceComparison seqComp =
                     GencodeFuncotationFactory.createSequenceComparison(
                             variantContext,
                             altAllele,
                             referenceContext,
                             transcript,
-                            exonPositionList );
+                            exonPositionList,
+                            muc16TranscriptIdMap,
+                            muc16TranscriptDataSource);
 
             final GencodeFuncotation.VariantClassification varClass = GencodeFuncotationFactory.getVariantClassification(
                     variantContext,

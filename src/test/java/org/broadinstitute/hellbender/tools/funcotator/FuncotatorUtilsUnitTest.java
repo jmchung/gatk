@@ -7,6 +7,7 @@ import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceFileSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
+import org.broadinstitute.hellbender.utils.read.ReadUtils;
 import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -323,7 +324,7 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @DataProvider
     Object[][] provideDataForGetStartPositionInTranscript() {
 
-        final List<? extends Locatable> exons = Arrays.asList(
+        final List<? extends Locatable> exons_forward = Arrays.asList(
                 new SimpleInterval("chr1", 10,19),
                 new SimpleInterval("chr1", 30,39),
                 new SimpleInterval("chr1", 50,59),
@@ -331,13 +332,28 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                 new SimpleInterval("chr1", 90,99)
         );
 
+        final List<? extends Locatable> exons_backward = Arrays.asList(
+                new SimpleInterval("chr1", 90,99),
+                new SimpleInterval("chr1", 70,79),
+                new SimpleInterval("chr1", 50,59),
+                new SimpleInterval("chr1", 30,39),
+                new SimpleInterval("chr1", 10,19)
+        );
+
         return new Object[][] {
-                { new SimpleInterval("chr1", 1, 1), exons, -1 },
-                { new SimpleInterval("chr1", 25, 67), exons, -1 },
-                { new SimpleInterval("chr1", 105, 392), exons, -1 },
-                { new SimpleInterval("chr1", 10, 10), exons, 1 },
-                { new SimpleInterval("chr1", 99, 99), exons, 50 },
-                { new SimpleInterval("chr1", 50, 67), exons, 21 },
+                { new SimpleInterval("chr1", 1, 1),     exons_forward, Strand.POSITIVE, -1 },
+                { new SimpleInterval("chr1", 25, 67),   exons_forward, Strand.POSITIVE, -1 },
+                { new SimpleInterval("chr1", 105, 392), exons_forward, Strand.POSITIVE, -1 },
+                { new SimpleInterval("chr1", 10, 10),   exons_forward, Strand.POSITIVE,  1 },
+                { new SimpleInterval("chr1", 99, 99),   exons_forward, Strand.POSITIVE, 50 },
+                { new SimpleInterval("chr1", 50, 67),   exons_forward, Strand.POSITIVE, 21 },
+
+                { new SimpleInterval("chr1", 1, 1),     exons_backward, Strand.NEGATIVE, -1 },
+                { new SimpleInterval("chr1", 25, 67),   exons_backward, Strand.NEGATIVE, -1 },
+                { new SimpleInterval("chr1", 105, 392), exons_backward, Strand.NEGATIVE, -1 },
+                { new SimpleInterval("chr1", 10, 10),   exons_backward, Strand.NEGATIVE, 50 },
+                { new SimpleInterval("chr1", 99, 99),   exons_backward, Strand.NEGATIVE,  1 },
+                { new SimpleInterval("chr1", 50, 67),   exons_backward, Strand.NEGATIVE, 30 },
         };
     }
 
@@ -681,24 +697,54 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
 
         final String seq = "ATGAAAGGGGTGCCTATGCTAGATAGACAGATAGTGTGTGTGTGTGTGCGCGCGCGCGCGCGTTGTTAG";
 
+        //CTA ACA ACG CGC GCG CGC GCG CAC ACA CAC ACA CAC TAT CTG TCT ATC TAG CAT AGG CAC CCC TTT CAT
+
         return new Object[][] {
-                { seq,  1, 3, "ATG" },
-                { seq,  4, 6, "AAA" },
-                { seq,  7, 9, "GGG" },
-                { seq, 10, 12, "GTG" },
-                { seq, 13, 15, "CCT" },
-                { seq, 16, 18, "ATG" },
-                { seq, 19, 21, "CTA" },
+                { seq,  1, 3,  Strand.POSITIVE, "ATG" },
+                { seq,  4, 6,  Strand.POSITIVE, "AAA" },
+                { seq,  7, 9,  Strand.POSITIVE, "GGG" },
+                { seq, 10, 12, Strand.POSITIVE, "GTG" },
+                { seq, 13, 15, Strand.POSITIVE, "CCT" },
+                { seq, 16, 18, Strand.POSITIVE, "ATG" },
+                { seq, 19, 21, Strand.POSITIVE, "CTA" },
+                { seq,  1,  6, Strand.POSITIVE, "ATGAAA" },
+                { seq,  4,  9, Strand.POSITIVE, "AAAGGG" },
+                { seq,  7, 12, Strand.POSITIVE, "GGGGTG" },
+                { seq, 10, 15, Strand.POSITIVE, "GTGCCT" },
+                { seq, 13, 18, Strand.POSITIVE, "CCTATG" },
+                { seq, 16, 21, Strand.POSITIVE, "ATGCTA" },
+                { seq, 19, 24, Strand.POSITIVE, "CTAGAT" },
+                { seq, 1, seq.length(), Strand.POSITIVE, seq },
 
-                { seq,  1,  6, "ATGAAA" },
-                { seq,  4,  9, "AAAGGG" },
-                { seq,  7, 12, "GGGGTG" },
-                { seq, 10, 15, "GTGCCT" },
-                { seq, 13, 18, "CCTATG" },
-                { seq, 16, 21, "ATGCTA" },
-                { seq, 19, 24, "CTAGAT" },
+                { seq,  1, 3,  Strand.NEGATIVE, "CTA" },
+                { seq,  4, 6,  Strand.NEGATIVE, "ACA" },
+                { seq,  7, 9,  Strand.NEGATIVE, "ACG" },
+                { seq, 10, 12, Strand.NEGATIVE, "CGC" },
+                { seq, 13, 15, Strand.NEGATIVE, "GCG" },
+                { seq, 16, 18, Strand.NEGATIVE, "CGC" },
+                { seq, 19, 21, Strand.NEGATIVE, "GCG" },
+                { seq,  1,  6, Strand.NEGATIVE, "CTAACA" },
+                { seq,  4,  9, Strand.NEGATIVE, "ACAACG" },
+                { seq,  7, 12, Strand.NEGATIVE, "ACGCGC" },
+                { seq, 10, 15, Strand.NEGATIVE, "CGCGCG" },
+                { seq, 13, 18, Strand.NEGATIVE, "GCGCGC" },
+                { seq, 16, 21, Strand.NEGATIVE, "CGCGCG" },
+                { seq, 19, 24, Strand.NEGATIVE, "GCGCAC" },
+                { seq, 1, seq.length(), Strand.NEGATIVE, ReadUtils.getBasesReverseComplement( seq.getBytes() ) },
+        };
+    }
 
-                { seq, 1, seq.length(), seq },
+    @DataProvider
+    Object[][] provideDataForGetCodingSequenceAlleleStartPosition() {
+
+        return new Object[][] {
+                { 1,  1, 10, Strand.POSITIVE,  1},
+                { 5,  1, 10, Strand.POSITIVE,  5},
+                { 10, 1, 10, Strand.POSITIVE, 10},
+
+                { 1,  1, 10, Strand.NEGATIVE, 10},
+                { 5,  1, 10, Strand.NEGATIVE,  6},
+                { 10, 1, 10, Strand.NEGATIVE,  1},
         };
     }
 
@@ -734,8 +780,8 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
 //    }
 
     @Test(dataProvider = "provideDataForGetStartPositionInTranscript")
-    void testGetStartPositionInTranscript(final Locatable variant, final List<? extends Locatable> transcript, final int expected) {
-        Assert.assertEquals( FuncotatorUtils.getStartPositionInTranscript(variant, transcript), expected );
+    void testGetStartPositionInTranscript(final Locatable variant, final List<? extends Locatable> transcript, final Strand strand, final int expected) {
+        Assert.assertEquals( FuncotatorUtils.getStartPositionInTranscript(variant, transcript, strand), expected );
     }
 
     @Test(dataProvider = "providePositionAndExpectedAlignedPosition")
@@ -852,7 +898,14 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     void testGetAlignedAllele(  final String refSequence,
                                 final Integer alignedAlleleStart,
                                 final Integer alignedAlleleStop,
+                                final Strand strand,
                                 final String expected) {
-        Assert.assertEquals( FuncotatorUtils.getAlignedAllele(refSequence, alignedAlleleStart, alignedAlleleStop), expected );
+        Assert.assertEquals( FuncotatorUtils.getAlignedAllele(refSequence, alignedAlleleStart, alignedAlleleStop, strand), expected );
     }
+
+    @Test (dataProvider = "provideDataForGetCodingSequenceAlleleStartPosition")
+    void testGetCodingSequenceAlleleStartPosition(final int variantStartPosition, final int codingStartPosition, final int codingEndPosition, final Strand strand, final int expected) {
+        Assert.assertEquals( FuncotatorUtils.getCodingSequenceAlleleStartPosition(variantStartPosition, codingStartPosition, codingEndPosition, strand), expected );
+    }
+
 }

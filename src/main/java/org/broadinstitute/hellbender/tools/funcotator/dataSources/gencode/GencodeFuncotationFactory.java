@@ -12,10 +12,14 @@ import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceDataSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.funcotator.*;
+import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.codecs.GENCODE.*;
+import org.broadinstitute.hellbender.utils.read.ReadUtils;
 
 import java.io.File;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -27,45 +31,37 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     //==================================================================================================================
 
     /**
-     * ReferenceSequenceFile for the transcript reference file.
+     * The window around splice sites to mark variants as {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#SPLICE_SITE}.
      */
-    private final File fastaTranscriptFile;
+    final static private int spliceSiteVariantWindowBases = 2;
+
+    //==================================================================================================================
 
     /**
      * ReferenceSequenceFile for the transcript reference file.
      */
-    private final ReferenceDataSource fastaTranscriptReferenceSequenceFile;
+    private final ReferenceDataSource transcriptFastaReferenceDataSource;
 
     /**
      * Map between transcript IDs and the IDs from the FASTA file to look up the transcript.
      * This is necessary because of the way the FASTA file contigs are named.
      */
-    private final Map<String, String> transcriptIdMap;
+    private final Map<String, MappedTranscriptIdInfo> transcriptIdMap;
 
     //==================================================================================================================
 
     public GencodeFuncotationFactory(final File gencodeTranscriptFastaFile) {
-        fastaTranscriptFile = gencodeTranscriptFastaFile;
-        fastaTranscriptReferenceSequenceFile = ReferenceDataSource.of(gencodeTranscriptFastaFile);
+        transcriptFastaReferenceDataSource = ReferenceDataSource.of(gencodeTranscriptFastaFile);
 
-        transcriptIdMap = createTranscriptIdMap(fastaTranscriptReferenceSequenceFile);
+        transcriptIdMap = createTranscriptIdMap(transcriptFastaReferenceDataSource);
     }
 
     //==================================================================================================================
 
     @Override
     public void cleanup() {
-        fastaTranscriptReferenceSequenceFile.close();
+        transcriptFastaReferenceDataSource.close();
     }
-
-    //==================================================================================================================
-
-    /**
-     * The window around splice sites to mark variants as {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification#SPLICE_SITE}.
-     */
-    final static private int spliceSiteVariantWindowBases = 2;
-
-    //==================================================================================================================
 
     @Override
     public List<String> getSupportedFuncotationFields() {
@@ -108,20 +104,22 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     /**
      * Creates a map of Transcript IDs for use in looking up transcripts from the FASTA dictionary for the GENCODE Transcripts.
      * @param fastaReference The {@link ReferenceDataSource} corresponding to the Transcript FASTA file for this GENCODE dataset.
-     * @return A {@link Map} of {@link String} -> {@link String} which maps real transcript IDs to the string of all transcript IDs for a given transcript sequence as it appears in the FASTA Transcript file.
+     * @return A {@link Map} of {@link String} -> {@link MappedTranscriptIdInfo} which maps real transcript IDs to the information about that transcript in the transcript FASTA file.
      */
-    private static Map<String, String> createTranscriptIdMap(final ReferenceDataSource fastaReference) {
+    @VisibleForTesting
+    static Map<String, MappedTranscriptIdInfo> createTranscriptIdMap(final ReferenceDataSource fastaReference) {
 
-        final Map<String, String> idMap = new HashMap<>();
+        final Map<String, MappedTranscriptIdInfo> idMap = new HashMap<>();
 
         for ( final SAMSequenceRecord sequence : fastaReference.getSequenceDictionary().getSequences() ) {
-            final String seqName = sequence.getSequenceName();
+
+            final MappedTranscriptIdInfo transcriptInfo = createMappedTranscriptIdInfo( sequence );
 
             // The names in the file are actually in a list with | between each sequence name.
             // We need to split the names and add them to the dictionary so we can resolve them to the full
             // sequence name as it appears in the file:
-            for ( final String transcriptId : seqName.split("\\|") ) {
-                idMap.put(transcriptId, seqName);
+            for ( final String transcriptId : sequence.getSequenceName().split("\\|") ) {
+                idMap.put(transcriptId, transcriptInfo);
             }
         }
 
@@ -129,15 +127,71 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     }
 
     /**
+     * Creates a {@link MappedTranscriptIdInfo} object based on the given {@link SAMSequenceRecord}.
+     * This method is a helper method to get information out of a GENCODE transcript FASTA file easily.
+     * This method assumes that {@code sequence} is a sequence from a GENCODE transcript FASTA file.
+     * @param sequence The {@link SAMSequenceRecord} from which to create the {@link MappedTranscriptIdInfo}.
+     * @return A populated {@link MappedTranscriptIdInfo} object based on the given {@link SAMSequenceRecord}.
+     */
+    private static MappedTranscriptIdInfo createMappedTranscriptIdInfo( final SAMSequenceRecord sequence ) {
+
+        final MappedTranscriptIdInfo transcriptIdInfo = new MappedTranscriptIdInfo();
+
+        final Pattern utrPattern = Pattern.compile("UTR[35]:(\\d+)-(\\d+)");
+        final Pattern cdsPattern = Pattern.compile("CDS:(\\d+)-(\\d+)");
+
+        boolean has3pUtr = false;
+        boolean has5pUtr = false;
+
+        // Now let's go through the sequence name and pull out the salient features for each field:
+        for (final String field : sequence.getSequenceName().split("\\|")) {
+            if ((field.length() > 4) && (field.substring(0, 5).equals("UTR5:"))) {
+                final Matcher m = utrPattern.matcher(field);
+                m.find();
+                transcriptIdInfo.fivePrimeUtrStart = Integer.valueOf(m.group(1));
+                transcriptIdInfo.fivePrimeUtrEnd = Integer.valueOf(m.group(2));
+                has5pUtr = true;
+            } else if ((field.length() > 4) && (field.substring(0, 5).equals("UTR3:"))) {
+                final Matcher m = utrPattern.matcher(field);
+                m.find();
+                transcriptIdInfo.threePrimeUtrStart = Integer.valueOf(m.group(1));
+                transcriptIdInfo.threePrimeUtrEnd = Integer.valueOf(m.group(2));
+                has3pUtr = true;
+            } else if ((field.length() > 3) && (field.substring(0, 4).equals("CDS:"))) {
+                final Matcher m = cdsPattern.matcher(field);
+                m.find();
+                transcriptIdInfo.codingSequenceStart = Integer.valueOf(m.group(1));
+                transcriptIdInfo.codingSequenceEnd = Integer.valueOf(m.group(2));
+            }
+        }
+
+        transcriptIdInfo.mapKey = sequence.getSequenceName();
+        transcriptIdInfo.has3pUtr = has3pUtr;
+        transcriptIdInfo.has5pUtr = has5pUtr;
+
+        return transcriptIdInfo;
+    }
+
+    /**
      * Get the coding sequence from the GENCODE Transcript FASTA file for a given {@code transcriptId}.
      * This will get ONLY the coding sequence for the given {@code transcriptId} and will not include any UTRs.
      * @param transcriptId The ID of the transcript to get from the FASTA file.
+     * @param transcriptIdMap A map from transcriptId to MappedTranscriptIdInfo, which tells us how to pull information for the given {@code transcriptId} out of the given {@code transcriptFastaReferenceDataSource}.
+     * @param transcriptFastaReferenceDataSource A {@link ReferenceDataSource} for the GENCODE transcript FASTA file.
      * @return The coding sequence for the given {@code transcriptId} as represented in the GENCODE transcript FASTA file.
      */
-    private static String getCodingSequenceFromTranscriptFasta( final String transcriptId ) {
-        String codingSequence = "";
+    private static String getCodingSequenceFromTranscriptFasta( final String transcriptId,
+                                                                final Map<String, MappedTranscriptIdInfo> transcriptIdMap,
+                                                                final ReferenceDataSource transcriptFastaReferenceDataSource) {
 
-        return codingSequence;
+        final MappedTranscriptIdInfo transcriptMapIdAndMetadata = transcriptIdMap.get(transcriptId);
+        final SimpleInterval transcriptInterval = new SimpleInterval(
+                transcriptMapIdAndMetadata.mapKey,
+                transcriptMapIdAndMetadata.codingSequenceStart,
+                transcriptMapIdAndMetadata.codingSequenceEnd
+        );
+
+        return transcriptFastaReferenceDataSource.queryAndPrefetch( transcriptInterval ).getBaseString();
     }
 
     /**
@@ -238,18 +292,14 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Get the list of exons by their locations so we can use them to determine our location in the transcript and get
         // the transcript code itself:
-        final List<? extends Locatable> exonPositionList =
-                transcript.getExons().stream()
-                        .filter(e -> (e.getCds() != null))
-                        .map(GencodeGtfExonFeature::getCds)
-                        .collect(Collectors.toList());
+        final List<? extends Locatable> exonPositionList = getSortedExonPositions(transcript);
 
         // Set our transcript exon number:
         gencodeFuncotation.setTranscriptExon(exon.getExonNumber());
 
         // Set up our SequenceComparison object so we can calculate some useful fields more easily
         // These fields can all be set without knowing the alternate allele:
-        final FuncotatorUtils.SequenceComparison sequenceComparison = createSequenceComparison(variant, altAllele, reference, transcript, exonPositionList);
+        final FuncotatorUtils.SequenceComparison sequenceComparison = createSequenceComparison(variant, altAllele, reference, transcript, exonPositionList, transcriptIdMap, transcriptFastaReferenceDataSource);
 
         // OK, now that we have our SequenceComparison object set up we can continue the annotation:
 
@@ -271,6 +321,20 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         }
 
         return gencodeFuncotation;
+    }
+
+    /**
+     * Gets a list of locatables representing the exons containing coding regions within the given {@code transcript}.
+     * These exons are sorted by exon order.
+     * @param transcript A {@link GencodeGtfTranscriptFeature} from which to pull the exons.
+     * @return A list of {@link Locatable} objects representing the exons in the given {@code transcript} in the order in which the appear in the expressed protein.
+     */
+    static private List<? extends Locatable> getSortedExonPositions(final GencodeGtfTranscriptFeature transcript) {
+        return transcript.getExons().stream()
+                .filter(e -> (e.getCds() != null))
+                .map(GencodeGtfExonFeature::getCds)
+                .sorted( (lhs, rhs) -> lhs.getExonNumber() < rhs.getExonNumber() ? -1 : (lhs.getExonNumber() > rhs.getExonNumber() ) ? 1 : 0 )
+                .collect(Collectors.toList());
     }
 
     /**
@@ -452,7 +516,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
             final List<Locatable> activeRegions = Collections.singletonList(utr);
             final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
             final String codingSequence = FuncotatorUtils.getCodingSequence(reference, activeRegions, strand);
-            final int codingStartPos = FuncotatorUtils.getStartPositionInTranscript(variant, activeRegions);
+            final int codingStartPos = FuncotatorUtils.getStartPositionInTranscript(variant, activeRegions, strand);
 
             //Check for de novo starts:
             if ( FuncotatorUtils.getEukaryoticAminoAcidByCodon(codingSequence.substring(codingStartPos, codingStartPos+3) )
@@ -565,10 +629,12 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      */
     @VisibleForTesting
     static FuncotatorUtils.SequenceComparison createSequenceComparison(final VariantContext variant,
-                                                                       final Allele altAllele,
-                                                                       final ReferenceContext reference,
-                                                                       final GencodeGtfTranscriptFeature transcript,
-                                                                       final List<? extends htsjdk.samtools.util.Locatable> exonPositionList) {
+                                                                final Allele altAllele,
+                                                                final ReferenceContext reference,
+                                                                final GencodeGtfTranscriptFeature transcript,
+                                                                final List<? extends htsjdk.samtools.util.Locatable> exonPositionList,
+                                                                final Map<String, MappedTranscriptIdInfo> transcriptIdMap,
+                                                                final ReferenceDataSource transcriptFastaReferenceDataSource) {
 
         final FuncotatorUtils.SequenceComparison sequenceComparison = new FuncotatorUtils.SequenceComparison();
 
@@ -576,8 +642,21 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         sequenceComparison.setContig(variant.getContig());
 
         final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
+        final Allele refAllele;
+        if ( strand == Strand.POSITIVE ) {
+            refAllele = variant.getReference();
+        }
+        else {
+            refAllele = Allele.create(ReadUtils.getBasesReverseComplement( variant.getReference().getBases() ), true);
+        }
 
-        final String referenceCodingSequence = FuncotatorUtils.getCodingSequence(reference, exonPositionList, strand);
+        final String referenceCodingSequence;
+        if ( transcriptFastaReferenceDataSource != null ) {
+            referenceCodingSequence = getCodingSequenceFromTranscriptFasta( transcript.getTranscriptId(), transcriptIdMap, transcriptFastaReferenceDataSource);
+        }
+        else {
+            referenceCodingSequence = FuncotatorUtils.getCodingSequence(reference, exonPositionList, strand);
+        }
 
         // Get the reference sequence in the coding region as described by the given exonPositionList:
         sequenceComparison.setWholeReferenceSequence(new ReferenceSequence(transcript.getTranscriptId(),transcript.getStart(),referenceCodingSequence.getBytes()));
@@ -589,10 +668,12 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         sequenceComparison.setAlleleStart(variant.getStart());
 
         // Get the allele transcript start position:
-        sequenceComparison.setTranscriptAlleleStart(variant.getStart() - transcript.getStart());
+        sequenceComparison.setTranscriptAlleleStart(
+                FuncotatorUtils.getCodingSequenceAlleleStartPosition( variant.getStart(), transcript.getStart(), transcript.getEnd(), strand )
+        );
 
         // Get the coding region start position (in the above computed reference coding region):
-        sequenceComparison.setCodingSequenceAlleleStart(FuncotatorUtils.getStartPositionInTranscript(variant, exonPositionList));
+        sequenceComparison.setCodingSequenceAlleleStart(FuncotatorUtils.getStartPositionInTranscript(variant, exonPositionList, strand));
 
         // Get the in-frame start position of the codon containing the given variant:
         sequenceComparison.setAlignedCodingSequenceAlleleStart(FuncotatorUtils.getAlignedPosition(sequenceComparison.getCodingSequenceAlleleStart()));
@@ -605,7 +686,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         sequenceComparison.setAlignedReferenceAllele(
                 FuncotatorUtils.getAlignedAllele(sequenceComparison.getWholeReferenceSequence().getBaseString(),
                         sequenceComparison.getAlignedCodingSequenceAlleleStart(),
-                        sequenceComparison.getAlignedReferenceAlleleStop() )
+                        sequenceComparison.getAlignedReferenceAlleleStop(), strand )
         );
 
         // Get the amino acid sequence of the reference allele:
@@ -638,7 +719,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 //                altAllele);
 
         // Get the aligned alternate allele:
-        final int alignedRefAlleleStartPos = 1+sequenceComparison.getAlignedCodingSequenceAlleleStart() - sequenceComparison.getCodingSequenceAlleleStart();
+        final int alignedRefAlleleStartPos = 1 + sequenceComparison.getAlignedCodingSequenceAlleleStart() - sequenceComparison.getCodingSequenceAlleleStart();
 
         sequenceComparison.setAlignedAlternateAllele(
 
@@ -646,7 +727,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                         sequenceComparison.getAlignedReferenceAllele(),
                         alignedRefAlleleStartPos,
                         variant.getReference(),
-                        altAllele)
+                        altAllele )
 
 //                FuncotatorUtils.getAlignedAllele( altCodingSequence,
 //                        sequenceComparison.getAlignedCodingSequenceAlleleStart(),
@@ -680,6 +761,8 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                                                                                   final GencodeGtfTranscriptFeature transcript) {
         final GencodeFuncotation gencodeFuncotation = new GencodeFuncotation();
 
+        final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
+
         gencodeFuncotation.setHugoSymbol( gtfFeature.getGeneName() );
         gencodeFuncotation.setNcbiBuild( gtfFeature.getUcscGenomeVersion() );
         gencodeFuncotation.setChromosome( gtfFeature.getChromosomeName() );
@@ -690,14 +773,26 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         gencodeFuncotation.setEnd(variant.getStart() + altAllele.length() - 1);
 
         gencodeFuncotation.setVariantType( getVariantType(variant.getReference(), altAllele) );
-        gencodeFuncotation.setRefAllele( variant.getReference().getBaseString() );
+
+        if ( strand == Strand.POSITIVE ) {
+            gencodeFuncotation.setRefAllele(variant.getReference().getBaseString());
+        }
+        else {
+            gencodeFuncotation.setRefAllele(
+                    ReadUtils.getBasesReverseComplement( variant.getReference().getBases() )
+            );
+        }
+
         gencodeFuncotation.setTumorSeqAllele1( altAllele.getBaseString() );
         gencodeFuncotation.setTumorSeqAllele2( altAllele.getBaseString() );
 
         gencodeFuncotation.setGenomeChange(getGenomeChangeString(variant, altAllele, gtfFeature));
         gencodeFuncotation.setAnnotationTranscript( transcript.getTranscriptId() );
-        gencodeFuncotation.setTranscriptStrand( transcript.getGenomicStrand().toString() );
-        gencodeFuncotation.setTranscriptPos( variant.getStart() - transcript.getStart() );
+        gencodeFuncotation.setTranscriptStrand( strand.toString() );
+
+        gencodeFuncotation.setTranscriptPos(
+             FuncotatorUtils.getCodingSequenceAlleleStartPosition( variant.getStart(), transcript.getStart(), transcript.getEnd(), strand )
+        );
 
         gencodeFuncotation.setOtherTranscripts(
                 gtfFeature.getTranscripts().stream().map(GencodeGtfTranscriptFeature::getTranscriptId).collect(Collectors.toList())
@@ -830,4 +925,59 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
             }
         }
     }
+
+    //==================================================================================================================
+
+    /**
+     * A simple data object class to hold information about the transcripts in the
+     * GENCODE transcript FASTA file.
+     */
+    @VisibleForTesting
+    static class MappedTranscriptIdInfo {
+        /**
+         * The key in the GENCODE transcript FASTA file to use to get the coding sequence associated with this Transcript.
+         */
+        String mapKey;
+
+        /**
+         * The start position (1-based, inclusive) of the coding sequence in this transcript.
+         */
+        int codingSequenceStart;
+
+        /**
+         * The start position (1-based, inclusive) of the coding sequence in this transcript.
+         */
+        int codingSequenceEnd;
+
+        /**
+         * Whether or not the transcript has a 3' UTR.
+         */
+        boolean has3pUtr;
+
+        /**
+         * The start position (1-based, inclusive) of the 3' UTR in this transcript.
+         */
+        int threePrimeUtrStart;
+
+        /**
+         * The end position (1-based, inclusive) of the 3' UTR in this transcript.
+         */
+        int threePrimeUtrEnd;
+
+        /**
+         * Whether or not the transcript has a 3' UTR.
+         */
+        boolean has5pUtr;
+
+        /**
+         * The start position (1-based, inclusive) of the 5' UTR in this transcript.
+         */
+        int fivePrimeUtrStart;
+
+        /**
+         * The end position (1-based, inclusive) of the 5' UTR in this transcript.
+         */
+        int fivePrimeUtrEnd;
+    }
+
 }

@@ -60,6 +60,7 @@ import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.Utils;
+import org.broadinstitute.hellbender.utils.read.ReadUtils;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -211,14 +212,22 @@ public class FuncotatorUtils {
     /**
      * Gets the position describing where the given allele and variant lie inside the given transcript using transcript-based coordinates.
      * The index will be calculated even if the given variant ends outside the bounds of the given transcript.
+     * Assumes {@code transcript} is a sorted list (in exon number order).
      * @param variant A {@link Locatable} to locate inside the given {@code transcript}.
-     * @param transcript A {@link List} of {@link Locatable} that describe the transcript to use for locating the given {@code allele}.
+     * @param transcript A sorted {@link List} of {@link Locatable} (in exon number order) that describe the transcript to use for locating the given {@code allele}.
+     * @param strand The strand on which the transcript is read.
      * @return The position (1-based, inclusive) describing where the given {@code allele} lies in the given {@code transcript}.  If the variant is not in the given {@code transcript}, then this returns -1.
      */
-    public static int getStartPositionInTranscript(final Locatable variant,
-                                                   final List<? extends Locatable> transcript) {
+    public static int getStartPositionInTranscript( final Locatable variant,
+                                                    final List<? extends Locatable> transcript,
+                                                    final Strand strand) {
         Utils.nonNull(variant);
         Utils.nonNull(transcript);
+        Utils.nonNull(strand);
+
+        if ( strand == Strand.NONE ) {
+            throw new GATKException("Cannot handle `NONE` strand!");
+        }
 
         int position = 0;
 
@@ -233,7 +242,12 @@ public class FuncotatorUtils {
             }
 
             if (new SimpleInterval(exon).contains(variantStartLocus)) {
-                position += variantStartLocus.getStart() - exon.getStart();
+                if ( strand == Strand.POSITIVE ) {
+                    position += variantStartLocus.getStart() - exon.getStart();
+                }
+                else {
+                    position += exon.getEnd() - variantStartLocus.getStart();
+                }
                 foundPosition = true;
                 break;
             } else {
@@ -400,17 +414,31 @@ public class FuncotatorUtils {
      * @param codingSequence The whole coding sequence for this transcript.
      * @param alignedAlleleStart The codon-aligned position (1-based, inclusive) of the allele start.
      * @param alignedAlleleStop The codon-aligned position (1-based, inclusive) of the allele stop.
+     * @param strand The {@link Strand} on which the alleles are found.
      * @return A {@link String} containing the reference allele coding sequence.
      */
     public static String getAlignedAllele(final String codingSequence,
                                           final Integer alignedAlleleStart,
-                                          final Integer alignedAlleleStop) {
+                                          final Integer alignedAlleleStop,
+                                          final Strand strand) {
         Utils.nonNull(codingSequence);
         Utils.nonNull(alignedAlleleStart);
         Utils.nonNull(alignedAlleleStop);
+        Utils.nonNull(strand);
+
+        if ( strand == Strand.NONE ) {
+            throw new GATKException("Cannot handle `NONE` strand!");
+        }
 
         // Subtract 1 because we're 1-based.
-        return codingSequence.substring(alignedAlleleStart - 1, alignedAlleleStop);
+        if ( strand == Strand.POSITIVE ) {
+            return codingSequence.substring(alignedAlleleStart - 1, alignedAlleleStop);
+        }
+        else {
+            final int end = codingSequence.length() - alignedAlleleStart + 1;
+            final int start = codingSequence.length() - alignedAlleleStop;
+            return ReadUtils.getBasesReverseComplement( codingSequence.substring(start, end).getBytes() );
+        }
     }
 
     /**
@@ -456,11 +484,40 @@ public class FuncotatorUtils {
 
         // We have to subtract 1 here because we need to account for the 1-based indexing of
         // the start and end of the coding region:
-        final int alleleIndex = alleleStartPos - 1;
+        final int alleleIndex = Math.abs(alleleStartPos - 1);
 
         return referenceCodingSequence.substring(0, alleleIndex) +
                 altAllele.getBaseString() +
                 referenceCodingSequence.substring(alleleIndex + refAllele.length());
+    }
+
+    /**
+     * Gets the start position in the coding sequence for a variant based on the given {@code variantGenomicStartPosition}.
+     * It is assumed:
+     *      {@code codingRegionGenomicStartPosition} <= {@code variantGenomicStartPosition} <= {@code codingRegionGenomicEndPosition}
+     * The transcript start position is the genomic position the transcript starts assuming `+` traversal.  That is, it is the lesser of start position and end position.
+     * This is important because we determine the relative positions based on which direction the transcript is read.
+     * @param variantGenomicStartPosition Start position (1-based, inclusive) of a variant in the genome.
+     * @param codingRegionGenomicStartPosition Start position (1-based, inclusive) of a transcript in the genome.
+     * @param codingRegionGenomicEndPosition End position (1-based, inclusive) of a transcript in the genome.
+     * @param strand {@link Strand} from which strand the associated transcript is read.
+     * @return The start position (1-based, inclusive) in the coding sequence where the variant.
+     */
+    public static int getCodingSequenceAlleleStartPosition( final int variantGenomicStartPosition,
+                                                            final int codingRegionGenomicStartPosition,
+                                                            final int codingRegionGenomicEndPosition,
+                                                            final Strand strand) {
+        Utils.nonNull(strand);
+        if (strand == Strand.NONE) {
+            throw new GATKException( "Cannot interpret `NONE` strand!" );
+        }
+
+        if ( strand == Strand.POSITIVE ) {
+            return variantGenomicStartPosition - codingRegionGenomicStartPosition + 1;
+        }
+        else {
+            return codingRegionGenomicEndPosition - variantGenomicStartPosition + 1;
+        }
     }
 
     /**
