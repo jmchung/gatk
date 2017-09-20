@@ -686,7 +686,8 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         sequenceComparison.setAlignedReferenceAllele(
                 FuncotatorUtils.getAlignedAllele(sequenceComparison.getWholeReferenceSequence().getBaseString(),
                         sequenceComparison.getAlignedCodingSequenceAlleleStart(),
-                        sequenceComparison.getAlignedReferenceAlleleStop(), strand )
+                        sequenceComparison.getAlignedReferenceAlleleStop(),
+                        strand )
         );
 
         // Get the amino acid sequence of the reference allele:
