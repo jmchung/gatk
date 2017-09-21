@@ -11,12 +11,12 @@ import java.util.List;
  * An abstract class to allow for the creation of a {@link Funcotation} for a given data source.
  * Created by jonn on 8/30/17.
  */
-public abstract class DataSourceFuncotationFactory {
+public abstract class DataSourceFuncotationFactory implements AutoCloseable {
 
     /**
      * Perform cleanup tasks for this {@link DataSourceFuncotationFactory}.
      */
-    public void cleanup() {}
+    public void close() {}
 
     /**
      * @return An ordered list of the names of annotations that this Data Source supports.

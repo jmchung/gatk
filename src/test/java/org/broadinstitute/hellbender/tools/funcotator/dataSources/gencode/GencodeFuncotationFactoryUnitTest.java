@@ -96,23 +96,46 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
     }
 
     @DataProvider
-    Object[][] provideDataForCreateFuncotations() {
-        return new Object[][]{
-                {},
-        };
+    Object[][] provideSnpDataForGetVariantClassificationWithOutOfCdsData() {
+        final List<Object[]> l = new ArrayList<>();
+
+        l.addAll( DataProviderForSnpsOnMuc16.provideSnpDataForGetVariantClassification_1() );
+        l.addAll( DataProviderForSnpsOnMuc16.provideSnpDataForGetVariantClassification_2() );
+        l.addAll( DataProviderForSnpsOnMuc16.provideSnpDataForGetVariantClassification_3() );
+        l.addAll( DataProviderForSnpsOnMuc16.provideSnpDataForGetVariantClassification_NotInCDS() );
+
+        return l.toArray(new Object[][]{{}});
     }
 
     //==================================================================================================================
     // Tests:
 
     @Test (dataProvider = "provideSnpDataForGetVariantClassification")
-    void testGetVariantClassification(final int chromosomeNumber,
+    void testGetVariantClassificationForCodingRegions(final int chromosomeNumber,
                                       final int start,
                                       final int end,
                                       final GencodeFuncotation.VariantType variantType,
                                       final String ref,
                                       final String alt,
                                       final GencodeFuncotation.VariantClassification expectedVariantClassification) {
+
+        // This test can only deal with variants in coding regions.
+        // So we ignore any tests that are expected outside of coding regions.
+        // i.e. expectedVariantClassification is one of:
+        //     { INTRON, FIVE_PRIME_UTR, THREE_PRIME_UTR, IGR, FIVE_PRIME_FLANK, DE_NOVO_START_IN_FRAME, DE_NOVO_START_OUT_FRAME, RNA, LINCRNA }
+        // We test these cases in another unit test.
+        if ((expectedVariantClassification == GencodeFuncotation.VariantClassification.INTRON) ||
+            (expectedVariantClassification == GencodeFuncotation.VariantClassification.FIVE_PRIME_UTR) ||
+            (expectedVariantClassification == GencodeFuncotation.VariantClassification.THREE_PRIME_UTR) ||
+            (expectedVariantClassification == GencodeFuncotation.VariantClassification.IGR) ||
+            (expectedVariantClassification == GencodeFuncotation.VariantClassification.FIVE_PRIME_FLANK) ||
+            (expectedVariantClassification == GencodeFuncotation.VariantClassification.DE_NOVO_START_IN_FRAME) ||
+            (expectedVariantClassification == GencodeFuncotation.VariantClassification.DE_NOVO_START_OUT_FRAME) ||
+            (expectedVariantClassification == GencodeFuncotation.VariantClassification.RNA) ||
+            (expectedVariantClassification == GencodeFuncotation.VariantClassification.LINCRNA) )
+        {
+            return;
+        }
 
         final String contig = "chr" + Integer.toString(chromosomeNumber);
         final SimpleInterval variantInterval = new SimpleInterval( contig, start, end );
@@ -129,55 +152,96 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
         );
         final VariantContext variantContext = variantContextBuilder.make();
 
+        // Get our gene feature iterator:
+        final CloseableTribbleIterator<GencodeGtfFeature> gtfFeatureIterator;
         try {
-            // Get our gene feature iterator:
-            final CloseableTribbleIterator<GencodeGtfFeature> gtfFeatureIterator = muc16FeatureReader.query(contig, start, end);
-
-            // Get the gene.
-            // We know the first gene is the right one - the gene in question is the MUC16 gene:
-            final GencodeGtfGeneFeature             gene = (GencodeGtfGeneFeature) gtfFeatureIterator.next();
-            final GencodeGtfTranscriptFeature transcript = getMuc16Transcript(gene);
-            final GencodeGtfExonFeature             exon = getExonForVariant( gene, variantInterval );
-
-            final ReferenceContext referenceContext = new ReferenceContext( refDataSource, variantInterval );
-
-            final List<? extends Locatable> exonPositionList = GencodeFuncotationFactory.getSortedExonPositions(transcript);
-
-            final ReferenceDataSource muc16TranscriptDataSource = ReferenceDataSource.of(new File(MUC16_GENCODE_TRANSCRIPT_FASTA_FILE));
-            final Map<String, GencodeFuncotationFactory.MappedTranscriptIdInfo> muc16TranscriptIdMap = GencodeFuncotationFactory.createTranscriptIdMap(muc16TranscriptDataSource);
-
-            final FuncotatorUtils.SequenceComparison seqComp =
-                    GencodeFuncotationFactory.createSequenceComparison(
-                            variantContext,
-                            altAllele,
-                            referenceContext,
-                            transcript,
-                            exonPositionList,
-                            muc16TranscriptIdMap,
-                            muc16TranscriptDataSource);
-
-            final GencodeFuncotation.VariantClassification varClass = GencodeFuncotationFactory.getVariantClassification(
-                    variantContext,
-                    altAllele,
-                    variantType,
-                    exon,
-                    seqComp
-            );
-
-            Assert.assertEquals( varClass, expectedVariantClassification );
-
+            gtfFeatureIterator = muc16FeatureReader.query(contig, start, end);
         }
-        catch ( final IOException ex ) {
+        catch (final IOException ex) {
             throw new GATKException("Could not finish the test!", ex);
         }
+
+        // Get the gene.
+        // We know the first gene is the right one - the gene in question is the MUC16 gene:
+        final GencodeGtfGeneFeature             gene = (GencodeGtfGeneFeature) gtfFeatureIterator.next();
+        final GencodeGtfTranscriptFeature transcript = getMuc16Transcript(gene);
+        final GencodeGtfExonFeature             exon = getExonForVariant( gene, variantInterval );
+
+        final ReferenceContext referenceContext = new ReferenceContext( refDataSource, variantInterval );
+
+        final List<? extends Locatable> exonPositionList = GencodeFuncotationFactory.getSortedExonPositions(transcript);
+
+        final ReferenceDataSource muc16TranscriptDataSource = ReferenceDataSource.of(new File(MUC16_GENCODE_TRANSCRIPT_FASTA_FILE));
+        final Map<String, GencodeFuncotationFactory.MappedTranscriptIdInfo> muc16TranscriptIdMap = GencodeFuncotationFactory.createTranscriptIdMap(muc16TranscriptDataSource);
+
+        final FuncotatorUtils.SequenceComparison seqComp =
+                GencodeFuncotationFactory.createSequenceComparison(
+                        variantContext,
+                        altAllele,
+                        referenceContext,
+                        transcript,
+                        exonPositionList,
+                        muc16TranscriptIdMap,
+                        muc16TranscriptDataSource);
+
+        final GencodeFuncotation.VariantClassification varClass = GencodeFuncotationFactory.getVariantClassification(
+                variantContext,
+                altAllele,
+                variantType,
+                exon,
+                seqComp
+        );
+
+        Assert.assertEquals( varClass, expectedVariantClassification );
     }
 
-    @Test (dataProvider = "provideDataForCreateFuncotations")
-    void testCreateFuncotations() {
-//    private List<GencodeFuncotation> createFuncotations(final VariantContext variant,
-//                                                        final Allele altAllele,
-//                                                        final GencodeGtfGeneFeature gtfFeature,
-//                                                        final ReferenceContext reference);
+    @Test (dataProvider = "provideSnpDataForGetVariantClassificationWithOutOfCdsData")
+    void testCreateFuncotations(final int chromosomeNumber,
+                                final int start,
+                                final int end,
+                                final GencodeFuncotation.VariantType variantType,
+                                final String ref,
+                                final String alt,
+                                final GencodeFuncotation.VariantClassification expectedVariantClassification) {
+
+        final String contig = "chr" + Integer.toString(chromosomeNumber);
+        final SimpleInterval variantInterval = new SimpleInterval( contig, start, end );
+
+        final Allele refAllele = Allele.create(ref, true);
+        final Allele altAllele = Allele.create(alt);
+
+        final VariantContextBuilder variantContextBuilder = new VariantContextBuilder(
+                HG19_CHR19_REFERENCE_FILE_NAME,
+                contig,
+                start,
+                end,
+                Arrays.asList(refAllele, altAllele)
+        );
+        final VariantContext variantContext = variantContextBuilder.make();
+
+        // Get our gene feature iterator:
+        final CloseableTribbleIterator<GencodeGtfFeature> gtfFeatureIterator;
+        try {
+            gtfFeatureIterator = muc16FeatureReader.query(contig, start, end);
+        }
+        catch (final IOException ex) {
+            throw new GATKException("Could not finish the test!", ex);
+        }
+
+        // Get the gene.
+        // We know the first gene is the right one - the gene in question is the MUC16 gene:
+        final GencodeGtfGeneFeature gene = (GencodeGtfGeneFeature) gtfFeatureIterator.next();
+        final ReferenceContext referenceContext = new ReferenceContext( refDataSource, variantInterval );
+
+        // Create a factory for our funcotations:
+        try (final GencodeFuncotationFactory funcotationFactory = new GencodeFuncotationFactory(new File(MUC16_GENCODE_TRANSCRIPT_FASTA_FILE))) {
+            // Generate our funcotations:
+            final List<GencodeFuncotation> funcotations = funcotationFactory.createFuncotations(variantContext, altAllele, gene, referenceContext);
+
+            // Make sure we get what we expected:
+            Assert.assertEquals(funcotations.size(), 1);
+            Assert.assertEquals(funcotations.get(0).getVariantClassification(), expectedVariantClassification);
+        }
     }
 
 }

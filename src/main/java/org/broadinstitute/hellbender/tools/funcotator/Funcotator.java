@@ -107,7 +107,7 @@ public class Funcotator extends VariantWalker {
     public void closeTool() {
 
         for(final DataSourceFuncotationFactory factory : dataSourceFactories) {
-            factory.cleanup();
+            factory.close();
         }
         outputRenderer.close();
 

@@ -138,7 +138,6 @@ abstract public class DataProviderForSnpsOnMuc16 {
                 new Object[] {19, 9077817, 9077817, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.MISSENSE},
                 new Object[] {19, 9077822, 9077822, GencodeFuncotation.VariantType.SNP, "G", "A", GencodeFuncotation.VariantClassification.SILENT},
                 new Object[] {19, 9077847, 9077847, GencodeFuncotation.VariantType.SNP, "G", "A", GencodeFuncotation.VariantClassification.MISSENSE},
-                new Object[] {19, 9080450, 9080450, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.SPLICE_SITE},
                 new Object[] {19, 9080501, 9080501, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.MISSENSE},
                 new Object[] {19, 9080519, 9080519, GencodeFuncotation.VariantType.SNP, "G", "A", GencodeFuncotation.VariantClassification.MISSENSE},
                 new Object[] {19, 9082363, 9082363, GencodeFuncotation.VariantType.SNP, "G", "A", GencodeFuncotation.VariantClassification.MISSENSE},
@@ -460,7 +459,6 @@ abstract public class DataProviderForSnpsOnMuc16 {
                 new Object[] {19, 8993443, 8993443, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.SILENT},
                 new Object[] {19, 8993535, 8993535, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.MISSENSE},
                 new Object[] {19, 8994157, 8994157, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.MISSENSE},
-                new Object[] {19, 8994416, 8994416, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.SPLICE_SITE},
                 new Object[] {19, 8994429, 8994429, GencodeFuncotation.VariantType.SNP, "G", "A", GencodeFuncotation.VariantClassification.SILENT},
                 new Object[] {19, 8994476, 8994476, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.MISSENSE},
                 new Object[] {19, 8994489, 8994489, GencodeFuncotation.VariantType.SNP, "G", "A", GencodeFuncotation.VariantClassification.SILENT},
@@ -489,7 +487,6 @@ abstract public class DataProviderForSnpsOnMuc16 {
                 new Object[] {19, 8999545, 8999545, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.MISSENSE},
                 new Object[] {19, 8999551, 8999551, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.MISSENSE},
                 new Object[] {19, 8999555, 8999555, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.SILENT},
-                new Object[] {19, 9000146, 9000146, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.SPLICE_SITE},
                 new Object[] {19, 9000160, 9000160, GencodeFuncotation.VariantType.SNP, "G", "A", GencodeFuncotation.VariantClassification.SILENT},
                 new Object[] {19, 9000207, 9000207, GencodeFuncotation.VariantType.SNP, "G", "A", GencodeFuncotation.VariantClassification.MISSENSE},
                 new Object[] {19, 9000453, 9000453, GencodeFuncotation.VariantType.SNP, "G", "A", GencodeFuncotation.VariantClassification.MISSENSE},
@@ -1258,6 +1255,14 @@ abstract public class DataProviderForSnpsOnMuc16 {
                 new Object[] {19, 9073481, 9073481, GencodeFuncotation.VariantType.SNP, "G", "A", GencodeFuncotation.VariantClassification.SILENT},
                 new Object[] {19, 9073507, 9073507, GencodeFuncotation.VariantType.SNP, "G", "A", GencodeFuncotation.VariantClassification.MISSENSE},
                 new Object[] {19, 9073527, 9073527, GencodeFuncotation.VariantType.SNP, "G", "T", GencodeFuncotation.VariantClassification.MISSENSE}
+        );
+    }
+
+    static List<Object[]> provideSnpDataForGetVariantClassification_NotInCDS() {
+        return Arrays.asList(
+                new Object[] {19, 9080450, 9080450, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.SPLICE_SITE},
+                new Object[] {19, 8994416, 8994416, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.SPLICE_SITE},
+                new Object[] {19, 9000146, 9000146, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.SPLICE_SITE}
         );
     }
 
