@@ -5,6 +5,7 @@ import java.util.List;
 
 /**
  * Helper class to contain a data provider helper method set for getting SNPs on the MUC16 gene.
+ * These cases were pulled directly from Oncotator (MUC16Testdata.py)
  * Created by jonn on 9/15/17.
  */
 abstract public class DataProviderForSnpsOnMuc16 {
@@ -1265,5 +1266,4 @@ abstract public class DataProviderForSnpsOnMuc16 {
                 new Object[] {19, 9000146, 9000146, GencodeFuncotation.VariantType.SNP, "C", "T", GencodeFuncotation.VariantClassification.SPLICE_SITE}
         );
     }
-
 }

@@ -517,7 +517,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
             // Get our coding sequence for this region:
             final List<Locatable> activeRegions = Collections.singletonList(utr);
             final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
-            
+
             final String referenceCodingSequence;
             if ( transcriptFastaReferenceDataSource != null ) {
                 referenceCodingSequence = getCodingSequenceFromTranscriptFasta( transcript.getTranscriptId(), transcriptIdMap, transcriptFastaReferenceDataSource);
@@ -767,29 +767,28 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     /**
      * Creates a Gencode Funcotation with all trivial fields populated.
      * @param variant The {@link VariantContext} for the current variant.
-     * @param alternateAllele The alternate {@link Allele} we are currently annotating.
+     * @param altAllele The alternate {@link Allele} we are currently annotating.
      * @param gtfFeature The current {@link GencodeGtfGeneFeature} read from the input feature file.
      * @param transcript The current {@link GencodeGtfTranscriptFeature} containing our {@code alternateAllele}.
      * @return A trivially populated {@link GencodeFuncotation} object.
      */
      private static GencodeFuncotation createGencodeFuncotationWithTrivialFieldsPopulated(final VariantContext variant,
-                                                                                  final Allele alternateAllele,
+                                                                                  final Allele altAllele,
                                                                                   final GencodeGtfGeneFeature gtfFeature,
                                                                                   final GencodeGtfTranscriptFeature transcript) {
         final GencodeFuncotation gencodeFuncotation = new GencodeFuncotation();
 
         final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
 
-        final Allele altAllele;
          if ( strand == Strand.POSITIVE ) {
              gencodeFuncotation.setRefAllele(variant.getReference().getBaseString());
-             altAllele = alternateAllele;
+             gencodeFuncotation.setTranscriptStrand("+");
          }
          else {
              gencodeFuncotation.setRefAllele(
                      ReadUtils.getBasesReverseComplement( variant.getReference().getBases() )
              );
-             altAllele = Allele.create( ReadUtils.getBasesReverseComplement( alternateAllele.getBases() ), false);
+             gencodeFuncotation.setTranscriptStrand("-");
          }
 
         gencodeFuncotation.setHugoSymbol( gtfFeature.getGeneName() );
@@ -808,7 +807,6 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         gencodeFuncotation.setGenomeChange(getGenomeChangeString(variant, altAllele, gtfFeature));
         gencodeFuncotation.setAnnotationTranscript( transcript.getTranscriptId() );
-        gencodeFuncotation.setTranscriptStrand( strand.toString() );
 
         gencodeFuncotation.setTranscriptPos(
              FuncotatorUtils.getCodingSequenceAlleleStartPosition( variant.getStart(), transcript.getStart(), transcript.getEnd(), strand )
