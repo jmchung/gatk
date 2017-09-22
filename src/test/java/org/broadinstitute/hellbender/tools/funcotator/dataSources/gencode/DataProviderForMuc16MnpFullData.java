@@ -9,22 +9,6 @@ import java.util.List;
  * Created by jonn on 9/21/17.
  */
 public class DataProviderForMuc16MnpFullData {
-
-//    Method: testCreateFuncotations([
-// Parameter{index=0, type=java.lang.String, declaredAnnotations=[]}, 
-// Parameter{index=1, type=int, declaredAnnotations=[]}, 
-// Parameter{index=2, type=int, declaredAnnotations=[]}, 
-// Parameter{index=3, type=int, declaredAnnotations=[]}, 
-// Parameter{index=4, type=org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation$VariantClassification, declaredAnnotations=[]}, 
-// Parameter{index=5, type=org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation$VariantType, declaredAnnotations=[]}, 
-// Parameter{index=6, type=java.lang.String, declaredAnnotations=[]}, 
-// Parameter{index=7, type=java.lang.String, declaredAnnotations=[]}, 
-// Parameter{index=8, type=java.lang.String, declaredAnnotations=[]}, 
-// Parameter{index=9, type=java.lang.String, declaredAnnotations=[]}, 
-// Parameter{index=10, type=java.lang.String, declaredAnnotations=[]}, 
-// Parameter{index=11, type=java.lang.String, declaredAnnotations=[]}, 
-// Parameter{index=12, type=java.lang.String, declaredAnnotations=[]}])
-
     static List<Object[]> provideMnpDataForMuc16_1() {
         return Arrays.asList(
                 new Object[]{"MUC16", 19, 9091811, 9091811, GencodeFuncotation.VariantClassification.SILENT, GencodeFuncotation.VariantType.SNP, "G", "A", "g.chr19:9091811G>A", "-", "c.4C>T", "c.(4-6)Ctg>Ttg", "p.L2L"},
@@ -39,21 +23,6 @@ public class DataProviderForMuc16MnpFullData {
                 new Object[]{"MUC16", 19, 8959609, 8959609, GencodeFuncotation.VariantClassification.NONSTOP, GencodeFuncotation.VariantType.SNP, "C", "A", "g.chr19:8959609C>A", "-", "c.43523G>T", "c.(43522-43524)tGa>tTa", "p.*14508L"},
                 new Object[]{"MUC16", 19, 8959610, 8959610, GencodeFuncotation.VariantClassification.NONSTOP, GencodeFuncotation.VariantType.SNP, "A", "G", "g.chr19:8959610A>G", "-", "c.43522T>C", "c.(43522-43524)Tga>Cga", "p.*14508R"},
                 new Object[]{"MUC16", 19, 8959611, 8959611, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "T", "A", "g.chr19:8959611T>A", "-", "c.43521A>T", "c.(43519-43521)caA>caT", "p.Q14507H"},
-                new Object[]{"PIK3CA", 3, 178916619, 178916619, GencodeFuncotation.VariantClassification.SILENT, GencodeFuncotation.VariantType.SNP, "T", "A", "g.chr3:178916619T>A", "+", "c.6T>A", "c.(4-6)ccT>ccA", "p.P2P"},
-                new Object[]{"PIK3CA", 3, 178916620, 178916620, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "C", "T", "g.chr3:178916620C>T", "+", "c.7C>T", "c.(7-9)Cca>Tca", "p.P3S"},
-                new Object[]{"PIK3CA", 3, 178916617, 178916617, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "C", "T", "g.chr3:178916617C>T", "+", "c.4C>T", "c.(4-6)Cct>Tct", "p.P2S"},
-                new Object[]{"PIK3CA", 3, 178919220, 178919220, GencodeFuncotation.VariantClassification.SILENT, GencodeFuncotation.VariantType.SNP, "C", "T", "g.chr3:178919220C>T", "+", "c.705C>T", "c.(703-705)tcC>tcT", "p.S235S"},
-                new Object[]{"PIK3CA", 3, 178921433, 178921433, GencodeFuncotation.VariantClassification.SILENT, GencodeFuncotation.VariantType.SNP, "A", "T", "g.chr3:178921433A>T", "+", "c.915A>T", "c.(913-915)ccA>ccT", "p.P305P"},
-                new Object[]{"PIK3CA", 3, 178922366, 178922366, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "T", "A", "g.chr3:178922366T>A", "+", "c.1135T>A", "c.(1135-1137)Tcc>Acc", "p.S379T"},
-                new Object[]{"PIK3CA", 3, 178928317, 178928317, GencodeFuncotation.VariantClassification.SILENT, GencodeFuncotation.VariantType.SNP, "C", "T", "g.chr3:178928317C>T", "+", "c.1503C>T", "c.(1501-1503)tcC>tcT", "p.S501S"},
-                new Object[]{"PIK3CA", 3, 178936091, 178936091, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "G", "A", "g.chr3:178936091G>A", "+", "c.1633G>A", "c.(1633-1635)Gag>Aag", "p.E545K"},
-                new Object[]{"PIK3CA", 3, 178937063, 178937063, GencodeFuncotation.VariantClassification.NONSENSE, GencodeFuncotation.VariantType.SNP, "C", "T", "g.chr3:178937063C>T", "+", "c.1744C>T", "c.(1744-1746)Cag>Tag", "p.Q582*"},
-                new Object[]{"PIK3CA", 3, 178941890, 178941890, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "G", "A", "g.chr3:178941890G>A", "+", "c.2209G>A", "c.(2209-2211)Gag>Aag", "p.E737K"},
-                new Object[]{"PIK3CA", 3, 178942511, 178942511, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "C", "T", "g.chr3:178942511C>T", "+", "c.2318C>T", "c.(2317-2319)tCc>tTc", "p.S773F"},
-                new Object[]{"PIK3CA", 3, 178942523, 178942523, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "G", "A", "g.chr3:178942523G>A", "+", "c.2330G>A", "c.(2329-2331)aGg>aAg", "p.R777K"},
-                new Object[]{"PIK3CA", 3, 178943785, 178943785, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "C", "T", "g.chr3:178943785C>T", "+", "c.2452C>T", "c.(2452-2454)Cgt>Tgt", "p.R818C"},
-                new Object[]{"PIK3CA", 3, 178947158, 178947158, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "G", "A", "g.chr3:178947158G>A", "+", "c.2594G>A", "c.(2593-2595)gGc>gAc", "p.G865D"},
-                new Object[]{"PIK3CA", 3, 178952085, 178952085, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "A", "T", "g.chr3:178952085A>T", "+", "c.3140A>T", "c.(3139-3141)cAt>cTt", "p.H1047L"},
                 // Had to change gt transcript change.  Had to change protein change for proper codon
                 new Object[]{"MUC16", 19, 9002672, 9002672, GencodeFuncotation.VariantClassification.SPLICE_SITE, GencodeFuncotation.VariantType.SNP, "G", "A", "g.chr19:9002672G>A", "-", "c.40144C>T", "c.(40144-40146)Cct>Tct", "p.P13382S"},
                 // Had to change GT for the protein change, since this is an intron splice site.

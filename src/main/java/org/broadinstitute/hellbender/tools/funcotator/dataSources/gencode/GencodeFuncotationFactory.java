@@ -575,8 +575,16 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         for ( final GencodeGtfExonFeature exon : transcript.getExons() ) {
             if (( Math.abs( exon.getStart() - variant.getStart() ) <= spliceSiteVariantWindowBases ) ||
                 ( Math.abs( exon.getEnd() - variant.getStart() ) <= spliceSiteVariantWindowBases )) {
+
+                // Set the variant classification:
                 gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.SPLICE_SITE);
                 gencodeFuncotation.setSecondaryVariantClassification(GencodeFuncotation.VariantClassification.INTRON);
+
+                // Since we're in a splice site, we need to create the coding region string for a splice site.
+                final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
+                gencodeFuncotation.setCodonChange(
+                        FuncotatorUtils.createSpliceSiteCodonChange(variant.getStart(), exon.getExonNumber(), exon.getStart(), exon.getEnd(), strand)
+                );
             }
         }
 
@@ -610,13 +618,21 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 }
             }
 
-            if ( !determinedRegionAlready ) {
-                for (final GencodeGtfExonFeature exon : transcript.getExons()) {
-                    final GencodeGtfCDSFeature cds = exon.getCds();
-                    if ((cds != null) && (cds.contains(variant))) {
-                        subFeature = exon;
-                        determinedRegionAlready = true;
-                    }
+            // Even though we may have an overlapping UTR already, we may be able to find a spot in the transcript
+            // where this overlaps something more meaningful.
+            // For example, see HG19 - chr19:8959608
+            for (final GencodeGtfExonFeature exon : transcript.getExons()) {
+                if ((exon.getCds() != null) && (exon.getCds().contains(variant))) {
+                    subFeature = exon;
+                    determinedRegionAlready = true;
+                }
+                else if ((exon.getStartCodon() != null) && (exon.getStartCodon().contains(variant))) {
+                    subFeature = exon;
+                    determinedRegionAlready = true;
+                }
+                else if ((exon.getStopCodon() != null) && (exon.getStopCodon().contains(variant))) {
+                    subFeature = exon;
+                    determinedRegionAlready = true;
                 }
             }
 
@@ -856,9 +872,17 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @return A short {@link String} representation of the genomic change for the given variant, allele, and feature.
      */
     private static String getGenomeChangeString(final VariantContext variant, final Allele altAllele, final GencodeGtfGeneFeature gtfFeature) {
-        return "g." + gtfFeature.getChromosomeName() +
-                ":" + variant.getStart() +
-                variant.getReference().getBaseString() + ">" + altAllele.getBaseString();
+
+        if ( variant.getReference().length() == 1) {
+            return "g." + gtfFeature.getChromosomeName() +
+                    ":" + variant.getStart() +
+                    variant.getReference().getBaseString() + ">" + altAllele.getBaseString();
+        }
+        else {
+            return "g." + gtfFeature.getChromosomeName() +
+                    ":" + variant.getStart() + "_" + ( variant.getStart() + variant.getReference().length() - 1) +
+                    variant.getReference().getBaseString() + ">" + altAllele.getBaseString();
+        }
     }
 
     /**

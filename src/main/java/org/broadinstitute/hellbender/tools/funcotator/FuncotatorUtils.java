@@ -340,6 +340,45 @@ public class FuncotatorUtils {
     }
 
     /**
+     * Gets a codon change string for a splice site.
+     * Assumes the variant and exon referenced in the params are on the same contig.
+     * @param variantStart Start position (1-based, inclusive) of the variant.
+     * @param exonNumber Number of the exon in the transcript.
+     * @param exonStart Start position (1-based, inclusive) of the exon.
+     * @param exonEnd End position (1-based, inclusive) of the exon.
+     * @param strand The {@link Strand} on which the variant and exon are read.
+     * @return A {@link String} representing the codon change for the splice site represented by the given parameters.
+     */
+    public static String createSpliceSiteCodonChange(final int variantStart,
+                                                     final int exonNumber,
+                                                     final int exonStart,
+                                                     final int exonEnd,
+                                                     final Strand strand) {
+        Utils.nonNull(strand);
+        if ( strand == Strand.NONE ) {
+            throw new GATKException("Unable to handle NONE strand.");
+        }
+
+        char sign = '-';
+        int offset = exonStart - variantStart;
+        if ( Math.abs(offset) > Math.abs(variantStart - exonEnd)) {
+            offset = variantStart - exonEnd;
+            sign = '+';
+        }
+
+        if (strand == Strand.NEGATIVE) {
+            if ( sign == '+' ) {
+                sign = '-';
+            }
+            else {
+                sign = '+';
+            }
+        }
+
+        return "c.e" + exonNumber + sign + offset;
+    }
+
+    /**
      * Creates the string representation of the codon change for the given {@link SequenceComparison}.
      * @param seqComp {@link SequenceComparison} representing the alternate and reference alleles for a DNA sequence.
      * @return A {@link String} representing the codon change for the given {@link SequenceComparison}.

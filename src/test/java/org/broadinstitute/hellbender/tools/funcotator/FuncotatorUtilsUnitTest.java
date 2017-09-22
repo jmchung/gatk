@@ -12,6 +12,7 @@ import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.*;
 import java.util.Arrays;
@@ -906,6 +907,11 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @Test (dataProvider = "provideDataForGetCodingSequenceAlleleStartPosition")
     void testGetCodingSequenceAlleleStartPosition(final int variantStartPosition, final int codingStartPosition, final int codingEndPosition, final Strand strand, final int expected) {
         Assert.assertEquals( FuncotatorUtils.getCodingSequenceAlleleStartPosition(variantStartPosition, codingStartPosition, codingEndPosition, strand), expected );
+    }
+
+    @Test
+    void testCreateSpliceSiteCodonChange() {
+        throw new NotImplementedException();
     }
 
 }
