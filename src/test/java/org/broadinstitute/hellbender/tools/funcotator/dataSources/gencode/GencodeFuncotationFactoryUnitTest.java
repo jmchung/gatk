@@ -181,7 +181,7 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
 
         final ReferenceContext referenceContext = new ReferenceContext( refDataSource, variantInterval );
 
-        final List<? extends Locatable> exonPositionList = GencodeFuncotationFactory.getSortedExonPositions(transcript);
+        final List<? extends Locatable> exonPositionList = GencodeFuncotationFactory.getSortedExonAndStartStopPositions(transcript);
 
         final ReferenceDataSource muc16TranscriptDataSource = ReferenceDataSource.of(new File(MUC16_GENCODE_TRANSCRIPT_FASTA_FILE));
         final Map<String, GencodeFuncotationFactory.MappedTranscriptIdInfo> muc16TranscriptIdMap = GencodeFuncotationFactory.createTranscriptIdMap(muc16TranscriptDataSource);

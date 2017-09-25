@@ -103,6 +103,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
     /**
      * Creates a map of Transcript IDs for use in looking up transcripts from the FASTA dictionary for the GENCODE Transcripts.
+     * We include the start and stop codons in the transcripts so we can handle start/stop codon variants.
      * @param fastaReference The {@link ReferenceDataSource} corresponding to the Transcript FASTA file for this GENCODE dataset.
      * @return A {@link Map} of {@link String} -> {@link MappedTranscriptIdInfo} which maps real transcript IDs to the information about that transcript in the transcript FASTA file.
      */
@@ -293,7 +294,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Get the list of exons by their locations so we can use them to determine our location in the transcript and get
         // the transcript code itself:
-        final List<? extends Locatable> exonPositionList = getSortedExonPositions(transcript);
+        final List<? extends Locatable> exonPositionList = getSortedExonAndStartStopPositions(transcript);
 
         // Set our transcript exon number:
         gencodeFuncotation.setTranscriptExon(exon.getExonNumber());
@@ -325,13 +326,51 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     }
 
     /**
-     * Gets a list of locatables representing the exons containing coding regions within the given {@code transcript}.
-     * These exons are sorted by exon order.
+     * Gets a list of locatables representing the start codon, exons, and stop codon containing coding regions within the given {@code transcript}.
+     * These exons are sorted by exon-number order.
      * @param transcript A {@link GencodeGtfTranscriptFeature} from which to pull the exons.
      * @return A list of {@link Locatable} objects representing the exons in the given {@code transcript} in the order in which the appear in the expressed protein.
      */
     @VisibleForTesting
-    static List<? extends Locatable> getSortedExonPositions(final GencodeGtfTranscriptFeature transcript) {
+    static List<? extends Locatable> getSortedExonAndStartStopPositions(final GencodeGtfTranscriptFeature transcript) {
+
+        // Sort by exon number first:
+        transcript.getExons().sort((lhs, rhs) -> lhs.getExonNumber() < rhs.getExonNumber() ? -1 : (lhs.getExonNumber() > rhs.getExonNumber() ) ? 1 : 0 );
+
+//        final List<Locatable> exonList = new ArrayList<>();
+//        for ( final GencodeGtfExonFeature exon : transcript.getExons() ) {
+//            if ( exon.getCds() != null ) {
+//                exonList.add( exon );
+//            }
+//        }
+//        return exonList;
+
+        //============
+
+//        final List<Locatable> exonList = new ArrayList<>();
+//        Locatable startCodon = null;
+//        Locatable stopCodon  = null;
+//        for ( final GencodeGtfExonFeature exon : transcript.getExons() ) {
+//            if ( (exon.getStartCodon() != null) && (startCodon == null) ) {
+//                startCodon = exon.getStartCodon();
+//            }
+//            if ( (exon.getStopCodon() != null) && (stopCodon == null) ) {
+//                stopCodon = exon.getStopCodon();
+//            }
+//            if ( exon.getCds() != null ) {
+//                exonList.add( exon.getCds() );
+//            }
+//        }
+//        if (startCodon != null) {
+//            exonList.add(0, startCodon);
+//        }
+//        if (stopCodon != null) {
+//            exonList.add(stopCodon);
+//        }
+//        return exonList;
+
+        //============
+
         return transcript.getExons().stream()
                 .filter(e -> (e.getCds() != null))
                 .map(GencodeGtfExonFeature::getCds)
@@ -680,6 +719,21 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
             altAllele = Allele.create(ReadUtils.getBasesReverseComplement( alternateAllele.getBases() ), false);
         }
 
+        int startCodonStartPosition = -1;
+        int startCodonEndPosition   = -1;
+        int stopCodonStartPosition  = -1;
+        int stopCodonEndPosition    = -1;
+        for (final GencodeGtfExonFeature exon : transcript.getExons()) {
+            if ( exon.getStartCodon() != null ) {
+                startCodonStartPosition = exon.getStartCodon().getStart();
+                startCodonEndPosition   = exon.getStartCodon().getEnd();
+            }
+            if ( exon.getStopCodon() != null ) {
+                stopCodonStartPosition = exon.getStopCodon().getStart();
+                stopCodonEndPosition   = exon.getStopCodon().getEnd();
+            }
+        }
+
         final String referenceCodingSequence;
         if ( transcriptFastaReferenceDataSource != null ) {
             referenceCodingSequence = getCodingSequenceFromTranscriptFasta( transcript.getTranscriptId(), transcriptIdMap, transcriptFastaReferenceDataSource);
@@ -703,7 +757,9 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         );
 
         // Get the coding region start position (in the above computed reference coding region):
-        sequenceComparison.setCodingSequenceAlleleStart(FuncotatorUtils.getStartPositionInTranscript(variant, exonPositionList, strand));
+        sequenceComparison.setCodingSequenceAlleleStart(
+                FuncotatorUtils.getStartPositionInTranscript(variant, exonPositionList, strand)
+        );
 
         // Get the in-frame start position of the codon containing the given variant:
         sequenceComparison.setAlignedCodingSequenceAlleleStart(FuncotatorUtils.getAlignedPosition(sequenceComparison.getCodingSequenceAlleleStart()));
