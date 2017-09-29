@@ -19,9 +19,6 @@ public class DataProviderForMuc16MnpFullData {
                 new Object[]{"MUC16", 19, 8959605, 8959605, GencodeFuncotation.VariantClassification.THREE_PRIME_UTR, GencodeFuncotation.VariantType.SNP, "C", "A", "g.chr19:8959605C>A", "-", null, null, null},
                 new Object[]{"MUC16", 19, 8959606, 8959606, GencodeFuncotation.VariantClassification.THREE_PRIME_UTR, GencodeFuncotation.VariantType.SNP, "A", "G", "g.chr19:8959606A>G", "-", null, null, null},
                 new Object[]{"MUC16", 19, 8959607, 8959607, GencodeFuncotation.VariantClassification.THREE_PRIME_UTR, GencodeFuncotation.VariantType.SNP, "G", "A", "g.chr19:8959607G>A", "-", null, null, null},
-                new Object[]{"MUC16", 19, 8959608, 8959608, GencodeFuncotation.VariantClassification.NONSTOP, GencodeFuncotation.VariantType.SNP, "T", "A", "g.chr19:8959608T>A", "-", "c.43524A>T", "c.(43522-43524)tgA>tgT", "p.*14508C"},
-                new Object[]{"MUC16", 19, 8959609, 8959609, GencodeFuncotation.VariantClassification.NONSTOP, GencodeFuncotation.VariantType.SNP, "C", "A", "g.chr19:8959609C>A", "-", "c.43523G>T", "c.(43522-43524)tGa>tTa", "p.*14508L"},
-                new Object[]{"MUC16", 19, 8959610, 8959610, GencodeFuncotation.VariantClassification.NONSTOP, GencodeFuncotation.VariantType.SNP, "A", "G", "g.chr19:8959610A>G", "-", "c.43522T>C", "c.(43522-43524)Tga>Cga", "p.*14508R"},
                 new Object[]{"MUC16", 19, 8959611, 8959611, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "T", "A", "g.chr19:8959611T>A", "-", "c.43521A>T", "c.(43519-43521)caA>caT", "p.Q14507H"},
                 // Had to change gt transcript change.  Had to change protein change for proper codon
                 new Object[]{"MUC16", 19, 9002672, 9002672, GencodeFuncotation.VariantClassification.SPLICE_SITE, GencodeFuncotation.VariantType.SNP, "G", "A", "g.chr19:9002672G>A", "-", "c.40144C>T", "c.(40144-40146)Cct>Tct", "p.P13382S"},
@@ -45,8 +42,6 @@ public class DataProviderForMuc16MnpFullData {
                 new Object[]{"MUC16", 19, 9088334, 9088334, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "G", "A", "g.chr19:9088334G>A", "-", "c.3481C>T", "c.(3481-3483)Cct>Tct", "p.P1161S"},
                 new Object[]{"MUC16", 19, 9018458, 9018458, GencodeFuncotation.VariantClassification.SILENT, GencodeFuncotation.VariantType.SNP, "A", "T", "g.chr19:9018458A>T", "-", "c.37716T>A", "c.(37714-37716)acT>acA", "p.T12572T"},
                 new Object[]{"MUC16", 19, 9063777, 9063777, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "C", "A", "g.chr19:9063777C>A", "-", "c.23669G>T", "c.(23668-23670)tGg>tTg", "p.W7890L"},
-                new Object[]{"MUC16", 19, 9069475, 9069475, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "C", "A", "g.chr19:9069475C>A", "-", "c.17971G>T", "c.(17971-17973)Ggt>Tgt", "p.G5991C"},
-                new Object[]{"MUC16", 19, 9069850, 9069850, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "C", "A", "g.chr19:9069850C>A", "-", "c.17596G>T", "c.(17596-17598)Ggt>Tgt", "p.G5866C"},
                 new Object[]{"MUC16", 19, 9071965, 9071965, GencodeFuncotation.VariantClassification.NONSENSE, GencodeFuncotation.VariantType.SNP, "C", "A", "g.chr19:9071965C>A", "-", "c.15481G>T", "c.(15481-15483)Gga>Tga", "p.G5161*"},
                 new Object[]{"MUC16", 19, 9073131, 9073131, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "G", "A", "g.chr19:9073131G>A", "-", "c.14315C>T", "c.(14314-14316)cCt>cTt", "p.P4772L"},
                 new Object[]{"MUC16", 19, 9073306, 9073306, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "C", "A", "g.chr19:9073306C>A", "-", "c.14140G>T", "c.(14140-14142)Ggg>Tgg", "p.G4714W"},
@@ -2093,5 +2088,15 @@ public class DataProviderForMuc16MnpFullData {
                 new Object[]{"MUC16", 19, 9067330, 9067330, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "G", "A", "g.chr19:9067330G>A", "-", "c.20116C>T", "c.(20116-20118)Cat>Tat", "p.H6706Y"},
                 new Object[]{"MUC16", 19, 9070709, 9070709, GencodeFuncotation.VariantClassification.SILENT, GencodeFuncotation.VariantType.SNP, "G", "A", "g.chr19:9070709G>A", "-", "c.16737C>T", "c.(16735-16737)atC>atT", "p.I5579I"}
         );
+    }
+
+    static List<Object[]> provideEdgeCasesForMUC16Data_1() {
+        return Arrays.asList(
+                new Object[]{"MUC16", 19, 8959608, 8959608, GencodeFuncotation.VariantClassification.NONSTOP, GencodeFuncotation.VariantType.SNP, "T", "A", "g.chr19:8959608T>A", "-", "c.43524A>T", "c.(43522-43524)tgA>tgT", "p.*14508C"},
+                new Object[]{"MUC16", 19, 8959609, 8959609, GencodeFuncotation.VariantClassification.NONSTOP, GencodeFuncotation.VariantType.SNP, "C", "A", "g.chr19:8959609C>A", "-", "c.43523G>T", "c.(43522-43524)tGa>tTa", "p.*14508L"},
+                new Object[]{"MUC16", 19, 8959610, 8959610, GencodeFuncotation.VariantClassification.NONSTOP, GencodeFuncotation.VariantType.SNP, "A", "G", "g.chr19:8959610A>G", "-", "c.43522T>C", "c.(43522-43524)Tga>Cga", "p.*14508R"},
+                new Object[]{"MUC16", 19, 9069475, 9069475, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "C", "A", "g.chr19:9069475C>A", "-", "c.17971G>T", "c.(17971-17973)Ggt>Tgt", "p.G5991C"},
+                new Object[]{"MUC16", 19, 9069850, 9069850, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "C", "A", "g.chr19:9069850C>A", "-", "c.17596G>T", "c.(17596-17598)Ggt>Tgt", "p.G5866C"}
+                );
     }
 }

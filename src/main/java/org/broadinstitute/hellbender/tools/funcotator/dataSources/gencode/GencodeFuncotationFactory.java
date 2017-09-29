@@ -706,11 +706,12 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         // Get the contig:
         sequenceComparison.setContig(variant.getContig());
 
-        final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
+        // Get the strand:
+        sequenceComparison.setStrand(Strand.toStrand( transcript.getGenomicStrand().toString() ));
 
         final Allele refAllele;
         final Allele altAllele;
-        if ( strand == Strand.POSITIVE ) {
+        if ( sequenceComparison.getStrand() == Strand.POSITIVE ) {
             refAllele = variant.getReference();
             altAllele = alternateAllele;
         }
@@ -719,27 +720,27 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
             altAllele = Allele.create(ReadUtils.getBasesReverseComplement( alternateAllele.getBases() ), false);
         }
 
-        int startCodonStartPosition = -1;
-        int startCodonEndPosition   = -1;
-        int stopCodonStartPosition  = -1;
-        int stopCodonEndPosition    = -1;
-        for (final GencodeGtfExonFeature exon : transcript.getExons()) {
-            if ( exon.getStartCodon() != null ) {
-                startCodonStartPosition = exon.getStartCodon().getStart();
-                startCodonEndPosition   = exon.getStartCodon().getEnd();
-            }
-            if ( exon.getStopCodon() != null ) {
-                stopCodonStartPosition = exon.getStopCodon().getStart();
-                stopCodonEndPosition   = exon.getStopCodon().getEnd();
-            }
-        }
+//        int startCodonStartPosition = -1;
+//        int startCodonEndPosition   = -1;
+//        int stopCodonStartPosition  = -1;
+//        int stopCodonEndPosition    = -1;
+//        for (final GencodeGtfExonFeature exon : transcript.getExons()) {
+//            if ( exon.getStartCodon() != null ) {
+//                startCodonStartPosition = exon.getStartCodon().getStart();
+//                startCodonEndPosition   = exon.getStartCodon().getEnd();
+//            }
+//            if ( exon.getStopCodon() != null ) {
+//                stopCodonStartPosition = exon.getStopCodon().getStart();
+//                stopCodonEndPosition   = exon.getStopCodon().getEnd();
+//            }
+//        }
 
         final String referenceCodingSequence;
         if ( transcriptFastaReferenceDataSource != null ) {
             referenceCodingSequence = getCodingSequenceFromTranscriptFasta( transcript.getTranscriptId(), transcriptIdMap, transcriptFastaReferenceDataSource);
         }
         else {
-            referenceCodingSequence = FuncotatorUtils.getCodingSequence(reference, exonPositionList, strand);
+            referenceCodingSequence = FuncotatorUtils.getCodingSequence(reference, exonPositionList, sequenceComparison.getStrand());
         }
 
         // Get the reference sequence in the coding region as described by the given exonPositionList:
@@ -753,12 +754,12 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Get the allele transcript start position:
         sequenceComparison.setTranscriptAlleleStart(
-                FuncotatorUtils.getCodingSequenceAlleleStartPosition( variant.getStart(), transcript.getStart(), transcript.getEnd(), strand )
+                FuncotatorUtils.getCodingSequenceAlleleStartPosition( variant.getStart(), transcript.getStart(), transcript.getEnd(), sequenceComparison.getStrand() )
         );
 
         // Get the coding region start position (in the above computed reference coding region):
         sequenceComparison.setCodingSequenceAlleleStart(
-                FuncotatorUtils.getStartPositionInTranscript(variant, exonPositionList, strand)
+                FuncotatorUtils.getStartPositionInTranscript(variant, exonPositionList, sequenceComparison.getStrand())
         );
 
         // Get the in-frame start position of the codon containing the given variant:

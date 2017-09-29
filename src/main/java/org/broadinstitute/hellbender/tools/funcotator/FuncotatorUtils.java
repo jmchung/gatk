@@ -327,6 +327,10 @@ public class FuncotatorUtils {
                 }
             }
         }
+        else {
+            ref = seqComp.getAlignedReferenceAllele();
+            alt = seqComp.getAlignedAlternateAllele();
+        }
 
         if ( seqComp.getAlignedCodingSequenceAlleleStart().equals(seqComp.getAlignedReferenceAlleleStop()) ) {
             return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + ")" +
@@ -658,6 +662,7 @@ public class FuncotatorUtils {
         private ReferenceSequence wholeReferenceSequence = null;
 
         private String  contig                           = null;
+        private Strand  strand                           = null;
         private Integer alleleStart                      = null;
         private Integer transcriptAlleleStart            = null;
         private Integer codingSequenceAlleleStart        = null;
@@ -692,6 +697,19 @@ public class FuncotatorUtils {
 
         public void setContig(final String contig) {
             this.contig = contig;
+        }
+
+        public Strand getStrand() {
+            return strand;
+        }
+
+        public void setStrand(final Strand strand) {
+
+            if (strand == Strand.NONE) {
+                throw new GATKException("Cannot handle NONE strand.");
+            }
+
+            this.strand = strand;
         }
 
         public Integer getAlleleStart() {
