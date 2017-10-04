@@ -7,6 +7,7 @@ import htsjdk.tribble.FeatureReader;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
+import lombok.Data;
 import org.broadinstitute.hellbender.engine.*;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.funcotator.FuncotatorUtils;
@@ -16,6 +17,7 @@ import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.File;
 import java.io.IOException;
@@ -84,6 +86,47 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
     // Data Providers:
 
     @DataProvider
+    Object[][] provideTranscriptForGetSortedExonAndStartStopPositions() {
+        return new Object[][] {
+                {
+                        DataProviderForExampleGencodeGtfGene.createGencodeGtfGeneFeature().getTranscripts().get(0),
+                        Arrays.asList(
+                                new SimpleInterval("chr22", 50201037, 50201039),
+                                new SimpleInterval("chr22", 50206317, 50206520),
+                                new SimpleInterval("chr22", 50208536, 50208716),
+                                new SimpleInterval("chr22", 50210181, 50210311),
+                                new SimpleInterval("chr22", 50210631, 50210911),
+                                new SimpleInterval("chr22", 50215717, 50215867),
+                                new SimpleInterval("chr22", 50216691, 50216876),
+                                new SimpleInterval("chr22", 50216972, 50217128),
+                                new SimpleInterval("chr22", 50217205, 50217357),
+                                new SimpleInterval("chr22", 50217361, 50217615),
+                                new SimpleInterval("chr22", 50217367, 50217369),
+                                new SimpleInterval("chr22", 50200979, 50201036)
+                        )
+                },
+                {
+                        DataProviderForExampleGencodeGtfGene.createGencodeGtfGeneFeature().getTranscripts().get(1),
+                        Arrays.asList(
+                                new SimpleInterval("chr22", 50206317, 50206520),
+                                new SimpleInterval("chr22", 50208536, 50208716),
+                                new SimpleInterval("chr22", 50210181, 50210311),
+                                new SimpleInterval("chr22", 50210631, 50210911),
+                                new SimpleInterval("chr22", 50215717, 50215867),
+                                new SimpleInterval("chr22", 50216691, 50216876),
+                                new SimpleInterval("chr22", 50216972, 50217128),
+                                new SimpleInterval("chr22", 50217205, 50217616),
+                                new SimpleInterval("chr22", 50200979, 50201036)
+                        )
+                },
+                {
+                        DataProviderForExampleGencodeGtfGene.createGencodeGtfGeneFeature().getTranscripts().get(2),
+                        Collections.emptyList()
+                },
+        };
+    }
+
+    @DataProvider
     Object[][] provideMuc16SnpDataForGetVariantClassification() {
         final List<Object[]> l = new ArrayList<>();
 
@@ -116,11 +159,25 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
         l.addAll( DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_4() );
         l.addAll( DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_5() );
 
+        l.addAll( DataProviderForMuc16MnpFullData.provideEdgeCasesForMUC16Data_1() );
+
         return l.toArray(new Object[][]{{}});
     }
 
     //==================================================================================================================
     // Tests:
+
+    @Test ( dataProvider = "provideTranscriptForGetSortedExonAndStartStopPositions")
+    void testGetSortedExonAndStartStopPositions(final GencodeGtfTranscriptFeature transcript, final List<? extends Locatable> expected) {
+
+        final List<? extends Locatable> exons = GencodeFuncotationFactory.getSortedExonAndStartStopPositions(transcript);
+
+        Assert.assertEquals(exons.size(), expected.size());
+        for( int i = 0; i < exons.size() ; ++i ) {
+            final SimpleInterval interval = new SimpleInterval( exons.get(i).getContig(), exons.get(i).getStart(), exons.get(i).getEnd());
+            Assert.assertEquals( interval, expected.get(i) );
+        }
+    }
 
     @Test (dataProvider = "provideMuc16SnpDataForGetVariantClassification")
     void testGetVariantClassificationForCodingRegions(final int chromosomeNumber,

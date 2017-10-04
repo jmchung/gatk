@@ -3,6 +3,7 @@ package org.broadinstitute.hellbender.tools.funcotator;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.tribble.annotation.Strand;
 import htsjdk.variant.variantcontext.Allele;
+import lombok.Data;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceFileSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
@@ -749,6 +750,22 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
         };
     }
 
+    @DataProvider
+    Object[][] provideDataForTestCreateSpliceSiteCodonChange() {
+
+        return new Object[][] {
+                {1000, 5, 1000, 1500, Strand.POSITIVE, "c.e5-0"},
+                {1000, 4, 0, 1500, Strand.POSITIVE,    "c.e4+500"},
+                {1000, 3, 500, 1500, Strand.POSITIVE,  "c.e3-500"},
+
+                {1000, 5, 1000, 1500, Strand.NEGATIVE, "c.e5+0"},
+                {1000, 4, 0, 1500, Strand.NEGATIVE,    "c.e4-500"},
+                {1000, 3, 500, 1500, Strand.NEGATIVE,  "c.e3+500"},
+
+                {1000, 5, 1500, 500, Strand.NEGATIVE,  "c.e5+500"},
+        };
+    }
+
     //==================================================================================================================
     // Tests:
 
@@ -762,17 +779,17 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
         Assert.assertEquals( FuncotatorUtils.isFrameshift(refStart, refEnd, altEnd), expected );
     }
 
-    @Test(dataProvider = "provideReferenceAndExonListAndExpected")
-    void testGetCodingSequence(final ReferenceContext reference, final List<Locatable> exonList, final Strand strand, final String expected) {
-        final String codingSequence = FuncotatorUtils.getCodingSequence(reference, exonList, strand);
-        Assert.assertEquals( codingSequence, expected );
-    }
+//    @Test(dataProvider = "provideReferenceAndExonListAndExpected")
+//    void testGetCodingSequence(final ReferenceContext reference, final List<Locatable> exonList, final Strand strand, final String expected) {
+//        final String codingSequence = FuncotatorUtils.getCodingSequence(reference, exonList, strand);
+//        Assert.assertEquals( codingSequence, expected );
+//    }
 
-    @Test(dataProvider = "provideReferenceAndExonListForGatkExceptions",
-            expectedExceptions = GATKException.class)
-    void testGetCodingSequenceWithGatkExceptions(final ReferenceContext reference, final Strand strand, final List<Locatable> exonList) {
-        FuncotatorUtils.getCodingSequence(reference, exonList, strand);
-    }
+//    @Test(dataProvider = "provideReferenceAndExonListForGatkExceptions",
+//            expectedExceptions = GATKException.class)
+//    void testGetCodingSequenceWithGatkExceptions(final ReferenceContext reference, final Strand strand, final List<Locatable> exonList) {
+//        FuncotatorUtils.getCodingSequence(reference, exonList, strand);
+//    }
 
 //    @Test(dataProvider = "provideReferenceAndExonListForIllegalArgumentExceptions",
 //            expectedExceptions = IllegalArgumentException.class)
@@ -909,9 +926,15 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
         Assert.assertEquals( FuncotatorUtils.getCodingSequenceAlleleStartPosition(variantStartPosition, codingStartPosition, codingEndPosition, strand), expected );
     }
 
-    @Test
-    void testCreateSpliceSiteCodonChange() {
-        throw new NotImplementedException();
+    @Test (dataProvider = "provideDataForTestCreateSpliceSiteCodonChange")
+    void testCreateSpliceSiteCodonChange(final int variantStart,
+                                         final int exonNumber,
+                                         final int exonStart,
+                                         final int exonEnd,
+                                         final Strand strand,
+                                         final String expected) {
+
+        Assert.assertEquals( FuncotatorUtils.createSpliceSiteCodonChange(variantStart, exonNumber, exonStart, exonEnd, strand), expected );
     }
 
 }

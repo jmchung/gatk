@@ -369,6 +369,7 @@ public class FuncotatorUtils {
             offset = variantStart - exonEnd;
             sign = '+';
         }
+        offset = Math.abs(offset);
 
         if (strand == Strand.NEGATIVE) {
             if ( sign == '+' ) {

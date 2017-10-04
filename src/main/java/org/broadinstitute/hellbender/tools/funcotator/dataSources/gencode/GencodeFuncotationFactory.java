@@ -334,13 +334,19 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     @VisibleForTesting
     static List<? extends Locatable> getSortedExonAndStartStopPositions(final GencodeGtfTranscriptFeature transcript) {
 
-        // Sort by exon number first:
-        transcript.getExons().sort((lhs, rhs) -> lhs.getExonNumber() < rhs.getExonNumber() ? -1 : (lhs.getExonNumber() > rhs.getExonNumber() ) ? 1 : 0 );
-
+//        // Sort by exon number first:
+//        transcript.getExons().sort((lhs, rhs) -> lhs.getExonNumber() < rhs.getExonNumber() ? -1 : (lhs.getExonNumber() > rhs.getExonNumber() ) ? 1 : 0 );
+//
 //        final List<Locatable> exonList = new ArrayList<>();
 //        for ( final GencodeGtfExonFeature exon : transcript.getExons() ) {
 //            if ( exon.getCds() != null ) {
-//                exonList.add( exon );
+//                exonList.add( exon.getCds() );
+//            }
+//            else if (exon.getStartCodon() != null) {
+//                exonList.add( exon.getStartCodon() );
+//            }
+//            else if ( exon.getStopCodon() != null ) {
+//                exonList.add( exon.getStopCodon() );
 //            }
 //        }
 //        return exonList;
