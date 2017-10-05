@@ -56,7 +56,7 @@ public enum AminoAcid {
     ARGANINE("Arganine","Arg","R",new String[]{"AGA","AGG","CGA","CGC","CGG","CGT"}),
     ASPARAGINE("Asparagine","Asn","N",new String[]{"AAC","AAT"}),
     ASPARTIC_ACID("Aspartic acid","Asp","D",new String[]{"GAT","GAC"}),
-    CYSTEINE("Cysteine","Cys","C",new String[]{"TGC","TGC"}),
+    CYSTEINE("Cysteine","Cys","C",new String[]{"TGC","TGT"}),
     GLUTAMIC_ACID("Glutamic acid","Glu","E",new String[]{"GAA","GAG"}),
     GLUTAMINE("Glutamine","Gln","Q",new String[]{"CAA","CAG"}),
     GLYCINE("Glycine","Gly","G",new String[]{"GGA","GGC","GGG","GGT"}),

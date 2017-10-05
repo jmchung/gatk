@@ -292,12 +292,12 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         // Set the exon number:
         gencodeFuncotation.setTranscriptExon( exon.getExonNumber() );
 
+        // Set our transcript exon number:
+        gencodeFuncotation.setTranscriptExon(exon.getExonNumber());
+
         // Get the list of exons by their locations so we can use them to determine our location in the transcript and get
         // the transcript code itself:
         final List<? extends Locatable> exonPositionList = getSortedExonAndStartStopPositions(transcript);
-
-        // Set our transcript exon number:
-        gencodeFuncotation.setTranscriptExon(exon.getExonNumber());
 
         // Set up our SequenceComparison object so we can calculate some useful fields more easily
         // These fields can all be set without knowing the alternate allele:
@@ -334,54 +334,42 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     @VisibleForTesting
     static List<? extends Locatable> getSortedExonAndStartStopPositions(final GencodeGtfTranscriptFeature transcript) {
 
-//        // Sort by exon number first:
-//        transcript.getExons().sort((lhs, rhs) -> lhs.getExonNumber() < rhs.getExonNumber() ? -1 : (lhs.getExonNumber() > rhs.getExonNumber() ) ? 1 : 0 );
-//
-//        final List<Locatable> exonList = new ArrayList<>();
-//        for ( final GencodeGtfExonFeature exon : transcript.getExons() ) {
-//            if ( exon.getCds() != null ) {
-//                exonList.add( exon.getCds() );
-//            }
-//            else if (exon.getStartCodon() != null) {
-//                exonList.add( exon.getStartCodon() );
-//            }
-//            else if ( exon.getStopCodon() != null ) {
-//                exonList.add( exon.getStopCodon() );
-//            }
-//        }
-//        return exonList;
+        // Sort by exon number first:
+        transcript.getExons().sort((lhs, rhs) -> lhs.getExonNumber() < rhs.getExonNumber() ? -1 : (lhs.getExonNumber() > rhs.getExonNumber() ) ? 1 : 0 );
 
-        //============
+        final List<Locatable> exonList = new ArrayList<>(transcript.getExons().size());
+        for ( final GencodeGtfExonFeature exon : transcript.getExons() ) {
 
-//        final List<Locatable> exonList = new ArrayList<>();
-//        Locatable startCodon = null;
-//        Locatable stopCodon  = null;
-//        for ( final GencodeGtfExonFeature exon : transcript.getExons() ) {
-//            if ( (exon.getStartCodon() != null) && (startCodon == null) ) {
-//                startCodon = exon.getStartCodon();
-//            }
-//            if ( (exon.getStopCodon() != null) && (stopCodon == null) ) {
-//                stopCodon = exon.getStopCodon();
-//            }
-//            if ( exon.getCds() != null ) {
-//                exonList.add( exon.getCds() );
-//            }
-//        }
-//        if (startCodon != null) {
-//            exonList.add(0, startCodon);
-//        }
-//        if (stopCodon != null) {
-//            exonList.add(stopCodon);
-//        }
-//        return exonList;
+            // Add in a CDS region:
+            if ( exon.getCds() != null ) {
 
-        //============
+                // If we have a start codon that is not in the CDS for some reason,
+                // we need to add it to our list:
+                if (exon.getStartCodon() != null) {
+                    if ( !exon.getCds().contains(exon.getStartCodon()) ) {
+                        exonList.add( exon.getStartCodon() );
+                    }
+                }
 
-        return transcript.getExons().stream()
-                .filter(e -> (e.getCds() != null))
-                .map(GencodeGtfExonFeature::getCds)
-                .sorted( (lhs, rhs) -> lhs.getExonNumber() < rhs.getExonNumber() ? -1 : (lhs.getExonNumber() > rhs.getExonNumber() ) ? 1 : 0 )
-                .collect(Collectors.toList());
+                exonList.add( exon.getCds() );
+
+                // If we have a stop codon that is not in the CDS for some reason,
+                // we need to add it to our list:
+                if (exon.getStopCodon() != null) {
+                    if ( !exon.getCds().contains(exon.getStopCodon()) ) {
+                        exonList.add( exon.getStopCodon() );
+                    }
+                }
+
+            }
+            else if (exon.getStartCodon() != null) {
+                exonList.add( exon.getStartCodon() );
+            }
+            else if ( exon.getStopCodon() != null ) {
+                exonList.add( exon.getStopCodon() );
+            }
+        }
+        return exonList;
     }
 
     /**
@@ -726,24 +714,9 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
             altAllele = Allele.create(ReadUtils.getBasesReverseComplement( alternateAllele.getBases() ), false);
         }
 
-//        int startCodonStartPosition = -1;
-//        int startCodonEndPosition   = -1;
-//        int stopCodonStartPosition  = -1;
-//        int stopCodonEndPosition    = -1;
-//        for (final GencodeGtfExonFeature exon : transcript.getExons()) {
-//            if ( exon.getStartCodon() != null ) {
-//                startCodonStartPosition = exon.getStartCodon().getStart();
-//                startCodonEndPosition   = exon.getStartCodon().getEnd();
-//            }
-//            if ( exon.getStopCodon() != null ) {
-//                stopCodonStartPosition = exon.getStopCodon().getStart();
-//                stopCodonEndPosition   = exon.getStopCodon().getEnd();
-//            }
-//        }
-
         final String referenceCodingSequence;
         if ( transcriptFastaReferenceDataSource != null ) {
-            referenceCodingSequence = getCodingSequenceFromTranscriptFasta( transcript.getTranscriptId(), transcriptIdMap, transcriptFastaReferenceDataSource);
+            referenceCodingSequence = getCodingSequenceFromTranscriptFasta( transcript.getTranscriptId(), transcriptIdMap, transcriptFastaReferenceDataSource );
         }
         else {
             referenceCodingSequence = FuncotatorUtils.getCodingSequence(reference, exonPositionList, sequenceComparison.getStrand());
@@ -805,24 +778,10 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 )
         );
 
-//        // Get our alternate allele coding sequence:
-//        final String altCodingSequence = FuncotatorUtils.getAlternateCodingSequence(
-//                sequenceComparison.getWholeReferenceSequence().getBaseString(),
-//                sequenceComparison.getCodingSequenceAlleleStart(),
-//                refAllele,
-//                altAllele);
-//
-//        sequenceComparison.setAlignedAlternateAllele(
-//                FuncotatorUtils.getAlignedAllele( altCodingSequence,
-//                        sequenceComparison.getAlignedCodingSequenceAlleleStart(),
-//                        sequenceComparison.getAlignedAlternateAlleleStop())
-//        );
-
         // Get the aligned alternate allele:
         final int alignedRefAlleleStartPos = 1 + sequenceComparison.getAlignedCodingSequenceAlleleStart() - sequenceComparison.getCodingSequenceAlleleStart();
 
         sequenceComparison.setAlignedAlternateAllele(
-
                 FuncotatorUtils.getAlternateCodingSequence(
                         sequenceComparison.getAlignedReferenceAllele(),
                         alignedRefAlleleStartPos,
