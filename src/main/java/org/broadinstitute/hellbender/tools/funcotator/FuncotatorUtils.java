@@ -418,8 +418,15 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getReferenceAminoAcidSequence());
         Utils.nonNull(seqComp.getAlternateAminoAcidSequence());
 
-        return "c." + seqComp.getCodingSequenceAlleleStart() +
-                seqComp.getReferenceAllele() + ">" + seqComp.getAlternateAllele();
+        if ( seqComp.getAlternateAllele().length() > 1 ) {
+            final int s = seqComp.getCodingSequenceAlleleStart() - seqComp.getAlternateAllele().length() + 1;
+            return "c." + s + "_" + seqComp.getCodingSequenceAlleleStart() +
+                    seqComp.getReferenceAllele() + ">" + seqComp.getAlternateAllele();
+        }
+        else {
+            return "c." + seqComp.getCodingSequenceAlleleStart() +
+                    seqComp.getReferenceAllele() + ">" + seqComp.getAlternateAllele();
+        }
     }
 
     /**

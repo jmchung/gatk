@@ -34,6 +34,7 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
 
     // TODO: FIX THIS PATH OMG!
     private static final String HG19_CHR19_REFERENCE_FILE_NAME = "/Users/jonn/Development/references/GRCh37.p13.chr19.fasta";
+    // TODO: FIX THIS PATH OMG!
     private static final String HG19_CHR3_REFERENCE_FILE_NAME = "/Users/jonn/Development/references/GRCh37.p13.chr3.fasta";
 
     private static final String MUC16_GENCODE_ANNOTATIONS_FILE_NAME = FUNCOTATOR_TEST_DIR + "gencode.v19.MUC16.gtf";

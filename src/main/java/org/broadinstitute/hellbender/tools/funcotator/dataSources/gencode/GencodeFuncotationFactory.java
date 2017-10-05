@@ -786,7 +786,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         );
 
         // Get the aligned alternate allele:
-        final int alignedRefAlleleStartPos = 1 + sequenceComparison.getAlignedCodingSequenceAlleleStart() - sequenceComparison.getCodingSequenceAlleleStart();
+        final int alignedRefAlleleStartPos = refAllele.length() + sequenceComparison.getAlignedCodingSequenceAlleleStart() - sequenceComparison.getCodingSequenceAlleleStart();
 
         sequenceComparison.setAlignedAlternateAllele(
                 FuncotatorUtils.getAlternateCodingSequence(
