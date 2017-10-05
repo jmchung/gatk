@@ -11,8 +11,10 @@ import htsjdk.variant.variantcontext.VariantContext;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceDataSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
+import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.tools.funcotator.*;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
+import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.codecs.GENCODE.*;
 import org.broadinstitute.hellbender.utils.read.ReadUtils;
 
@@ -186,6 +188,11 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                                                                 final ReferenceDataSource transcriptFastaReferenceDataSource) {
 
         final MappedTranscriptIdInfo transcriptMapIdAndMetadata = transcriptIdMap.get(transcriptId);
+
+        if ( transcriptMapIdAndMetadata == null ) {
+            throw new UserException.BadInput( "Unable to find the given Transcript ID in our transcript list (not in given transcript FASTA file): " + transcriptId );
+        }
+
         final SimpleInterval transcriptInterval = new SimpleInterval(
                 transcriptMapIdAndMetadata.mapKey,
                 transcriptMapIdAndMetadata.codingSequenceStart,

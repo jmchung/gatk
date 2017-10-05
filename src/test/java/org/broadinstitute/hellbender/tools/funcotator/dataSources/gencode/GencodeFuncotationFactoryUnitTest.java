@@ -172,7 +172,7 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
 
         return l.toArray(new Object[][]{{}});
     }
-    
+
     @DataProvider
     Object[][] provideMnpDataForCreateFuncotations() {
         final List<Object[]> outList = new ArrayList<>();
@@ -360,7 +360,6 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
                                     final FeatureReader<GencodeGtfFeature> featureReader,
                                     final ReferenceDataSource referenceDataSource,
                                     final String transcriptFastaFile) {
-
 
         final String contig = "chr" + Integer.toString(chromosomeNumber);
         final SimpleInterval variantInterval = new SimpleInterval( contig, start, end );
