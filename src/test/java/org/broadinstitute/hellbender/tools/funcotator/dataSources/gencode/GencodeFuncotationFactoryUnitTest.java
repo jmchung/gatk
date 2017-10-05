@@ -31,18 +31,31 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
     // Static Variables:
 
     private static final String FUNCOTATOR_TEST_DIR = toolsTestDir + "funcotator" + File.separator;
+
+    // TODO: FIX THIS PATH OMG!
     private static final String HG19_CHR19_REFERENCE_FILE_NAME = "/Users/jonn/Development/references/GRCh37.p13.chr19.fasta";
+    private static final String HG19_CHR3_REFERENCE_FILE_NAME = "/Users/jonn/Development/references/GRCh37.p13.chr3.fasta";
+
     private static final String MUC16_GENCODE_ANNOTATIONS_FILE_NAME = FUNCOTATOR_TEST_DIR + "gencode.v19.MUC16.gtf";
     private static final String MUC16_GENCODE_TRANSCRIPT_FASTA_FILE = FUNCOTATOR_TEST_DIR + "gencode.v19.MUC16_transcript.fasta";
     private static final String MUC_16_TRANSCRIPT = "ENST00000397910.4";
 
+    private static final String PIK3CA_GENCODE_ANNOTATIONS_FILE_NAME = FUNCOTATOR_TEST_DIR + "gencode.v19.PIK3CA.gtf";
+    private static final String PIK3CA_GENCODE_TRANSCRIPT_FASTA_FILE = FUNCOTATOR_TEST_DIR + "gencode.v19.PIK3CA_transcript.fasta";
+    private static final String PIK3CA_TRANSCRIPT = "ENST00000263967.3";
+
     private static final FeatureReader<GencodeGtfFeature> muc16FeatureReader;
-    private static final ReferenceDataSource refDataSource;
+    private static final FeatureReader<GencodeGtfFeature> pik3caFeatureReader;
+
+    private static final ReferenceDataSource refDataSourceHg19Ch19;
+    private static final ReferenceDataSource refDataSourceHg19Ch3;
 
     // Initialization of static variables:
     static {
         muc16FeatureReader = AbstractFeatureReader.getFeatureReader( MUC16_GENCODE_ANNOTATIONS_FILE_NAME, new GencodeGtfCodec() );
-        refDataSource = ReferenceDataSource.of( new File (HG19_CHR19_REFERENCE_FILE_NAME) );
+        pik3caFeatureReader = AbstractFeatureReader.getFeatureReader( PIK3CA_GENCODE_ANNOTATIONS_FILE_NAME, new GencodeGtfCodec() );
+        refDataSourceHg19Ch19 = ReferenceDataSource.of( new File (HG19_CHR19_REFERENCE_FILE_NAME) );
+        refDataSourceHg19Ch3 = ReferenceDataSource.of( new File (HG19_CHR3_REFERENCE_FILE_NAME) );
     }
 
     //==================================================================================================================
@@ -78,6 +91,29 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
                 .findFirst();
 
         return transcriptOption.orElseThrow( () -> new GATKException("Could not get the MUC16 transcript from the MUC16 gene!  The test has mutated!  No good!") );
+    }
+
+    private static List<Object[]> addReferenceDataToUnitTestData(final List<Object[]> unitTestData,
+                                                                 final String referenceFileName,
+                                                                 final FeatureReader<GencodeGtfFeature> featureReader,
+                                                                 final ReferenceDataSource referenceDataSource,
+                                                                 final String transcriptFastaFile) {
+
+        final List<Object[]> outList = new ArrayList<>(unitTestData.size());
+
+        for ( final Object[] rawData : unitTestData ) {
+            final Object[] dataWithReference = new Object[rawData.length + 4];
+            for ( int i = 0; i < rawData.length; ++i ) {
+                dataWithReference[i] = rawData[i];
+            }
+            dataWithReference[dataWithReference.length-4] = referenceFileName;
+            dataWithReference[dataWithReference.length-3] = featureReader;
+            dataWithReference[dataWithReference.length-2] = referenceDataSource;
+            dataWithReference[dataWithReference.length-1] = transcriptFastaFile;
+            outList.add(dataWithReference);
+        }
+
+        return outList;
     }
 
     //==================================================================================================================
@@ -138,18 +174,21 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
     }
     
     @DataProvider
-    Object[][] provideMuc16MnpDataForCreateFuncotations() {
-        final List<Object[]> l = new ArrayList<>();
+    Object[][] provideMnpDataForCreateFuncotations() {
+        final List<Object[]> outList = new ArrayList<>();
 
-        l.addAll( DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_1() );
-        l.addAll( DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_2() );
-        l.addAll( DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_3() );
-        l.addAll( DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_4() );
-        l.addAll( DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_5() );
+        outList.addAll( addReferenceDataToUnitTestData(DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_1(), HG19_CHR19_REFERENCE_FILE_NAME, muc16FeatureReader, refDataSourceHg19Ch19, MUC16_GENCODE_TRANSCRIPT_FASTA_FILE ) );
+        outList.addAll( addReferenceDataToUnitTestData(DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_2(), HG19_CHR19_REFERENCE_FILE_NAME, muc16FeatureReader, refDataSourceHg19Ch19, MUC16_GENCODE_TRANSCRIPT_FASTA_FILE ) );
+        outList.addAll( addReferenceDataToUnitTestData(DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_3(), HG19_CHR19_REFERENCE_FILE_NAME, muc16FeatureReader, refDataSourceHg19Ch19, MUC16_GENCODE_TRANSCRIPT_FASTA_FILE ) );
+        outList.addAll( addReferenceDataToUnitTestData(DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_4(), HG19_CHR19_REFERENCE_FILE_NAME, muc16FeatureReader, refDataSourceHg19Ch19, MUC16_GENCODE_TRANSCRIPT_FASTA_FILE ) );
+        outList.addAll( addReferenceDataToUnitTestData(DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_5(), HG19_CHR19_REFERENCE_FILE_NAME, muc16FeatureReader, refDataSourceHg19Ch19, MUC16_GENCODE_TRANSCRIPT_FASTA_FILE ) );
+        outList.addAll( addReferenceDataToUnitTestData(DataProviderForMuc16MnpFullData.provideEdgeCasesForMUC16Data_1(), HG19_CHR19_REFERENCE_FILE_NAME, muc16FeatureReader, refDataSourceHg19Ch19, MUC16_GENCODE_TRANSCRIPT_FASTA_FILE ) );
 
-        l.addAll( DataProviderForMuc16MnpFullData.provideEdgeCasesForMUC16Data_1() );
+        outList.addAll( addReferenceDataToUnitTestData(DataProviderForPik3caMnpFullData.providePik3caMnpData(), HG19_CHR3_REFERENCE_FILE_NAME, pik3caFeatureReader, refDataSourceHg19Ch3, PIK3CA_GENCODE_TRANSCRIPT_FASTA_FILE ) );
 
-        return l.toArray(new Object[][]{{}});
+        final Object[][] outArray = outList.toArray(new Object[][]{{}});
+
+        return outArray;
     }
 
     //==================================================================================================================
@@ -225,7 +264,7 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
         final GencodeGtfTranscriptFeature transcript = getMuc16Transcript(gene);
         final GencodeGtfExonFeature             exon = getExonForVariant( gene, variantInterval );
 
-        final ReferenceContext referenceContext = new ReferenceContext( refDataSource, variantInterval );
+        final ReferenceContext referenceContext = new ReferenceContext(refDataSourceHg19Ch19, variantInterval );
 
         final List<? extends Locatable> exonPositionList = GencodeFuncotationFactory.getSortedExonAndStartStopPositions(transcript);
 
@@ -289,7 +328,7 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
         // Get the gene.
         // We know the first gene is the right one - the gene in question is the MUC16 gene:
         final GencodeGtfGeneFeature gene = (GencodeGtfGeneFeature) gtfFeatureIterator.next();
-        final ReferenceContext referenceContext = new ReferenceContext( refDataSource, variantInterval );
+        final ReferenceContext referenceContext = new ReferenceContext(refDataSourceHg19Ch19, variantInterval );
 
         // Create a factory for our funcotations:
         try (final GencodeFuncotationFactory funcotationFactory = new GencodeFuncotationFactory(new File(MUC16_GENCODE_TRANSCRIPT_FASTA_FILE))) {
@@ -303,20 +342,24 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
         }
     }
 
-    @Test (dataProvider = "provideMuc16MnpDataForCreateFuncotations")
-    void testCreateFuncotationsMuc16Mnp(final String expectedGeneName,
-                                final int chromosomeNumber,
-                                final int start,
-                                final int end,
-                                final GencodeFuncotation.VariantClassification expectedVariantClassification,
-                                final GencodeFuncotation.VariantType expectedVariantType,
-                                final String ref,
-                                final String alt,
-                                final String expectedGenomeChange,
-                                final String expectedStrand,
-                                final String expectedCDnaChange,
-                                final String expectedCodonChange,
-                                final String expectedProteinChange) {
+    @Test (dataProvider = "provideMnpDataForCreateFuncotations")
+    void testCreateFuncotationsMnps(final String expectedGeneName,
+                                    final int chromosomeNumber,
+                                    final int start,
+                                    final int end,
+                                    final GencodeFuncotation.VariantClassification expectedVariantClassification,
+                                    final GencodeFuncotation.VariantType expectedVariantType,
+                                    final String ref,
+                                    final String alt,
+                                    final String expectedGenomeChange,
+                                    final String expectedStrand,
+                                    final String expectedCDnaChange,
+                                    final String expectedCodonChange,
+                                    final String expectedProteinChange,
+                                    final String referenceFileName,
+                                    final FeatureReader<GencodeGtfFeature> featureReader,
+                                    final ReferenceDataSource referenceDataSource,
+                                    final String transcriptFastaFile) {
 
 
         final String contig = "chr" + Integer.toString(chromosomeNumber);
@@ -326,7 +369,7 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
         final Allele altAllele = Allele.create(alt);
 
         final VariantContextBuilder variantContextBuilder = new VariantContextBuilder(
-                HG19_CHR19_REFERENCE_FILE_NAME,
+                referenceFileName,
                 contig,
                 start,
                 end,
@@ -337,7 +380,7 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
         // Get our gene feature iterator:
         final CloseableTribbleIterator<GencodeGtfFeature> gtfFeatureIterator;
         try {
-            gtfFeatureIterator = muc16FeatureReader.query(contig, start, end);
+            gtfFeatureIterator = featureReader.query(contig, start, end);
         }
         catch (final IOException ex) {
             throw new GATKException("Could not finish the test!", ex);
@@ -346,10 +389,10 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
         // Get the gene.
         // We know the first gene is the right one - the gene in question is the MUC16 gene:
         final GencodeGtfGeneFeature gene = (GencodeGtfGeneFeature) gtfFeatureIterator.next();
-        final ReferenceContext referenceContext = new ReferenceContext( refDataSource, variantInterval );
+        final ReferenceContext referenceContext = new ReferenceContext(referenceDataSource, variantInterval );
 
         // Create a factory for our funcotations:
-        try (final GencodeFuncotationFactory funcotationFactory = new GencodeFuncotationFactory(new File(MUC16_GENCODE_TRANSCRIPT_FASTA_FILE))) {
+        try (final GencodeFuncotationFactory funcotationFactory = new GencodeFuncotationFactory(new File(transcriptFastaFile))) {
 
             // Generate our funcotations:
             final List<GencodeFuncotation> funcotations = funcotationFactory.createFuncotations(variantContext, altAllele, gene, referenceContext);
@@ -369,5 +412,4 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
             Assert.assertEquals(funcotation.getHugoSymbol(), expectedGeneName);
         }
     }
-
 }

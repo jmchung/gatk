@@ -9,7 +9,7 @@ import java.util.List;
  * Created by jonn on 9/21/17.
  */
 public class DataProviderForPik3caMnpFullData {
-    List<Object[]> providePik3caMnpData() {
+    public static List<Object[]> providePik3caMnpData() {
         return Arrays.asList(
                 new Object[]{"PIK3CA", 3, 178916619, 178916619, GencodeFuncotation.VariantClassification.SILENT, GencodeFuncotation.VariantType.SNP, "T", "A", "g.chr3:178916619T>A", "+", "c.6T>A", "c.(4-6)ccT>ccA", "p.P2P"},
                 new Object[]{"PIK3CA", 3, 178916620, 178916620, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.SNP, "C", "T", "g.chr3:178916620C>T", "+", "c.7C>T", "c.(7-9)Cca>Tca", "p.P3S"},
