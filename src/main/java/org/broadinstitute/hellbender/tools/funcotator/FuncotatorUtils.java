@@ -461,6 +461,39 @@ public class FuncotatorUtils {
     }
 
     /**
+     * Get the coding sequence-aligned allele based on stop and start position.
+     * @param codingSequence Coding sequence from which the allele should be derived.
+     * @param alignedAlleleStart Start position of the allele (1-indexed, inclusive).
+     * @param alignedAlleleStop Stop position of the allele (1-indexed, inclusive).
+     * @param strand {@link Strand} on which the allele is coded.
+     * @return The {@link String} representation of the allele.
+     */
+    private static String getAlignedAlleleSequence(final String codingSequence,
+                                                final Integer alignedAlleleStart,
+                                                final Integer alignedAlleleStop,
+                                                final Strand strand) {
+
+        // Get our indices:
+        // Subtract 1 because we're 1-based.
+        int start = alignedAlleleStart - 1;
+        int end = alignedAlleleStop;
+
+        final String alignedAlleleSeq;
+
+        if ( strand == Strand.POSITIVE ) {
+            alignedAlleleSeq = codingSequence.substring(start, end);
+        }
+        else {
+            // Negative strand means we need to reverse complement and go from the other end:
+            start = codingSequence.length() - alignedAlleleStop;
+            end = codingSequence.length() - alignedAlleleStart + 1;
+            alignedAlleleSeq = ReadUtils.getBasesReverseComplement( codingSequence.substring(start, end).getBytes() );
+        }
+
+        return alignedAlleleSeq;
+    }
+
+    /**
      * Gets the coding sequence for the allele with given start and stop positions, codon-aligned to the start of the reference sequence.
      * @param codingSequence The whole coding sequence for this transcript.
      * @param alignedAlleleStart The codon-aligned position (1-based, inclusive) of the allele start.
@@ -471,25 +504,42 @@ public class FuncotatorUtils {
     public static String getAlignedAllele(final String codingSequence,
                                           final Integer alignedAlleleStart,
                                           final Integer alignedAlleleStop,
+                                          final Allele  refAllele,
+                                          final Integer refAlleleStart,
                                           final Strand strand) {
         Utils.nonNull(codingSequence);
         Utils.nonNull(alignedAlleleStart);
         Utils.nonNull(alignedAlleleStop);
+        Utils.nonNull(refAllele);
+        Utils.nonNull(refAlleleStart);
         Utils.nonNull(strand);
 
         if ( strand == Strand.NONE ) {
             throw new GATKException("Cannot handle `NONE` strand!");
         }
 
-        // Subtract 1 because we're 1-based.
-        if ( strand == Strand.POSITIVE ) {
-            return codingSequence.substring(alignedAlleleStart - 1, alignedAlleleStop);
+        String alignedAlleleSeq = getAlignedAlleleSequence(codingSequence, alignedAlleleStart, alignedAlleleStop, strand);
+
+        // Check to make sure the sequence has the reference we're expecting:
+        if ( !codingSequence.substring(refAlleleStart - 1, refAlleleStart - 1 + refAllele.length()).equals(refAllele.getBaseString()) ) {
+            // Oh noes!
+            // Ref allele is different from reference sequence!
+
+            // Oh well, we should use the reference we were given anyways...
+            final String substitutedAlignedSeq = getAlternateCodingSequence(codingSequence, refAlleleStart, refAllele, refAllele);
+
+            // We use the positive strand here because we have already reverse complemented the sequence in the call
+            // above.
+            final String substitutedAlignedAlleleSeq = getAlignedAlleleSequence(substitutedAlignedSeq, alignedAlleleStart, alignedAlleleStop, Strand.POSITIVE);
+
+            // Warn the user!
+            logger.warn("Reference allele is different than the reference coding sequence!  Substituting given allele for sequence code (" + alignedAlleleSeq + "->" + substitutedAlignedAlleleSeq + ")");
+
+            // Set up our return value:
+            alignedAlleleSeq = substitutedAlignedAlleleSeq;
         }
-        else {
-            final int end = codingSequence.length() - alignedAlleleStart + 1;
-            final int start = codingSequence.length() - alignedAlleleStop;
-            return ReadUtils.getBasesReverseComplement( codingSequence.substring(start, end).getBytes() );
-        }
+
+        return alignedAlleleSeq;
     }
 
     /**
@@ -522,8 +572,8 @@ public class FuncotatorUtils {
      * Get the full alternate coding sequence given a reference coding sequence, and two alleles.
      * @param referenceCodingSequence The reference sequence on which to base the resulting alternate coding sequence.
      * @param alleleStartPos Starting position (1-based, inclusive) for the ref and alt alleles in the given {@code referenceCodingSequence}.
-     * @param refAllele Reference Allele.
-     * @param altAllele Alternate Allele.
+     * @param refAllele Reference Allele.  Used for the length of the reference (content ignored).
+     * @param altAllele Alternate Allele.  Used for both content and length of the alternate allele.
      * @return The coding sequence that includes the given alternate allele in place of the given reference allele.
      */
     public static String getAlternateCodingSequence( final String referenceCodingSequence, final int alleleStartPos,

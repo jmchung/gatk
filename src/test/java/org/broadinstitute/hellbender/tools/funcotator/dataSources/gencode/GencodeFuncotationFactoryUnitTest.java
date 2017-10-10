@@ -175,9 +175,10 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
     }
 
     @DataProvider
-    Object[][] provideMnpDataForCreateFuncotations() {
+    Object[][] provideDataForCreateFuncotations() {
         final List<Object[]> outList = new ArrayList<>();
 
+        // MUC13 SNPs / DNPs:
         outList.addAll( addReferenceDataToUnitTestData(DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_1(), HG19_CHR19_REFERENCE_FILE_NAME, muc16FeatureReader, refDataSourceHg19Ch19, MUC16_GENCODE_TRANSCRIPT_FASTA_FILE ) );
         outList.addAll( addReferenceDataToUnitTestData(DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_2(), HG19_CHR19_REFERENCE_FILE_NAME, muc16FeatureReader, refDataSourceHg19Ch19, MUC16_GENCODE_TRANSCRIPT_FASTA_FILE ) );
         outList.addAll( addReferenceDataToUnitTestData(DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_3(), HG19_CHR19_REFERENCE_FILE_NAME, muc16FeatureReader, refDataSourceHg19Ch19, MUC16_GENCODE_TRANSCRIPT_FASTA_FILE ) );
@@ -185,10 +186,16 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
         outList.addAll( addReferenceDataToUnitTestData(DataProviderForMuc16MnpFullData.provideMnpDataForMuc16_5(), HG19_CHR19_REFERENCE_FILE_NAME, muc16FeatureReader, refDataSourceHg19Ch19, MUC16_GENCODE_TRANSCRIPT_FASTA_FILE ) );
         outList.addAll( addReferenceDataToUnitTestData(DataProviderForMuc16MnpFullData.provideEdgeCasesForMUC16Data_1(), HG19_CHR19_REFERENCE_FILE_NAME, muc16FeatureReader, refDataSourceHg19Ch19, MUC16_GENCODE_TRANSCRIPT_FASTA_FILE ) );
 
+        // PIK3CA SNPs / DNPs:
         outList.addAll( addReferenceDataToUnitTestData(DataProviderForPik3caMnpFullData.providePik3caMnpData(), HG19_CHR3_REFERENCE_FILE_NAME, pik3caFeatureReader, refDataSourceHg19Ch3, PIK3CA_GENCODE_TRANSCRIPT_FASTA_FILE ) );
 
-        final Object[][] outArray = outList.toArray(new Object[][]{{}});
+        // PIK3CA INDELs:
+        outList.addAll( addReferenceDataToUnitTestData(DataProviderForPik3caMnpFullData.providePik3caInDelData(), HG19_CHR3_REFERENCE_FILE_NAME, pik3caFeatureReader, refDataSourceHg19Ch3, PIK3CA_GENCODE_TRANSCRIPT_FASTA_FILE ) );
+        //TODO: Uncomment this after you fix it!
+        //outList.addAll( addReferenceDataToUnitTestData(DataProviderForPik3caMnpFullData.providePik3caInDelData2(), HG19_CHR3_REFERENCE_FILE_NAME, pik3caFeatureReader, refDataSourceHg19Ch3, PIK3CA_GENCODE_TRANSCRIPT_FASTA_FILE ) );
 
+
+        final Object[][] outArray = outList.toArray(new Object[][]{{}});
         return outArray;
     }
 
@@ -343,24 +350,24 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
         }
     }
 
-    @Test (dataProvider = "provideMnpDataForCreateFuncotations")
-    void testCreateFuncotationsMnps(final String expectedGeneName,
-                                    final int chromosomeNumber,
-                                    final int start,
-                                    final int end,
-                                    final GencodeFuncotation.VariantClassification expectedVariantClassification,
-                                    final GencodeFuncotation.VariantType expectedVariantType,
-                                    final String ref,
-                                    final String alt,
-                                    final String expectedGenomeChange,
-                                    final String expectedStrand,
-                                    final String expectedCDnaChange,
-                                    final String expectedCodonChange,
-                                    final String expectedProteinChange,
-                                    final String referenceFileName,
-                                    final FeatureReader<GencodeGtfFeature> featureReader,
-                                    final ReferenceDataSource referenceDataSource,
-                                    final String transcriptFastaFile) {
+    @Test (dataProvider = "provideDataForCreateFuncotations")
+    void testCreateFuncotations(final String expectedGeneName,
+                                final int chromosomeNumber,
+                                final int start,
+                                final int end,
+                                final GencodeFuncotation.VariantClassification expectedVariantClassification,
+                                final GencodeFuncotation.VariantType expectedVariantType,
+                                final String ref,
+                                final String alt,
+                                final String expectedGenomeChange,
+                                final String expectedStrand,
+                                final String expectedCDnaChange,
+                                final String expectedCodonChange,
+                                final String expectedProteinChange,
+                                final String referenceFileName,
+                                final FeatureReader<GencodeGtfFeature> featureReader,
+                                final ReferenceDataSource referenceDataSource,
+                                final String transcriptFastaFile) {
 
         final String contig = "chr" + Integer.toString(chromosomeNumber);
         final SimpleInterval variantInterval = new SimpleInterval( contig, start, end );

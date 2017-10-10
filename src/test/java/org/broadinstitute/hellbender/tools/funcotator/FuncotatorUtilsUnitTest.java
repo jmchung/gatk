@@ -699,38 +699,41 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
 
         //CTA ACA ACG CGC GCG CGC GCG CAC ACA CAC ACA CAC TAT CTG TCT ATC TAG CAT AGG CAC CCC TTT CAT
 
-        return new Object[][] {
-                { seq,  1, 3,  Strand.POSITIVE, "ATG" },
-                { seq,  4, 6,  Strand.POSITIVE, "AAA" },
-                { seq,  7, 9,  Strand.POSITIVE, "GGG" },
-                { seq, 10, 12, Strand.POSITIVE, "GTG" },
-                { seq, 13, 15, Strand.POSITIVE, "CCT" },
-                { seq, 16, 18, Strand.POSITIVE, "ATG" },
-                { seq, 19, 21, Strand.POSITIVE, "CTA" },
-                { seq,  1,  6, Strand.POSITIVE, "ATGAAA" },
-                { seq,  4,  9, Strand.POSITIVE, "AAAGGG" },
-                { seq,  7, 12, Strand.POSITIVE, "GGGGTG" },
-                { seq, 10, 15, Strand.POSITIVE, "GTGCCT" },
-                { seq, 13, 18, Strand.POSITIVE, "CCTATG" },
-                { seq, 16, 21, Strand.POSITIVE, "ATGCTA" },
-                { seq, 19, 24, Strand.POSITIVE, "CTAGAT" },
-                { seq, 1, seq.length(), Strand.POSITIVE, seq },
+//        final Allele refAllele,
+//        final Integer refAlleleStart,
 
-                { seq,  1, 3,  Strand.NEGATIVE, "CTA" },
-                { seq,  4, 6,  Strand.NEGATIVE, "ACA" },
-                { seq,  7, 9,  Strand.NEGATIVE, "ACG" },
-                { seq, 10, 12, Strand.NEGATIVE, "CGC" },
-                { seq, 13, 15, Strand.NEGATIVE, "GCG" },
-                { seq, 16, 18, Strand.NEGATIVE, "CGC" },
-                { seq, 19, 21, Strand.NEGATIVE, "GCG" },
-                { seq,  1,  6, Strand.NEGATIVE, "CTAACA" },
-                { seq,  4,  9, Strand.NEGATIVE, "ACAACG" },
-                { seq,  7, 12, Strand.NEGATIVE, "ACGCGC" },
-                { seq, 10, 15, Strand.NEGATIVE, "CGCGCG" },
-                { seq, 13, 18, Strand.NEGATIVE, "GCGCGC" },
-                { seq, 16, 21, Strand.NEGATIVE, "CGCGCG" },
-                { seq, 19, 24, Strand.NEGATIVE, "GCGCAC" },
-                { seq, 1, seq.length(), Strand.NEGATIVE, ReadUtils.getBasesReverseComplement( seq.getBytes() ) },
+        return new Object[][] {
+                { seq,  1, 3,  Allele.create("ATG", true), 1, Strand.POSITIVE, "ATG" },
+                { seq,  4, 6,  Allele.create("AAA", true), 4, Strand.POSITIVE, "AAA" },
+                { seq,  7, 9,  Allele.create("GGG", true), 7, Strand.POSITIVE, "GGG" },
+                { seq, 10, 12, Allele.create("GTG", true), 10, Strand.POSITIVE, "GTG" },
+                { seq, 13, 15, Allele.create("CCT", true), 13, Strand.POSITIVE, "CCT" },
+                { seq, 16, 18, Allele.create("ATG", true), 16, Strand.POSITIVE, "ATG" },
+                { seq, 19, 21, Allele.create("CTA", true), 19, Strand.POSITIVE, "CTA" },
+                { seq,  1,  6, Allele.create("ATGAAA", true), 1, Strand.POSITIVE, "ATGAAA" },
+                { seq,  4,  9, Allele.create("AAAGGG", true), 4, Strand.POSITIVE, "AAAGGG" },
+                { seq,  7, 12, Allele.create("GGGGTG", true), 7, Strand.POSITIVE, "GGGGTG" },
+                { seq, 10, 15, Allele.create("GTGCCT", true), 10, Strand.POSITIVE, "GTGCCT" },
+                { seq, 13, 18, Allele.create("CCTATG", true), 13, Strand.POSITIVE, "CCTATG" },
+                { seq, 16, 21, Allele.create("ATGCTA", true), 16, Strand.POSITIVE, "ATGCTA" },
+                { seq, 19, 24, Allele.create("CTAGAT", true), 19, Strand.POSITIVE, "CTAGAT" },
+                { seq, 1, seq.length(), Allele.create(seq, true), 1, Strand.POSITIVE, seq },
+
+                { seq,  1, 3,  Allele.create("CTA", true), 1, Strand.NEGATIVE, "CTA" },
+                { seq,  4, 6,  Allele.create("ACA", true), 4, Strand.NEGATIVE, "ACA" },
+                { seq,  7, 9,  Allele.create("ACG", true), 7, Strand.NEGATIVE, "ACG" },
+                { seq, 10, 12, Allele.create("CGC", true), 10, Strand.NEGATIVE, "CGC" },
+                { seq, 13, 15, Allele.create("GCG", true), 13, Strand.NEGATIVE, "GCG" },
+                { seq, 16, 18, Allele.create("CGC", true), 16, Strand.NEGATIVE, "CGC" },
+                { seq, 19, 21, Allele.create("GCG", true), 19, Strand.NEGATIVE, "GCG" },
+                { seq,  1,  6, Allele.create("CTAACA", true), 1, Strand.NEGATIVE, "CTAACA" },
+                { seq,  4,  9, Allele.create("ACAACG", true), 4, Strand.NEGATIVE, "ACAACG" },
+                { seq,  7, 12, Allele.create("ACGCGC", true), 7, Strand.NEGATIVE, "ACGCGC" },
+                { seq, 10, 15, Allele.create("CGCGCG", true), 10, Strand.NEGATIVE, "CGCGCG" },
+                { seq, 13, 18, Allele.create("GCGCGC", true), 13, Strand.NEGATIVE, "GCGCGC" },
+                { seq, 16, 21, Allele.create("CGCGCG", true), 16, Strand.NEGATIVE, "CGCGCG" },
+                { seq, 19, 24, Allele.create("GCGCAC", true), 19, Strand.NEGATIVE, "GCGCAC" },
+                { seq, 1, seq.length(), Allele.create(ReadUtils.getBasesReverseComplement( seq.getBytes() ), true), 1, Strand.NEGATIVE, ReadUtils.getBasesReverseComplement( seq.getBytes() ) },
         };
     }
 
@@ -914,9 +917,12 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     void testGetAlignedAllele(  final String refSequence,
                                 final Integer alignedAlleleStart,
                                 final Integer alignedAlleleStop,
+                                final Allele refAllele,
+                                final Integer refAlleleStart,
                                 final Strand strand,
                                 final String expected) {
-        Assert.assertEquals( FuncotatorUtils.getAlignedAllele(refSequence, alignedAlleleStart, alignedAlleleStop, strand), expected );
+        final String alignedRefAllele = FuncotatorUtils.getAlignedAllele(refSequence, alignedAlleleStart, alignedAlleleStop, refAllele, refAlleleStart, strand);
+        Assert.assertEquals( alignedRefAllele, expected );
     }
 
     @Test (dataProvider = "provideDataForGetCodingSequenceAlleleStartPosition")

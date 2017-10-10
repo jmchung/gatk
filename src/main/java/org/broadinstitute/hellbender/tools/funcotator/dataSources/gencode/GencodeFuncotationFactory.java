@@ -760,6 +760,8 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 FuncotatorUtils.getAlignedAllele(sequenceComparison.getWholeReferenceSequence().getBaseString(),
                         sequenceComparison.getAlignedCodingSequenceAlleleStart(),
                         sequenceComparison.getAlignedReferenceAlleleStop(),
+                        refAllele,
+                        sequenceComparison.getCodingSequenceAlleleStart(),
                         Strand.POSITIVE )
         );
 
