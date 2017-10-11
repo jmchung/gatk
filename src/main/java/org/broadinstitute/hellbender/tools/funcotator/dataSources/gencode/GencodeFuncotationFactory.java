@@ -752,8 +752,12 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         sequenceComparison.setAlignedCodingSequenceAlleleStart(FuncotatorUtils.getAlignedPosition(sequenceComparison.getCodingSequenceAlleleStart()));
 
         // Get the in-frame stop position of the codon containing the given variant:
-        sequenceComparison.setAlignedReferenceAlleleStop(FuncotatorUtils.getAlignedEndPosition(sequenceComparison.getAlignedCodingSequenceAlleleStart(),
-                variant.getReference().length() ));
+        sequenceComparison.setAlignedReferenceAlleleStop(
+                FuncotatorUtils.getAlignedEndPosition(
+                        // Subtract 1 because of the 1-based/inclusive nature of genetic coordinates:
+                        sequenceComparison.getCodingSequenceAlleleStart() + refAllele.length() - 1
+                )
+        );
 
         // Get the in-frame/codon-aligned region containing the reference allele:
         sequenceComparison.setAlignedReferenceAllele(
@@ -782,14 +786,12 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         // Set our stop position:
         sequenceComparison.setAlignedAlternateAlleleStop(
                 FuncotatorUtils.getAlignedEndPosition(
-                        sequenceComparison.getAlignedCodingSequenceAlleleStart(),
-                        altAllele.length()
+                        sequenceComparison.getCodingSequenceAlleleStart() + altAllele.length() - 1
                 )
         );
 
         // Get the aligned alternate allele:
-        final int alignedRefAlleleStartPos = refAllele.length() + sequenceComparison.getAlignedCodingSequenceAlleleStart() - sequenceComparison.getCodingSequenceAlleleStart();
-
+        final int alignedRefAlleleStartPos = sequenceComparison.getCodingSequenceAlleleStart() - sequenceComparison.getAlignedCodingSequenceAlleleStart() + 1;
         sequenceComparison.setAlignedAlternateAllele(
                 FuncotatorUtils.getAlternateCodingSequence(
                         sequenceComparison.getAlignedReferenceAllele(),

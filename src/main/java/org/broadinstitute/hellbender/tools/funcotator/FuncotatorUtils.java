@@ -229,11 +229,17 @@ public class FuncotatorUtils {
             throw new GATKException("Cannot handle `NONE` strand!");
         }
 
-        int position = 0;
+        int position = 1;
 
         boolean foundPosition = false;
 
-        final SimpleInterval variantStartLocus = new SimpleInterval(variant.getContig(), variant.getStart(), variant.getStart());
+        final SimpleInterval variantStartLocus;
+        if ( strand == strand.POSITIVE ) {
+            variantStartLocus = new SimpleInterval(variant.getContig(), variant.getStart(), variant.getStart());
+        }
+        else {
+            variantStartLocus = new SimpleInterval(variant.getContig(), variant.getEnd(), variant.getEnd());
+        }
 
         for (final Locatable exon : transcript) {
             if (!exon.getContig().equals(variantStartLocus.getContig())) {
@@ -257,7 +263,7 @@ public class FuncotatorUtils {
         }
 
         if ( foundPosition ) {
-            return position + 1;
+            return position;
         }
 
         return -1;
@@ -275,11 +281,20 @@ public class FuncotatorUtils {
     }
 
     /**
+     * Get the sequence-aligned end position for the given allele end position.
+     * @param alleleEndPosition The genome end position (1-based, inclusive) for an allele.
+     * @return An aligned end position (1-based, inclusive) for the given allele end position.
+     */
+    public static int getAlignedEndPosition(final int alleleEndPosition) {
+        return (int)(Math.ceil(alleleEndPosition / 3.0) * 3);
+    }
+
+    /**
      * Gets the sequence aligned position (1-based, inclusive) for the given coding sequence position.
      * This will produce the next lowest position evenly divisible by 3, such that a codon starting at this returned
      * position would include the given position.
      * @param position A sequence starting coordinate for which to produce an coding-aligned position.
-     * @return A coding-aligned position (1-based, inclusive) corresponding to the given {@code position}
+     * @return A coding-aligned position (1-based, inclusive) corresponding to the given {@code position}.
      */
     public static int getAlignedPosition(final int position) {
         return position - ((position - 1) % 3);
@@ -315,8 +330,7 @@ public class FuncotatorUtils {
         // Capitalize the right parts of each string if they're of equal length:
         if (seqComp.getAlignedReferenceAllele().length() == seqComp.getAlignedAlternateAllele().length()) {
             for ( int i = 0 ; i < seqComp.getAlignedReferenceAllele().length(); ++i ) {
-                if ( seqComp.getAlignedReferenceAllele().charAt(i) !=
-                        seqComp.getAlignedAlternateAllele().charAt(i) ) {
+                if ( seqComp.getAlignedReferenceAllele().charAt(i) != seqComp.getAlignedAlternateAllele().charAt(i) ) {
                     ref += Character.toUpperCase( seqComp.getAlignedReferenceAllele().charAt(i) );
                     alt += Character.toUpperCase( seqComp.getAlignedAlternateAllele().charAt(i) );
                 }
@@ -419,8 +433,8 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getAlternateAminoAcidSequence());
 
         if ( seqComp.getAlternateAllele().length() > 1 ) {
-            final int s = seqComp.getCodingSequenceAlleleStart() - seqComp.getAlternateAllele().length() + 1;
-            return "c." + s + "_" + seqComp.getCodingSequenceAlleleStart() +
+//            final int s = seqComp.getCodingSequenceAlleleStart() - seqComp.getReferenceAllele().length() + 1;
+            return "c." + seqComp.getCodingSequenceAlleleStart() + "_" + (seqComp.getCodingSequenceAlleleStart() + seqComp.getReferenceAllele().length() - 1) +
                     seqComp.getReferenceAllele() + ">" + seqComp.getAlternateAllele();
         }
         else {
@@ -472,7 +486,6 @@ public class FuncotatorUtils {
                                                 final Integer alignedAlleleStart,
                                                 final Integer alignedAlleleStop,
                                                 final Strand strand) {
-
         // Get our indices:
         // Subtract 1 because we're 1-based.
         int start = alignedAlleleStart - 1;
@@ -520,8 +533,19 @@ public class FuncotatorUtils {
 
         String alignedAlleleSeq = getAlignedAlleleSequence(codingSequence, alignedAlleleStart, alignedAlleleStop, strand);
 
-        // Check to make sure the sequence has the reference we're expecting:
-        if ( !codingSequence.substring(refAlleleStart - 1, refAlleleStart - 1 + refAllele.length()).equals(refAllele.getBaseString()) ) {
+        // Check whether our reference sequence is derived from the reference or if it should be derived from the given
+        // reference.
+        final String expectedReferenceSequence;
+        if ( strand == Strand.POSITIVE ) {
+            expectedReferenceSequence = codingSequence.substring(refAlleleStart - 1, refAlleleStart - 1 + refAllele.length());
+        }
+        else {
+            final int start = codingSequence.length() - (refAlleleStart - 1 + refAllele.length());
+            final int end = codingSequence.length() - refAlleleStart;
+            expectedReferenceSequence = ReadUtils.getBasesReverseComplement( codingSequence.substring(start, end).getBytes() );
+        }
+
+        if ( !expectedReferenceSequence.equals(refAllele.getBaseString()) ) {
             // Oh noes!
             // Ref allele is different from reference sequence!
 

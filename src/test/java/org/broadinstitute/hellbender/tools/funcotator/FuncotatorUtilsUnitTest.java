@@ -347,13 +347,15 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                 { new SimpleInterval("chr1", 10, 10),   exons_forward, Strand.POSITIVE,  1 },
                 { new SimpleInterval("chr1", 99, 99),   exons_forward, Strand.POSITIVE, 50 },
                 { new SimpleInterval("chr1", 50, 67),   exons_forward, Strand.POSITIVE, 21 },
+                { new SimpleInterval("chr1", 67, 75),   exons_forward, Strand.POSITIVE, -1 },
 
                 { new SimpleInterval("chr1", 1, 1),     exons_backward, Strand.NEGATIVE, -1 },
                 { new SimpleInterval("chr1", 25, 67),   exons_backward, Strand.NEGATIVE, -1 },
                 { new SimpleInterval("chr1", 105, 392), exons_backward, Strand.NEGATIVE, -1 },
                 { new SimpleInterval("chr1", 10, 10),   exons_backward, Strand.NEGATIVE, 50 },
                 { new SimpleInterval("chr1", 99, 99),   exons_backward, Strand.NEGATIVE,  1 },
-                { new SimpleInterval("chr1", 50, 67),   exons_backward, Strand.NEGATIVE, 30 },
+                { new SimpleInterval("chr1", 50, 67),   exons_backward, Strand.NEGATIVE, -1 },
+                { new SimpleInterval("chr1", 67, 75),   exons_backward, Strand.NEGATIVE, 15 },
         };
     }
 
@@ -485,6 +487,24 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                 {1,4,6},
                 {1,5,6},
                 {1,6,6},
+        };
+    }
+
+    @DataProvider
+    Object[][] provideDataForTestGetAlignedEndPositionOneArg() {
+        return new Object[][] {
+                {1,  3},
+                {2,  3},
+                {3,  3},
+                {4,  6},
+                {5,  6},
+                {6,  6},
+                {7,  9},
+                {8,  9},
+                {9,  9},
+                {10,12},
+                {11,12},
+                {12,12},
         };
     }
 
@@ -811,6 +831,11 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @Test(dataProvider = "providePositionAndExpectedAlignedEndPosition")
     void testGetAlignedEndPosition(final int alignedStart, final int length, final int expected) {
         Assert.assertEquals(FuncotatorUtils.getAlignedEndPosition(alignedStart, length), expected);
+    }
+
+    @Test(dataProvider = "provideDataForTestGetAlignedEndPositionOneArg")
+    void testGetAlignedEndPositionOneArg(final int alleleEndPos, final int expected) {
+        Assert.assertEquals(FuncotatorUtils.getAlignedEndPosition(alleleEndPos), expected);
     }
 
     @Test(dataProvider = "provideDataForGetAlternateCodingSequence")
