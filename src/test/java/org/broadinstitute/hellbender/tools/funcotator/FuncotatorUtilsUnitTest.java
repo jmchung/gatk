@@ -7,6 +7,7 @@ import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceFileSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
+import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.read.ReadUtils;
 import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.Assert;
@@ -479,18 +480,6 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     }
 
     @DataProvider
-    Object[][] providePositionAndExpectedAlignedEndPosition() {
-        return new Object[][] {
-                {1,1,3},
-                {1,2,3},
-                {1,3,3},
-                {1,4,6},
-                {1,5,6},
-                {1,6,6},
-        };
-    }
-
-    @DataProvider
     Object[][] provideDataForTestGetAlignedEndPositionOneArg() {
         return new Object[][] {
                 {1,  3},
@@ -699,6 +688,21 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     }
 
     @DataProvider
+    Object[][] provideDataForGetProteinChangeString() {
+
+        return new Object[][] {
+                {"N",   1,  1,  "G", "p.N1G"},
+                {"NY",  1,  2, "GN", "p.1_2NY>GN"},
+                {"YY",  1,  2, "NY", "p.Y1N"},
+                {"NY",  1,  2, "NG", "p.Y2G"},
+                {"N",  71, 71,  "G", "p.N71G"},
+                {"NY", 71, 72, "GN", "p.71_72NY>GN"},
+                {"YY", 71, 72, "NY", "p.Y71N"},
+                {"NY", 71, 72, "NG", "p.Y72G"},
+        };
+    }
+
+    @DataProvider
     Object[][] provideDataForGetProteinChangeEndPosition() {
         return new Object[][] {
                 {1,  3, 1},
@@ -828,11 +832,6 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
         Assert.assertEquals(FuncotatorUtils.getAlignedPosition(pos), expected);
     }
 
-    @Test(dataProvider = "providePositionAndExpectedAlignedEndPosition")
-    void testGetAlignedEndPosition(final int alignedStart, final int length, final int expected) {
-        Assert.assertEquals(FuncotatorUtils.getAlignedEndPosition(alignedStart, length), expected);
-    }
-
     @Test(dataProvider = "provideDataForTestGetAlignedEndPositionOneArg")
     void testGetAlignedEndPositionOneArg(final int alleleEndPos, final int expected) {
         Assert.assertEquals(FuncotatorUtils.getAlignedEndPosition(alleleEndPos), expected);
@@ -931,6 +930,22 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @Test (dataProvider = "provideDataForGetProteinChangePosition")
     void testGetProteinChangePosition(final Integer alignedCodingSequenceStartPos, final int expected) {
         Assert.assertEquals( FuncotatorUtils.getProteinChangePosition(alignedCodingSequenceStartPos) , expected );
+    }
+
+    @Test (dataProvider = "provideDataForGetProteinChangeString")
+    void testGetProteinChangeString(final String refAminoAcidSeq,
+                                    final int protChangeStartPos,
+                                    final int protChangeEndPos,
+                                    final String altAminoAcidSeq,
+                                    final String expected) {
+
+        final FuncotatorUtils.SequenceComparison seqComp = new FuncotatorUtils.SequenceComparison();
+        seqComp.setReferenceAminoAcidSequence(refAminoAcidSeq);
+        seqComp.setProteinChangeStartPosition(protChangeStartPos);
+        seqComp.setProteinChangeEndPosition(protChangeEndPos);
+        seqComp.setAlternateAminoAcidSequence(altAminoAcidSeq);
+
+        Assert.assertEquals( FuncotatorUtils.getProteinChangeString(seqComp), expected );
     }
 
     @Test (dataProvider = "provideDataForGetProteinChangeEndPosition")

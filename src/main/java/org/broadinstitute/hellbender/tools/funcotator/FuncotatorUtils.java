@@ -234,7 +234,7 @@ public class FuncotatorUtils {
         boolean foundPosition = false;
 
         final SimpleInterval variantStartLocus;
-        if ( strand == strand.POSITIVE ) {
+        if ( strand == Strand.POSITIVE ) {
             variantStartLocus = new SimpleInterval(variant.getContig(), variant.getStart(), variant.getStart());
         }
         else {
@@ -267,17 +267,6 @@ public class FuncotatorUtils {
         }
 
         return -1;
-    }
-
-    /**
-     * Get the sequence-aligned end position for the given allele and start position.
-     * @param seqAlignedStart The sequence-aligned starting position (1-based, inclusive) from which to calculate the end position.
-     * @param alleleLength The length of the allele in bases.
-     * @return An aligned end position (1-based, inclusive) for the given codon start and allele length.
-     */
-    public static int getAlignedEndPosition(final int seqAlignedStart, final int alleleLength) {
-        // We subtract 1 because the start and end positions must be inclusive.
-        return (int)(Math.ceil((seqAlignedStart + alleleLength - 1) / 3.0) * 3);
     }
 
     /**
@@ -410,13 +399,52 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getProteinChangeEndPosition());
         Utils.nonNull(seqComp.getAlternateAminoAcidSequence());
 
-        if ( seqComp.getProteinChangeStartPosition().equals(seqComp.getProteinChangeEndPosition()) ) {
-            return "p." + seqComp.getReferenceAminoAcidSequence() + seqComp.getProteinChangeStartPosition() +
-                    seqComp.getAlternateAminoAcidSequence();
+        String refAaSeq = seqComp.getReferenceAminoAcidSequence();
+        String altAaSeq = seqComp.getAlternateAminoAcidSequence();
+        Integer protChangeStartPos = seqComp.getProteinChangeStartPosition();
+        Integer protChangeEndPos = seqComp.getProteinChangeEndPosition();
+
+        // We should go through our strings and make sure we only render the parts of the protein that have actually
+        // changed.  This means that we keep track of the `same` and `different` parts of the sequences.
+        // `Same` parts at the front & back of the string are ignored.
+        // We keep them in the middle.
+        // Then we recompute the position in which the protein has changed.
+        if ( refAaSeq.length() == altAaSeq.length() ) {
+
+            boolean foundStartDiff = false;
+            boolean foundEndDiff = false;
+
+            int startingDifference = 0;
+            int endingDifference = 0;
+
+            for ( int i = 0 ; i < refAaSeq.length() ; ++i ) {
+                final int rIndx = refAaSeq.length() - 1 - i;
+                if ( (!foundStartDiff) && (refAaSeq.charAt(i) != altAaSeq.charAt(i)) ) {
+                    startingDifference = i;
+                    foundStartDiff = true;
+                }
+                if ( (!foundEndDiff) && (refAaSeq.charAt(rIndx) != altAaSeq.charAt(rIndx)) ) {
+                    endingDifference = i;
+                    foundEndDiff = true;
+                }
+            }
+
+            // Set the new start / stop positions:
+            protChangeStartPos += startingDifference;
+            protChangeEndPos -= endingDifference;
+
+            // Set the new ref and alt amino acid sequences:
+            refAaSeq = refAaSeq.substring(startingDifference, refAaSeq.length() - endingDifference);
+            altAaSeq = altAaSeq.substring(startingDifference, altAaSeq.length() - endingDifference);
+        }
+
+        if ( protChangeStartPos.equals(protChangeEndPos) ) {
+            return "p." + refAaSeq + protChangeStartPos +
+                    altAaSeq;
         }
         else {
-            return "p." + seqComp.getReferenceAminoAcidSequence() + seqComp.getProteinChangeStartPosition()
-                    + "-" + seqComp.getProteinChangeEndPosition() + seqComp.getAlternateAminoAcidSequence();
+            return "p." + protChangeStartPos
+                    + "_" + protChangeEndPos + refAaSeq + '>' + altAaSeq;
         }
     }
 
@@ -433,7 +461,6 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getAlternateAminoAcidSequence());
 
         if ( seqComp.getAlternateAllele().length() > 1 ) {
-//            final int s = seqComp.getCodingSequenceAlleleStart() - seqComp.getReferenceAllele().length() + 1;
             return "c." + seqComp.getCodingSequenceAlleleStart() + "_" + (seqComp.getCodingSequenceAlleleStart() + seqComp.getReferenceAllele().length() - 1) +
                     seqComp.getReferenceAllele() + ">" + seqComp.getAlternateAllele();
         }
