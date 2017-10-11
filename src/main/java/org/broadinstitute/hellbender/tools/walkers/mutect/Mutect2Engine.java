@@ -37,6 +37,7 @@ import org.broadinstitute.hellbender.utils.variant.GATKVCFConstants;
 import org.broadinstitute.hellbender.utils.variant.GATKVCFHeaderLines;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by davidben on 9/15/16.
@@ -320,12 +321,23 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
             }
         }
 
+        // TODO: apply realigner here
+        if (realigner.isPresent()) {
+            final List<GATKRead> altReads = Utils.stream(tumorPileup)
+                    .filter(pe -> getCurrentOrFollowingIndelLength(pe) > 0 || isNextToUsefulSoftClip(pe) || (pe.getBase() != refBase && pe.getQual() > MINIMUM_BASE_QUALITY))
+                    .map(PileupElement::getRead)
+                    .collect(Collectors.toList());
+
+            realigner.get().realign(altReads, context.getLocation());
+        }
+
+
         if (!MTAC.genotypePonSites && !featureContext.getValues(MTAC.pon, new SimpleInterval(context.getContig(), (int) context.getPosition(), (int) context.getPosition())).isEmpty()) {
             return new ActivityProfileState(refInterval, 0.0);
         }
 
 
-        // TODO: apply realigner here
+
 
         return new ActivityProfileState( refInterval, 1.0, ActivityProfileState.Type.NONE, null);
     }
