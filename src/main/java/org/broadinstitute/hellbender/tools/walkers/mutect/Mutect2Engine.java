@@ -321,14 +321,17 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
             }
         }
 
-        // TODO: apply realigner here
         if (realigner.isPresent()) {
             final List<GATKRead> altReads = Utils.stream(tumorPileup)
                     .filter(pe -> getCurrentOrFollowingIndelLength(pe) > 0 || isNextToUsefulSoftClip(pe) || (pe.getBase() != refBase && pe.getQual() > MINIMUM_BASE_QUALITY))
                     .map(PileupElement::getRead)
                     .collect(Collectors.toList());
 
-            realigner.get().realign(altReads, context.getLocation());
+            final int numWellMappedReads = realigner.get().countWellMappedReads(altReads, context.getLocation());
+
+            //TODO: some criterion
+            //TODO: perhaps this could be moved to the logic for the tumor alt count and qual sum, where we test each read
+            //TODO: for good mapping and break when sufficient evidence is found
         }
 
 

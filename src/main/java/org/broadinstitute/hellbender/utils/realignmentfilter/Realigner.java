@@ -31,12 +31,13 @@ public class Realigner {
     }
 
     /**
-     * Realign a collection of alt reads to see whether they are mapping artifacts
-     * @param altReads Reads supposedly supporting a variant
-     * @param ostensiblePosition Supposed location of these reads with respect to the bam's reference (not the realignment reference)
+     * Realign a collection of reads to see whether they are mapping artifacts
+     * @param reads Reads supposedly mapping to a locus
+     * @param supposedLocation Supposed location of these reads with respect to the bam's reference (not the realignment reference)
      */
-    public void realign(final Collection<GATKRead> altReads, final Locatable ostensiblePosition) {
-        final List<List<BwaMemAlignment>> alignments = aligner.alignSeqs(altReads, GATKRead::getBases);
+    public int countWellMappedReads(final Collection<GATKRead> reads, final Locatable supposedLocation) {
+        final List<List<BwaMemAlignment>> alignments = aligner.alignSeqs(reads, GATKRead::getBases);
+        return (int) alignments.stream().filter(alignment -> mapsToSupposedLocation(alignment, supposedLocation)).count();
     }
 
     private boolean mapsToSupposedLocation(final List<BwaMemAlignment> alignments, final Locatable supposedLocation) {
