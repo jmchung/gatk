@@ -67,9 +67,6 @@ public class ReadsPipelineSpark extends GATKSparkTool {
     @Override
     public boolean requiresReference() { return true; }
 
-    @Argument(doc = "whether to perform alignment using BWA-MEM", shortName = "align", fullName = "align", optional = true)
-    private boolean align;
-
     @Argument(doc = "the known variants", shortName = "knownSites", fullName = "knownSites", optional = false)
     protected List<String> baseRecalibrationKnownVariants;
 
@@ -121,12 +118,19 @@ public class ReadsPipelineSpark extends GATKSparkTool {
         //TOOO: should this use getUnfilteredReads? getReads will apply default and command line filters
         final JavaRDD<GATKRead> initialReads = getReads();
 
+        List<GATKRead> firstReads = initialReads.take(2);
+        GATKRead firstRead = firstReads.get(0);
+        GATKRead secondRead = firstReads.get(1);
+        final boolean align = firstRead.isUnmapped() && secondRead.isUnmapped();
+        boolean pairedEndAlignment = firstRead.isPaired() && secondRead.isPaired()
+                && firstRead.isFirstOfPair() && secondRead.isSecondOfPair();
+
         final JavaRDD<GATKRead> alignedReads;
         final SAMFileHeader header;
         final BwaSparkEngine engine;
         if (align) {
                 engine = new BwaSparkEngine(ctx, referenceArguments.getReferenceFileName(), bwaArgs.indexImageFile, getHeaderForReads(), getReferenceSequenceDictionary());
-                alignedReads = !bwaArgs.singleEndAlignment ? engine.alignPaired(getReads()) : engine.alignUnpaired(getReads());
+                alignedReads = pairedEndAlignment ? engine.alignPaired(getReads()) : engine.alignUnpaired(getReads());
                 header = engine.getHeader();
         } else {
             engine = null;

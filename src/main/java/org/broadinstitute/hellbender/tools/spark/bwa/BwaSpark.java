@@ -11,10 +11,12 @@ import org.broadinstitute.hellbender.cmdline.programgroups.SparkProgramGroup;
 import org.broadinstitute.hellbender.engine.spark.GATKSparkTool;
 import org.broadinstitute.hellbender.engine.spark.datasources.ReadsSparkSink;
 import org.broadinstitute.hellbender.exceptions.GATKException;
+import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
 import org.broadinstitute.hellbender.utils.read.ReadsWriteFormat;
 
 import java.io.IOException;
+import java.util.List;
 
 @CommandLineProgramProperties(summary = "Runs BWA",
         oneLineSummary = "BWA on Spark",
@@ -44,9 +46,20 @@ public final class BwaSpark extends GATKSparkTool {
 
     @Override
     protected void runTool(final JavaSparkContext ctx) {
+        JavaRDD<GATKRead> initialReads = getReads();
+
+        List<GATKRead> firstReads = initialReads.take(2);
+        GATKRead firstRead = firstReads.get(0);
+        GATKRead secondRead = firstReads.get(1);
+        if (!firstRead.isUnmapped() || !secondRead.isUnmapped()) {
+            throw new UserException("Input file contains mapped reads.");
+        }
+        boolean pairedEndAlignment = firstRead.isPaired() && secondRead.isPaired()
+                && firstRead.isFirstOfPair() && secondRead.isSecondOfPair();
+
         try ( final BwaSparkEngine engine =
                       new BwaSparkEngine(ctx, referenceArguments.getReferenceFileName(), bwaArgs.indexImageFile, getHeaderForReads(), getReferenceSequenceDictionary()) ) {
-            final JavaRDD<GATKRead> reads = !bwaArgs.singleEndAlignment ? engine.alignPaired(getReads()) : engine.alignUnpaired(getReads());
+            final JavaRDD<GATKRead> reads = pairedEndAlignment ? engine.alignPaired(initialReads) : engine.alignUnpaired(initialReads);
 
             try {
                 ReadsSparkSink.writeReads(ctx, output, null, reads, engine.getHeader(),

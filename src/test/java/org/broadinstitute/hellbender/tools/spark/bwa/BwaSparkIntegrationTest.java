@@ -54,7 +54,6 @@ public final class BwaSparkIntegrationTest extends CommandLineProgramTest {
         args.addArgument("shardedOutput", "true");
         args.add("numReducers=1");
         args.addOutput(output);
-        args.add("--" + BwaArgumentCollection.SINGLE_END_ALIGNMENT_FULL_NAME);
         this.runCommandLine(args.getArgsArray());
 
         SamAssertionUtils.assertSamsEqual(new File(output, "part-r-00000.bam"), expectedSam);
