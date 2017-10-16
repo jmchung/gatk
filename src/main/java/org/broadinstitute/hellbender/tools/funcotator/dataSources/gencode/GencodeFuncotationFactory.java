@@ -8,13 +8,13 @@ import htsjdk.tribble.Feature;
 import htsjdk.tribble.annotation.Strand;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
+import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceDataSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.tools.funcotator.*;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
-import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.codecs.GENCODE.*;
 import org.broadinstitute.hellbender.utils.read.ReadUtils;
 
@@ -298,9 +298,6 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Set the exon number:
         gencodeFuncotation.setTranscriptExon( exon.getExonNumber() );
-
-        // Set our transcript exon number:
-        gencodeFuncotation.setTranscriptExon(exon.getExonNumber());
 
         // Get the list of exons by their locations so we can use them to determine our location in the transcript and get
         // the transcript code itself:
@@ -622,8 +619,25 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
                 // Since we're in a splice site, we need to create the coding region string for a splice site.
                 final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
+                if ( strand == Strand.NONE ) {
+                    throw new GATKException("Unable to handle NONE strand.");
+                }
+
+                // Do we need to adjust the exon start / stop based on an indel?
+                // In the case of an insertion we need to remove the bases that were inserted to get to the actual positon
+                // in the genome of our variant.
+                // Similarly in the case of a deletion we need to add back in the bases that were deleted to get the actual
+                // position in the genome of our variant.
+                final int offsetIndelAdjustment = 0;
+//                if ( FuncotatorUtils.isDeletion(variant.getReference(), altAllele) ) {
+//                    offsetIndelAdjustment = altAllele.length() - variant.getReference().length();
+//                }
+//                else {
+//                    offsetIndelAdjustment = 0;
+//                }
+
                 gencodeFuncotation.setCodonChange(
-                        FuncotatorUtils.createSpliceSiteCodonChange(variant.getStart(), exon.getExonNumber(), exon.getStart(), exon.getEnd(), strand)
+                        FuncotatorUtils.createSpliceSiteCodonChange(variant.getStart(), exon.getExonNumber(), exon.getStart(), exon.getEnd(), strand, offsetIndelAdjustment)
                 );
             }
         }
@@ -906,7 +920,26 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      */
     private static String getGenomeChangeString(final VariantContext variant, final Allele altAllele, final GencodeGtfGeneFeature gtfFeature) {
 
-        if ( variant.getReference().length() == 1) {
+        // g.chr3:178916619_178916620insCGA
+
+        // Check for insertion:
+        if ( variant.getReference().length() < altAllele.length() ) {
+            final String cleanAltAlleleString = FuncotatorUtils.getNonOverlappingAltAlleleBaseString( variant.getReference(), altAllele, false);
+
+            return "g." + gtfFeature.getChromosomeName() +
+                    ":" + variant.getStart() + "_" + (variant.getStart() + 1) + "ins" +
+                    cleanAltAlleleString;
+        }
+        // Check for deletion:
+        else if ( variant.getReference().length() > altAllele.length() ) {
+            final String cleanAltAlleleString = FuncotatorUtils.getNonOverlappingAltAlleleBaseString( variant.getReference(), altAllele, true );
+
+            return "g." + gtfFeature.getChromosomeName() +
+                    ":" + (variant.getStart() + 1) + "_" + ( variant.getStart() + variant.getReference().length() - 1) +
+                    "del" + cleanAltAlleleString;
+        }
+        // Check for SNP:
+        else if ( variant.getReference().length() == 1 ) {
             return "g." + gtfFeature.getChromosomeName() +
                     ":" + variant.getStart() +
                     variant.getReference().getBaseString() + ">" + altAllele.getBaseString();

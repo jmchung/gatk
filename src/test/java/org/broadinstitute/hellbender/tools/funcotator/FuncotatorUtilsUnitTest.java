@@ -3,6 +3,7 @@ package org.broadinstitute.hellbender.tools.funcotator;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.tribble.annotation.Strand;
 import htsjdk.variant.variantcontext.Allele;
+import lombok.Data;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceFileSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
@@ -323,6 +324,37 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     }
 
     @DataProvider
+    Object[][] provideDataForTestGetNonOverlappingAltAlleleBaseString() {
+        return new Object[][] {
+                { Allele.create("A", true),          Allele.create("A"),          false, "" },
+                { Allele.create("AAAAAAAAAA", true), Allele.create("AAAAAAAAAA"), false, "" },
+
+                { Allele.create("AAAAAAAAAA", true), Allele.create("TAAAAAAAAA"), false, "T" },
+                { Allele.create("AAAAAAAAAA", true), Allele.create("AAAAAAAAAT"), false, "T" },
+                { Allele.create("AAAAAAAAAA", true), Allele.create("ATTTTTTTTT"), false, "TTTTTTTTT" },
+                { Allele.create("AAAAAAAAAA", true), Allele.create("TTTTTTTTTA"), false, "TTTTTTTTT" },
+
+                { Allele.create("AAAAA", true), Allele.create("TAAAAAAAAA"),      false, "TAAAA" },
+                { Allele.create("AAAAA", true), Allele.create("AAAAAAAAAT"),      false, "AAAAT" },
+                { Allele.create("AAAAA", true), Allele.create("ATTTTTTTTT"),      false, "TTTTTTTTT" },
+                { Allele.create("AAAAA", true), Allele.create("TTTTTTTTTA"),      false, "TTTTTTTTT" },
+
+                { Allele.create("AAAAAAAAAA", true), Allele.create("TAAAA"),      false, "T" },
+                { Allele.create("AAAAAAAAAA", true), Allele.create("AAAAT"),      false, "T" },
+                { Allele.create("AAAAAAAAAA", true), Allele.create("ATTTT"),      false, "TTTT" },
+                { Allele.create("AAAAAAAAAA", true), Allele.create("TTTTA"),      false, "TTTT" },
+
+//                { Allele.create("A", true),          Allele.create("A"),          true,  "" },
+//                { Allele.create("AAAAAAAAAA", true), Allele.create("AAAAAAAAAA"), true,  "" },
+//
+//                { Allele.create("AAAAAAAAAA", true), Allele.create("TAAAAAAAAA"), true,  "T" },
+//                { Allele.create("AAAAAAAAAA", true), Allele.create("AAAAAAAAAT"), true,  "T" },
+//                { Allele.create("AAAAAAAAAA", true), Allele.create("ATTTTTTTTT"), true,  "TTTTTTTTT" },
+//                { Allele.create("AAAAAAAAAA", true), Allele.create("TTTTTTTTTA"), true,  "TTTTTTTTT" },
+        };
+    }
+
+    @DataProvider
     Object[][] provideDataForGetStartPositionInTranscript() {
 
         final List<? extends Locatable> exons_forward = Arrays.asList(
@@ -461,6 +493,34 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                 { 8,9,10, true },
                 { 8,9,11, true },
                 { 8,9,12, false },
+        };
+    }
+
+    @DataProvider
+    Object[][] provideDataForTestIsInsertion() {
+        return new Object[][] {
+                { Allele.create("A", true),     Allele.create("T"),     false },
+                { Allele.create("A", true),     Allele.create("TT"),    true },
+                { Allele.create("AA", true),    Allele.create("TT"),    false },
+                { Allele.create("AA", true),    Allele.create("T"),     false },
+                { Allele.create("AAAAA", true), Allele.create("TTTTT"), false },
+                { Allele.create("A", true),     Allele.create("TTTTT"), true },
+                { Allele.create("AAAAA", true), Allele.create("T"),     false },
+                { Allele.create("AAAAA", true), Allele.create("TTTTT"), false },
+        };
+    }
+
+    @DataProvider
+    Object[][] provideDataForTestIsDeletion() {
+        return new Object[][] {
+                { Allele.create("A", true),     Allele.create("T"),     false },
+                { Allele.create("A", true),     Allele.create("TT"),    false },
+                { Allele.create("AA", true),    Allele.create("TT"),    false },
+                { Allele.create("AA", true),    Allele.create("T"),     true },
+                { Allele.create("AAAAA", true), Allele.create("TTTTT"), false },
+                { Allele.create("A", true),     Allele.create("TTTTT"), false },
+                { Allele.create("AAAAA", true), Allele.create("T"),     true },
+                { Allele.create("AAAAA", true), Allele.create("TTTTT"), false },
         };
     }
 
@@ -779,15 +839,35 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     Object[][] provideDataForTestCreateSpliceSiteCodonChange() {
 
         return new Object[][] {
-                {1000, 5, 1000, 1500, Strand.POSITIVE, "c.e5-0"},
-                {1000, 4, 0, 1500, Strand.POSITIVE,    "c.e4+500"},
-                {1000, 3, 500, 1500, Strand.POSITIVE,  "c.e3-500"},
+                {1000, 5, 1000, 1500, Strand.POSITIVE, 0, "c.e5-0"},
+                {1000, 4, 0, 1500, Strand.POSITIVE,    0, "c.e4+500"},
+                {1000, 3, 500, 1500, Strand.POSITIVE,  0, "c.e3-500"},
 
-                {1000, 5, 1000, 1500, Strand.NEGATIVE, "c.e5+0"},
-                {1000, 4, 0, 1500, Strand.NEGATIVE,    "c.e4-500"},
-                {1000, 3, 500, 1500, Strand.NEGATIVE,  "c.e3+500"},
+                {1000, 5, 1000, 1500, Strand.NEGATIVE, 0, "c.e5+0"},
+                {1000, 4, 0, 1500, Strand.NEGATIVE,    0, "c.e4-500"},
+                {1000, 3, 500, 1500, Strand.NEGATIVE,  0, "c.e3+500"},
 
-                {1000, 5, 1500, 500, Strand.NEGATIVE,  "c.e5+500"},
+                {1000, 5, 1500, 500, Strand.NEGATIVE,  0, "c.e5+500"},
+
+                {1000, 5, 1000, 1500, Strand.POSITIVE, 1, "c.e5+1"},
+                {1000, 4, 0, 1500, Strand.POSITIVE,    2, "c.e4+502"},
+                {1000, 3, 500, 1500, Strand.POSITIVE,  3, "c.e3-497"},
+
+                {1000, 5, 1000, 1500, Strand.NEGATIVE, 4, "c.e5+4"},
+                {1000, 4, 0, 1500, Strand.NEGATIVE,    5, "c.e4-495"},
+                {1000, 3, 500, 1500, Strand.NEGATIVE,  6, "c.e3+506"},
+
+                {1000, 5, 1500, 500, Strand.NEGATIVE,  7, "c.e5+507"},
+
+                {1000, 5, 1000, 1500, Strand.POSITIVE, -1, "c.e5-1"},
+                {1000, 4, 0, 1500, Strand.POSITIVE,    -2, "c.e4+498"},
+                {1000, 3, 500, 1500, Strand.POSITIVE,  -3, "c.e3-503"},
+
+                {1000, 5, 1000, 1500, Strand.NEGATIVE, -4, "c.e5-4"},
+                {1000, 4, 0, 1500, Strand.NEGATIVE,    -5, "c.e4-505"},
+                {1000, 3, 500, 1500, Strand.NEGATIVE,  -6, "c.e3+494"},
+
+                {1000, 5, 1500, 500, Strand.NEGATIVE,  -7, "c.e5+493"},
         };
     }
 
@@ -802,6 +882,16 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @Test(dataProvider = "providePositionsAndFrameshiftResults")
     void testIsFrameshiftByPositions(final int refStart, final int refEnd, final int altEnd, final boolean expected) {
         Assert.assertEquals( FuncotatorUtils.isFrameshift(refStart, refEnd, altEnd), expected );
+    }
+
+    @Test(dataProvider = "provideDataForTestIsInsertion")
+    void testIsInsertion(final Allele ref, final Allele alt, final boolean expected) {
+        Assert.assertEquals( FuncotatorUtils.isInsertion(ref, alt), expected );
+    }
+
+    @Test(dataProvider = "provideDataForTestIsDeletion")
+    void testIsDeletion(final Allele ref, final Allele alt, final boolean expected) {
+        Assert.assertEquals( FuncotatorUtils.isDeletion(ref, alt), expected );
     }
 
 //    @Test(dataProvider = "provideReferenceAndExonListAndExpected")
@@ -821,6 +911,11 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
 //    void testGetCodingSequenceWithIllegalArgumentExceptions(final ReferenceContext reference, final List<Locatable> exonList) {
 //        FuncotatorUtils.getCodingSequence(reference, exonList);
 //    }
+
+    @Test(dataProvider = "provideDataForTestGetNonOverlappingAltAlleleBaseString")
+    void testGetNonOverlappingAltAlleleBaseString(final Allele refAllele, final Allele altAllele, final boolean copyRefBasesWhenAltIsPastEnd, final String expected) {
+        Assert.assertEquals( FuncotatorUtils.getNonOverlappingAltAlleleBaseString(refAllele, altAllele, copyRefBasesWhenAltIsPastEnd), expected);
+    }
 
     @Test(dataProvider = "provideDataForGetStartPositionInTranscript")
     void testGetStartPositionInTranscript(final Locatable variant, final List<? extends Locatable> transcript, final Strand strand, final int expected) {
@@ -976,9 +1071,10 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                                          final int exonStart,
                                          final int exonEnd,
                                          final Strand strand,
+                                         final int offsetIndelAdjustment,
                                          final String expected) {
 
-        Assert.assertEquals( FuncotatorUtils.createSpliceSiteCodonChange(variantStart, exonNumber, exonStart, exonEnd, strand), expected );
+        Assert.assertEquals( FuncotatorUtils.createSpliceSiteCodonChange(variantStart, exonNumber, exonStart, exonEnd, strand, offsetIndelAdjustment), expected );
     }
 
 }

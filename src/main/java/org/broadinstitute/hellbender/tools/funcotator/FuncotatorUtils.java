@@ -193,6 +193,205 @@ public class FuncotatorUtils {
     }
 
     /**
+     * Determines whether the given reference and alternate alleles constitute an insertion mutation.
+     * @param reference The reference {@link Allele}.
+     * @param alternate The alternate / variant {@link Allele}.
+     * @return {@code true} if replacing the reference with the alternate results in an insertion.  {@code false} otherwise.
+     */
+    public static boolean isInsertion(final Allele reference, final Allele alternate) {
+
+        Utils.nonNull(reference);
+        Utils.nonNull(alternate);
+
+        // If we have more bases in the alternate, we have an insertion:
+        return reference.length() < alternate.length();
+    }
+
+    /**
+     * Determines whether the given reference and alternate alleles constitute a deletion mutation.
+     * @param reference The reference {@link Allele}.
+     * @param alternate The alternate / variant {@link Allele}.
+     * @return {@code true} if replacing the reference with the alternate results in a deletion.  {@code false} otherwise.
+     */
+    public static boolean isDeletion(final Allele reference, final Allele alternate) {
+
+        Utils.nonNull(reference);
+        Utils.nonNull(alternate);
+
+        // If we have fewer bases in the alternate, we have a deletion:
+        return reference.length() > alternate.length();
+    }
+
+//    /**
+//     * Get the string of alternate bases that are different from the given reference alleles.
+//     * Assumes there is one contiguous string of changed bases between the two alleles.
+//     * Assumes that if there is overlap between the alleles, the overlap occurs at either the front or the back of both.
+//     * @param refAllele Reference {@link Allele}.
+//     * @param altAllele Alternate {@link Allele}.
+//     * @param copyRefBasesWhenAltIsPastEnd Will copy the bases from the given {@code refAllele} when the alternate allele has no more bases to copy over.  Used primarily for handling deletions.
+//     * @return A string containing the bases from the given {@code altAllele} that are different from the reference (in their correct relative order).
+//     */
+//    public static String getNonOverlappingAltAlleleBaseString( final Allele refAllele, final Allele altAllele, final boolean copyRefBasesWhenAltIsPastEnd ) {
+//
+//        final StringBuilder sb = new StringBuilder();
+//
+//        final char noBase = 'x';
+//        final int maxAlleleLength = Math.max(refAllele.length(), altAllele.length());
+//        boolean overlapInBack = false;
+//        boolean havePassedOverlapAlready = false;
+//
+//        // Find out where the overlap is:
+//        if ( refAllele.getBases()[0] != altAllele.getBases()[0] ) {
+//            overlapInBack = true;
+//        }
+//
+//        // Go through and construct the changed allele string:
+//        for ( int i = 0; i < maxAlleleLength; ++i ) {
+//
+//            // Get our index for front or back differences:
+//            final int index;
+//            if ( overlapInBack ) {
+//                index = (maxAlleleLength - 1) - i;
+//            }
+//            else {
+//                index = i;
+//            }
+//
+//            // Check for differences between the bases:
+//            char refBase = noBase;
+//            char altBase = noBase;
+//
+//            if ( index < refAllele.length() ) {
+//                refBase = refAllele.getBaseString().charAt(index);
+//            }
+//            if ( index < altAllele.length() ) {
+//                altBase = altAllele.getBaseString().charAt(index);
+//            }
+//
+//            // Check to see if we're at the end of the differences between the alleles:
+//            if ( altBase == noBase ) {
+//                if ( copyRefBasesWhenAltIsPastEnd ) {
+//                    if ( overlapInBack ) {
+//                        sb.append( refAllele.getBaseString().substring(0, index + 1) );
+//                    }
+//                    else {
+//                        sb.append( refAllele.getBaseString().substring(index) );
+//                    }
+//                }
+//                break;
+//            }
+//            else if ( havePassedOverlapAlready && (altBase == refBase) ) {
+//                // We can now safely copy the rest of the alt allele into the string buffer and get out of the loop.
+//                if ( overlapInBack ) {
+//                    sb.append( altAllele.getBaseString().substring(0, index + 1) );
+//                }
+//                else {
+//                    sb.append( altAllele.getBaseString().substring(index) );
+//                }
+//                break;
+//            }
+//            else if ( altBase != refBase ) {
+//                sb.append(altBase);
+//                havePassedOverlapAlready = true;
+//            }
+//        }
+//
+//        // We're done.  Bye bye!
+//        return sb.toString();
+//    }
+
+    /**
+     * Get the string of alternate bases that are different from the given reference alleles.
+     * Assumes there is one contiguous string of changed bases between the two alleles.
+     * Assumes that if there is overlap between the alleles, the overlap occurs at either the front or the back of both.
+     * @param refAllele Reference {@link Allele}.
+     * @param altAllele Alternate {@link Allele}.
+     * @param copyRefBasesWhenAltIsPastEnd Will copy the bases from the given {@code refAllele} when the alternate allele has no more bases to copy over.  Used primarily for handling deletions.
+     * @return A string containing the bases from the given {@code altAllele} that are different from the reference (in their correct relative order).
+     */
+    public static String getNonOverlappingAltAlleleBaseString( final Allele refAllele, final Allele altAllele, final boolean copyRefBasesWhenAltIsPastEnd ) {
+
+        final StringBuilder sb = new StringBuilder();
+
+        final char noBase = 'x';
+        final int maxAlleleLength = Math.max(refAllele.length(), altAllele.length());
+        boolean havePassedOverlapAlready = false;
+
+        // Find out where the overlap is:
+        if ( refAllele.getBases()[0] != altAllele.getBases()[0] ) {
+            // overlap in back:
+            for ( int i = 0; i < maxAlleleLength; ++i ) {
+                // Check for differences between the bases:
+                char refBase = noBase;
+                char altBase = noBase;
+
+                if ( (refAllele.length() - 1 - i) >= 0 ) {
+                    refBase = refAllele.getBaseString().charAt(refAllele.length() - 1 - i);
+                }
+                if ( (altAllele.length() - 1 - i) >= 0 ) {
+                    altBase = altAllele.getBaseString().charAt(altAllele.length() - 1 - i);
+                }
+
+                // Check to see if we're at the end of the differences between the alleles:
+                if ( altBase == noBase ) {
+                    if ( copyRefBasesWhenAltIsPastEnd ) {
+                        sb.append( refAllele.getBaseString().substring(0, refAllele.length() - i) );
+                    }
+                    break;
+                }
+                else if ( havePassedOverlapAlready && (altBase == refBase) ) {
+                    // We can now safely copy the rest of the alt allele into the string buffer and get out of the loop.
+                    sb.append( altAllele.getBaseString().substring(0, altAllele.length() - i) );
+                    break;
+                }
+                else if (altBase != refBase) {
+                    sb.append(altBase);
+                    havePassedOverlapAlready = true;
+                }
+            }
+
+            // Now we rotate the string buffer because we've been iterating through it backwards:
+            sb.reverse();
+        }
+        else {
+            // overlap in front:
+            for ( int i = 0; i < maxAlleleLength; ++i ) {
+
+                // Check for differences between the bases:
+                char refBase = noBase;
+                char altBase = noBase;
+
+                if ( i < refAllele.length() ) {
+                    refBase = refAllele.getBaseString().charAt(i);
+                }
+                if ( i < altAllele.length() ) {
+                    altBase = altAllele.getBaseString().charAt(i);
+                }
+
+                // Check to see if we're at the end of the differences between the alleles:
+                if ( altBase == noBase ) {
+                    if ( copyRefBasesWhenAltIsPastEnd ) {
+                        sb.append( refAllele.getBaseString().substring(i) );
+                    }
+                    break;
+                }
+                else if ( havePassedOverlapAlready && (altBase == refBase) ) {
+                    // We can now safely copy the rest of the alt allele into the string buffer and get out of the loop.
+                    sb.append( altAllele.getBaseString().substring(i) );
+                    break;
+                }
+                else if ( altBase != refBase ) {
+                    sb.append(altBase);
+                    havePassedOverlapAlready = true;
+                }
+            }
+        }
+
+        // We're done.  Bye bye!
+        return sb.toString();
+    }
+
+    /**
      * Determines whether the given reference and alternate alleles constitute a frameshift mutation.
      * @param startPos Genomic start position (1-based, inclusive) of the variant.
      * @param refEnd Genomic end position (1-based, inclusive) of the reference allele.
@@ -313,36 +512,36 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getAlignedAlternateAllele());
         Utils.nonNull(seqComp.getCodingSequenceAlleleStart());
 
-        String ref = "";
-        String alt = "";
+        final StringBuilder ref = new StringBuilder();
+        final StringBuilder alt = new StringBuilder();
 
         // Capitalize the right parts of each string if they're of equal length:
         if (seqComp.getAlignedReferenceAllele().length() == seqComp.getAlignedAlternateAllele().length()) {
             for ( int i = 0 ; i < seqComp.getAlignedReferenceAllele().length(); ++i ) {
                 if ( seqComp.getAlignedReferenceAllele().charAt(i) != seqComp.getAlignedAlternateAllele().charAt(i) ) {
-                    ref += Character.toUpperCase( seqComp.getAlignedReferenceAllele().charAt(i) );
-                    alt += Character.toUpperCase( seqComp.getAlignedAlternateAllele().charAt(i) );
+                    ref.append(Character.toUpperCase( seqComp.getAlignedReferenceAllele().charAt(i) ));
+                    alt.append(Character.toUpperCase( seqComp.getAlignedAlternateAllele().charAt(i) ));
                 }
                 else {
                     final char c = Character.toLowerCase( seqComp.getAlignedReferenceAllele().charAt(i) );
-                    ref += c;
-                    alt += c;
+                    ref.append(c);
+                    alt.append(c);
                 }
             }
         }
         else {
-            ref = seqComp.getAlignedReferenceAllele();
-            alt = seqComp.getAlignedAlternateAllele();
+            ref.append(seqComp.getAlignedReferenceAllele());
+            alt.append(seqComp.getAlignedAlternateAllele());
         }
 
         if ( seqComp.getAlignedCodingSequenceAlleleStart().equals(seqComp.getAlignedReferenceAlleleStop()) ) {
             return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + ")" +
-                    ref + ">" + alt;
+                    ref.toString() + ">" + alt.toString();
         }
         else {
             return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + "-" +
                     seqComp.getAlignedReferenceAlleleStop() + ")" +
-                    ref + ">" + alt;
+                    ref.toString() + ">" + alt.toString();
         }
     }
 
@@ -361,6 +560,26 @@ public class FuncotatorUtils {
                                                      final int exonStart,
                                                      final int exonEnd,
                                                      final Strand strand) {
+        return createSpliceSiteCodonChange(variantStart, exonNumber, exonStart, exonEnd, strand, 0);
+    }
+
+    /**
+     * Gets a codon change string for a splice site.
+     * Assumes the variant and exon referenced in the params are on the same contig.
+     * @param variantStart Start position (1-based, inclusive) of the variant.
+     * @param exonNumber Number of the exon in the transcript.
+     * @param exonStart Start position (1-based, inclusive) of the exon.
+     * @param exonEnd End position (1-based, inclusive) of the exon.
+     * @param strand The {@link Strand} on which the variant and exon are read.
+     * @param offsetIndelAdjustment An adjustment added to account for bases lost / gained in an Indel event.
+     * @return A {@link String} representing the codon change for the splice site represented by the given parameters.
+     */
+    public static String createSpliceSiteCodonChange(final int variantStart,
+                                                     final int exonNumber,
+                                                     final int exonStart,
+                                                     final int exonEnd,
+                                                     final Strand strand,
+                                                     final int offsetIndelAdjustment) {
         Utils.nonNull(strand);
         if ( strand == Strand.NONE ) {
             throw new GATKException("Unable to handle NONE strand.");
@@ -376,6 +595,25 @@ public class FuncotatorUtils {
 
         if (strand == Strand.NEGATIVE) {
             if ( sign == '+' ) {
+                sign = '-';
+            }
+            else {
+                sign = '+';
+            }
+        }
+
+        // Add our indel adjustment here:
+        if ( sign == '+' ) {
+            offset += offsetIndelAdjustment;
+        }
+        else {
+            offset -= offsetIndelAdjustment;
+        }
+
+        // Make sure we correctly adjust for the zero crossing:
+        if ( offset < 0 ) {
+            offset *= -1;
+            if ( sign == '+') {
                 sign = '-';
             }
             else {
@@ -469,6 +707,16 @@ public class FuncotatorUtils {
                     seqComp.getReferenceAllele() + ">" + seqComp.getAlternateAllele();
         }
     }
+
+//    /**
+//     * Get the coding sequence change string for an intron-based splice site variant.
+//     * @param upstreamCodingSequenceSpliceSite The coding sequence location (1-based, inclusive) of the nearest upstream splice site.
+//     * @return A {@link String} representation of the coding sequence change for the given {@code upstreamCodingSequenceSpliceSite}
+//     */
+//    public static String getCodingSequenceChangeStringIntronSpliceSite( final int upstreamCodingSequenceSpliceSite ) {
+//        Utils.nonNull(upstreamCodingSequenceSpliceSite);
+//        return "c." + upstreamCodingSequenceSpliceSite + "_splice";
+//    }
 
     /**
      * Creates an amino acid sequence from a given coding sequence.
