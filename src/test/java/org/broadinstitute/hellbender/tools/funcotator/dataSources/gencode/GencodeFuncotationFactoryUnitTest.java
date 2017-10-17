@@ -199,6 +199,80 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
         return outArray;
     }
 
+    @DataProvider
+    Object[][] provideDataForTestIsVariantInCodingRegion() {
+        return new Object[][] {
+
+                // Trivially false cases:
+                {GencodeFuncotation.VariantClassification.INTRON, null, false},
+                {GencodeFuncotation.VariantClassification.INTRON, GencodeFuncotation.VariantClassification.INTRON, false},
+                {GencodeFuncotation.VariantClassification.INTRON, GencodeFuncotation.VariantClassification.MISSENSE, false},
+                {GencodeFuncotation.VariantClassification.FIVE_PRIME_UTR, null, false},
+                {GencodeFuncotation.VariantClassification.FIVE_PRIME_UTR, GencodeFuncotation.VariantClassification.INTRON, false},
+                {GencodeFuncotation.VariantClassification.FIVE_PRIME_UTR, GencodeFuncotation.VariantClassification.MISSENSE, false},
+                {GencodeFuncotation.VariantClassification.THREE_PRIME_UTR, null, false},
+                {GencodeFuncotation.VariantClassification.THREE_PRIME_UTR, GencodeFuncotation.VariantClassification.INTRON, false},
+                {GencodeFuncotation.VariantClassification.THREE_PRIME_UTR, GencodeFuncotation.VariantClassification.MISSENSE, false},
+                {GencodeFuncotation.VariantClassification.IGR, null, false},
+                {GencodeFuncotation.VariantClassification.IGR, GencodeFuncotation.VariantClassification.INTRON, false},
+                {GencodeFuncotation.VariantClassification.IGR, GencodeFuncotation.VariantClassification.MISSENSE, false},
+                {GencodeFuncotation.VariantClassification.FIVE_PRIME_FLANK, null, false},
+                {GencodeFuncotation.VariantClassification.FIVE_PRIME_FLANK, GencodeFuncotation.VariantClassification.INTRON, false},
+                {GencodeFuncotation.VariantClassification.FIVE_PRIME_FLANK, GencodeFuncotation.VariantClassification.MISSENSE, false},
+                {GencodeFuncotation.VariantClassification.DE_NOVO_START_IN_FRAME, null, false},
+                {GencodeFuncotation.VariantClassification.DE_NOVO_START_IN_FRAME, GencodeFuncotation.VariantClassification.INTRON, false},
+                {GencodeFuncotation.VariantClassification.DE_NOVO_START_IN_FRAME, GencodeFuncotation.VariantClassification.MISSENSE, false},
+                {GencodeFuncotation.VariantClassification.DE_NOVO_START_OUT_FRAME, null, false},
+                {GencodeFuncotation.VariantClassification.DE_NOVO_START_OUT_FRAME, GencodeFuncotation.VariantClassification.INTRON, false},
+                {GencodeFuncotation.VariantClassification.DE_NOVO_START_OUT_FRAME, GencodeFuncotation.VariantClassification.MISSENSE, false},
+                {GencodeFuncotation.VariantClassification.RNA, null, false},
+                {GencodeFuncotation.VariantClassification.RNA, GencodeFuncotation.VariantClassification.INTRON, false},
+                {GencodeFuncotation.VariantClassification.RNA, GencodeFuncotation.VariantClassification.MISSENSE, false},
+                {GencodeFuncotation.VariantClassification.LINCRNA, null, false},
+                {GencodeFuncotation.VariantClassification.LINCRNA, GencodeFuncotation.VariantClassification.INTRON, false},
+                {GencodeFuncotation.VariantClassification.LINCRNA, GencodeFuncotation.VariantClassification.MISSENSE, false},
+
+                // Trivially true cases:
+                {GencodeFuncotation.VariantClassification.MISSENSE, null, true},
+                {GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantClassification.INTRON, true},
+                {GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantClassification.MISSENSE, true},
+                {GencodeFuncotation.VariantClassification.NONSENSE, null, true},
+                {GencodeFuncotation.VariantClassification.NONSENSE, GencodeFuncotation.VariantClassification.INTRON, true},
+                {GencodeFuncotation.VariantClassification.NONSENSE, GencodeFuncotation.VariantClassification.MISSENSE, true},
+                {GencodeFuncotation.VariantClassification.NONSTOP, null, true},
+                {GencodeFuncotation.VariantClassification.NONSTOP, GencodeFuncotation.VariantClassification.INTRON, true},
+                {GencodeFuncotation.VariantClassification.NONSTOP, GencodeFuncotation.VariantClassification.MISSENSE, true},
+                {GencodeFuncotation.VariantClassification.SILENT, null, true},
+                {GencodeFuncotation.VariantClassification.SILENT, GencodeFuncotation.VariantClassification.INTRON, true},
+                {GencodeFuncotation.VariantClassification.SILENT, GencodeFuncotation.VariantClassification.MISSENSE, true},
+                {GencodeFuncotation.VariantClassification.IN_FRAME_DEL, null, true},
+                {GencodeFuncotation.VariantClassification.IN_FRAME_DEL, GencodeFuncotation.VariantClassification.INTRON, true},
+                {GencodeFuncotation.VariantClassification.IN_FRAME_DEL, GencodeFuncotation.VariantClassification.MISSENSE, true},
+                {GencodeFuncotation.VariantClassification.IN_FRAME_INS, null, true},
+                {GencodeFuncotation.VariantClassification.IN_FRAME_INS, GencodeFuncotation.VariantClassification.INTRON, true},
+                {GencodeFuncotation.VariantClassification.IN_FRAME_INS, GencodeFuncotation.VariantClassification.MISSENSE, true},
+                {GencodeFuncotation.VariantClassification.FRAME_SHIFT_INS, null, true},
+                {GencodeFuncotation.VariantClassification.FRAME_SHIFT_INS, GencodeFuncotation.VariantClassification.INTRON, true},
+                {GencodeFuncotation.VariantClassification.FRAME_SHIFT_INS, GencodeFuncotation.VariantClassification.MISSENSE, true},
+                {GencodeFuncotation.VariantClassification.FRAME_SHIFT_DEL, null, true},
+                {GencodeFuncotation.VariantClassification.FRAME_SHIFT_DEL, GencodeFuncotation.VariantClassification.INTRON, true},
+                {GencodeFuncotation.VariantClassification.FRAME_SHIFT_DEL, GencodeFuncotation.VariantClassification.MISSENSE, true},
+                {GencodeFuncotation.VariantClassification.START_CODON_SNP, null, true},
+                {GencodeFuncotation.VariantClassification.START_CODON_SNP, GencodeFuncotation.VariantClassification.INTRON, true},
+                {GencodeFuncotation.VariantClassification.START_CODON_SNP, GencodeFuncotation.VariantClassification.MISSENSE, true},
+                {GencodeFuncotation.VariantClassification.START_CODON_INS, null, true},
+                {GencodeFuncotation.VariantClassification.START_CODON_INS, GencodeFuncotation.VariantClassification.INTRON, true},
+                {GencodeFuncotation.VariantClassification.START_CODON_INS, GencodeFuncotation.VariantClassification.MISSENSE, true},
+                {GencodeFuncotation.VariantClassification.START_CODON_DEL, null, true},
+                {GencodeFuncotation.VariantClassification.START_CODON_DEL, GencodeFuncotation.VariantClassification.INTRON, true},
+                {GencodeFuncotation.VariantClassification.START_CODON_DEL, GencodeFuncotation.VariantClassification.MISSENSE, true},
+
+                // Splice site special cases:
+                {GencodeFuncotation.VariantClassification.SPLICE_SITE, GencodeFuncotation.VariantClassification.INTRON, false},
+                {GencodeFuncotation.VariantClassification.SPLICE_SITE, GencodeFuncotation.VariantClassification.MISSENSE, true},
+        };
+    }
+
     //==================================================================================================================
     // Tests:
 
@@ -410,13 +484,18 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
             final GencodeFuncotation funcotation = funcotations.get(0);
 
             Assert.assertEquals(funcotation.getVariantClassification(), expectedVariantClassification);
-            Assert.assertEquals(funcotation.getVariantType(), expectedVariantType);
-            Assert.assertEquals(funcotation.getGenomeChange(), expectedGenomeChange);
-            Assert.assertEquals(funcotation.getTranscriptStrand(), expectedStrand);
-            Assert.assertEquals(funcotation.getCodonChange(), expectedCodonChange);
-            Assert.assertEquals(funcotation.getcDnaChange(), expectedCDnaChange);
-            Assert.assertEquals(funcotation.getProteinChange(), expectedProteinChange);
-            Assert.assertEquals(funcotation.getHugoSymbol(), expectedGeneName);
+            Assert.assertEquals(funcotation.getVariantType(),           expectedVariantType);
+            Assert.assertEquals(funcotation.getGenomeChange(),          expectedGenomeChange);
+            Assert.assertEquals(funcotation.getTranscriptStrand(),      expectedStrand);
+            Assert.assertEquals(funcotation.getCodonChange(),           expectedCodonChange);
+            Assert.assertEquals(funcotation.getcDnaChange(),            expectedCDnaChange);
+            Assert.assertEquals(funcotation.getProteinChange(),         expectedProteinChange);
+            Assert.assertEquals(funcotation.getHugoSymbol(),            expectedGeneName);
         }
+    }
+
+    @Test (dataProvider = "provideDataForTestIsVariantInCodingRegion")
+    void testIsVariantInCodingRegion(final GencodeFuncotation.VariantClassification varClass, final GencodeFuncotation.VariantClassification secondaryVarClass, final boolean expected) {
+        Assert.assertEquals( GencodeFuncotationFactory.isVariantInCodingRegion(varClass, secondaryVarClass), expected );
     }
 }

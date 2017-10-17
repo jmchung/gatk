@@ -15,6 +15,7 @@ import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.tools.funcotator.*;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
+import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.codecs.GENCODE.*;
 import org.broadinstitute.hellbender.utils.read.ReadUtils;
 
@@ -203,6 +204,37 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
     }
 
     /**
+     * Returns whether a variant is in a coding region based on its primary and secondary {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification}.
+     * @param varClass Primary {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification} of a variant.
+     * @param secondaryVarClass Secondary {@link org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation.VariantClassification} of a variant.
+     * @return {@code true} if the corresponding variant is in a coding region; {@code false} otherwise.
+     */
+    @VisibleForTesting
+    static boolean isVariantInCodingRegion(final GencodeFuncotation.VariantClassification varClass,
+                                           final GencodeFuncotation.VariantClassification secondaryVarClass ) {
+
+        Utils.nonNull( varClass );
+
+        if ( varClass == GencodeFuncotation.VariantClassification.SPLICE_SITE ) {
+            Utils.nonNull( secondaryVarClass );
+            return secondaryVarClass != GencodeFuncotation.VariantClassification.INTRON;
+        }
+        else {
+            return  (varClass == GencodeFuncotation.VariantClassification.MISSENSE)        ||
+                    (varClass == GencodeFuncotation.VariantClassification.NONSENSE)        ||
+                    (varClass == GencodeFuncotation.VariantClassification.NONSTOP)         ||
+                    (varClass == GencodeFuncotation.VariantClassification.SILENT)          ||
+                    (varClass == GencodeFuncotation.VariantClassification.IN_FRAME_DEL)    ||
+                    (varClass == GencodeFuncotation.VariantClassification.IN_FRAME_INS)    ||
+                    (varClass == GencodeFuncotation.VariantClassification.FRAME_SHIFT_INS) ||
+                    (varClass == GencodeFuncotation.VariantClassification.FRAME_SHIFT_DEL) ||
+                    (varClass == GencodeFuncotation.VariantClassification.START_CODON_SNP) ||
+                    (varClass == GencodeFuncotation.VariantClassification.START_CODON_INS) ||
+                    (varClass == GencodeFuncotation.VariantClassification.START_CODON_DEL);
+        }
+    }
+
+    /**
      * Creates a {@link List} of {@link GencodeFuncotation}s based on the given {@link VariantContext}, {@link Allele}, and {@link GencodeGtfGeneFeature}.
      * @param variant The variant to annotate.
      * @param altAllele The allele of the given variant to annotate.
@@ -309,21 +341,25 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // OK, now that we have our SequenceComparison object set up we can continue the annotation:
 
-        // Set the DNA changes:
+        // Set the Codon and Protein changes:
         gencodeFuncotation.setCodonChange(FuncotatorUtils.getCodonChangeString(sequenceComparison));
         gencodeFuncotation.setProteinChange(FuncotatorUtils.getProteinChangeString(sequenceComparison));
-        gencodeFuncotation.setcDnaChange(FuncotatorUtils.getCodingSequenceChangeString(sequenceComparison));
 
-        // Now all we have to do is decide what the variant classification type should be.
-
-        gencodeFuncotation.setVariantClassification(
-                getVariantClassification( variant, altAllele, gencodeFuncotation.getVariantType(), exon, sequenceComparison )
-        );
-
-        if ( gencodeFuncotation.getVariantClassification() == GencodeFuncotation.VariantClassification.SPLICE_SITE ) {
+        // Set the Variant Classification:
+        final GencodeFuncotation.VariantClassification varClass = getVariantClassification( variant, altAllele, gencodeFuncotation.getVariantType(), exon, sequenceComparison );
+        gencodeFuncotation.setVariantClassification( varClass );
+        if ( varClass == GencodeFuncotation.VariantClassification.SPLICE_SITE ) {
             gencodeFuncotation.setSecondaryVariantClassification(
                     getVariantClassificationForCodingRegion(variant, altAllele, gencodeFuncotation.getVariantType(), sequenceComparison )
             );
+        }
+
+        // Set the Coding DNA change:
+        final boolean isInCodingRegion = isVariantInCodingRegion( varClass, gencodeFuncotation.getSecondaryVariantClassification() );
+
+        // Only set cDNA change if we have something in the actual coding region:
+        if ( isInCodingRegion ) {
+            gencodeFuncotation.setcDnaChange(FuncotatorUtils.getCodingSequenceChangeString(sequenceComparison));
         }
 
         return gencodeFuncotation;
@@ -608,6 +644,12 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         // Set as default INTRON variant classification:
         gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.INTRON);
 
+        // Determine the strand for the variant:
+        final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
+        if ( strand == Strand.NONE ) {
+            throw new GATKException("Unable to handle NONE strand.");
+        }
+
         // Need to check if we're within the window for splice site variants:
         for ( final GencodeGtfExonFeature exon : transcript.getExons() ) {
             if (( Math.abs( exon.getStart() - variant.getStart() ) <= spliceSiteVariantWindowBases ) ||
@@ -616,12 +658,6 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 // Set the variant classification:
                 gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.SPLICE_SITE);
                 gencodeFuncotation.setSecondaryVariantClassification(GencodeFuncotation.VariantClassification.INTRON);
-
-                // Since we're in a splice site, we need to create the coding region string for a splice site.
-                final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
-                if ( strand == Strand.NONE ) {
-                    throw new GATKException("Unable to handle NONE strand.");
-                }
 
                 // Do we need to adjust the exon start / stop based on an indel?
                 // In the case of an insertion we need to remove the bases that were inserted to get to the actual positon

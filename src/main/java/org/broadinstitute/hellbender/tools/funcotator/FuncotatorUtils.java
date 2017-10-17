@@ -193,6 +193,22 @@ public class FuncotatorUtils {
     }
 
     /**
+     * Determines whether the given reference and alternate alleles constitute a frameshift mutation.
+     * @param reference The {@link String} representation of the reference allele.
+     * @param alternate The {@link String} representation of the alternate allele.
+     * @return {@code true} if replacing the reference with the alternate results in a frameshift.  {@code false} otherwise.
+     */
+    public static boolean isFrameshift(final String reference, final String alternate) {
+
+        Utils.nonNull(reference);
+        Utils.nonNull(alternate);
+
+        // We know it's a frameshift if we have a replacement that is not of a
+        // length evenly divisible by 3 because that's how many bases are read at once:
+        return ((Math.abs( reference.length() - alternate.length() ) % 3) != 0);
+    }
+
+    /**
      * Determines whether the given reference and alternate alleles constitute an insertion mutation.
      * @param reference The reference {@link Allele}.
      * @param alternate The alternate / variant {@link Allele}.
@@ -512,36 +528,41 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getAlignedAlternateAllele());
         Utils.nonNull(seqComp.getCodingSequenceAlleleStart());
 
-        final StringBuilder ref = new StringBuilder();
-        final StringBuilder alt = new StringBuilder();
-
-        // Capitalize the right parts of each string if they're of equal length:
-        if (seqComp.getAlignedReferenceAllele().length() == seqComp.getAlignedAlternateAllele().length()) {
-            for ( int i = 0 ; i < seqComp.getAlignedReferenceAllele().length(); ++i ) {
-                if ( seqComp.getAlignedReferenceAllele().charAt(i) != seqComp.getAlignedAlternateAllele().charAt(i) ) {
-                    ref.append(Character.toUpperCase( seqComp.getAlignedReferenceAllele().charAt(i) ));
-                    alt.append(Character.toUpperCase( seqComp.getAlignedAlternateAllele().charAt(i) ));
-                }
-                else {
-                    final char c = Character.toLowerCase( seqComp.getAlignedReferenceAllele().charAt(i) );
-                    ref.append(c);
-                    alt.append(c);
-                }
-            }
-        }
-        else {
-            ref.append(seqComp.getAlignedReferenceAllele());
-            alt.append(seqComp.getAlignedAlternateAllele());
-        }
-
-        if ( seqComp.getAlignedCodingSequenceAlleleStart().equals(seqComp.getAlignedReferenceAlleleStop()) ) {
-            return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + ")" +
-                    ref.toString() + ">" + alt.toString();
-        }
-        else {
+        // Frame shifts have their own syntax which is simpler:
+        if ( FuncotatorUtils.isFrameshift(seqComp.getReferenceAllele(), seqComp.getAlternateAllele()) ) {
             return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + "-" +
                     seqComp.getAlignedReferenceAlleleStop() + ")" +
-                    ref.toString() + ">" + alt.toString();
+                    seqComp.getReferenceAllele().toLowerCase() + "fs";
+        }
+        else {
+            final StringBuilder ref = new StringBuilder();
+            final StringBuilder alt = new StringBuilder();
+
+            // Capitalize the right parts of each string if they're of equal length:
+            if (seqComp.getAlignedReferenceAllele().length() == seqComp.getAlignedAlternateAllele().length()) {
+                for (int i = 0; i < seqComp.getAlignedReferenceAllele().length(); ++i) {
+                    if (seqComp.getAlignedReferenceAllele().charAt(i) != seqComp.getAlignedAlternateAllele().charAt(i)) {
+                        ref.append(Character.toUpperCase(seqComp.getAlignedReferenceAllele().charAt(i)));
+                        alt.append(Character.toUpperCase(seqComp.getAlignedAlternateAllele().charAt(i)));
+                    } else {
+                        final char c = Character.toLowerCase(seqComp.getAlignedReferenceAllele().charAt(i));
+                        ref.append(c);
+                        alt.append(c);
+                    }
+                }
+            } else {
+                ref.append(seqComp.getAlignedReferenceAllele());
+                alt.append(seqComp.getAlignedAlternateAllele());
+            }
+
+            if (seqComp.getAlignedCodingSequenceAlleleStart().equals(seqComp.getAlignedReferenceAlleleStop())) {
+                return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + ")" +
+                        ref.toString() + ">" + alt.toString();
+            } else {
+                return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + "-" +
+                        seqComp.getAlignedReferenceAlleleStop() + ")" +
+                        ref.toString() + ">" + alt.toString();
+            }
         }
     }
 
@@ -698,25 +719,28 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getReferenceAminoAcidSequence());
         Utils.nonNull(seqComp.getAlternateAminoAcidSequence());
 
-        if ( seqComp.getAlternateAllele().length() > 1 ) {
+        if (seqComp.getAlternateAllele().length() > 1) {
             return "c." + seqComp.getCodingSequenceAlleleStart() + "_" + (seqComp.getCodingSequenceAlleleStart() + seqComp.getReferenceAllele().length() - 1) +
                     seqComp.getReferenceAllele() + ">" + seqComp.getAlternateAllele();
-        }
-        else {
+        } else {
             return "c." + seqComp.getCodingSequenceAlleleStart() +
                     seqComp.getReferenceAllele() + ">" + seqComp.getAlternateAllele();
         }
     }
 
-//    /**
-//     * Get the coding sequence change string for an intron-based splice site variant.
-//     * @param upstreamCodingSequenceSpliceSite The coding sequence location (1-based, inclusive) of the nearest upstream splice site.
-//     * @return A {@link String} representation of the coding sequence change for the given {@code upstreamCodingSequenceSpliceSite}
-//     */
-//    public static String getCodingSequenceChangeStringIntronSpliceSite( final int upstreamCodingSequenceSpliceSite ) {
-//        Utils.nonNull(upstreamCodingSequenceSpliceSite);
-//        return "c." + upstreamCodingSequenceSpliceSite + "_splice";
-//    }
+    /**
+     * Get the coding sequence change string from the given {@link SequenceComparison}
+     * @param transcriptPosition The position in the transcript of the given splice site variant.
+     * @return A {@link String} representing the coding sequence change between the ref and alt alleles in {@code seqComp}.
+     */
+    public static String getCodingSequenceChangeStringForExonSpliceSite( final int transcriptPosition ) {
+
+        if ( transcriptPosition < 1 ) {
+            throw new GATKException("Encountered transcript position less than 1 (transcript positions are 1-based): " + transcriptPosition + " < " + 1);
+        }
+
+        return "c." + transcriptPosition + "_splice";
+    }
 
     /**
      * Creates an amino acid sequence from a given coding sequence.

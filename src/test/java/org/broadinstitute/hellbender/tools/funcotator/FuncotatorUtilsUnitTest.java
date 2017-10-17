@@ -877,6 +877,7 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @Test(dataProvider = "provideAllelesAndFrameshiftResults")
     void testIsFrameshift(final Allele ref, final Allele alt, final boolean expected) {
         Assert.assertEquals( FuncotatorUtils.isFrameshift(ref, alt), expected );
+        Assert.assertEquals( FuncotatorUtils.isFrameshift(ref.getBaseString(), alt.getBaseString()), expected );
     }
 
     @Test(dataProvider = "providePositionsAndFrameshiftResults")
@@ -1076,5 +1077,4 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
 
         Assert.assertEquals( FuncotatorUtils.createSpliceSiteCodonChange(variantStart, exonNumber, exonStart, exonEnd, strand, offsetIndelAdjustment), expected );
     }
-
 }
