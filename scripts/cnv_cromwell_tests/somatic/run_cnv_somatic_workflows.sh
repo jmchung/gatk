@@ -5,9 +5,6 @@ script_path=$( cd "$(dirname "${BASH_SOURCE}")" ; pwd -P )
 cd "$script_path"
 
 ln -fs /home/travis/build/broadinstitute/gatk/scripts/cnv_wdl/cnv_common_tasks.wdl
-ln -fs /home/travis/build/broadinstitute/gatk/scripts/cnv_wdl/somatic/cnv_somatic_copy_ratio_bam_workflow.wdl
-ln -fs /home/travis/build/broadinstitute/gatk/scripts/cnv_wdl/somatic/cnv_somatic_allele_fraction_pair_workflow.wdl
-ln -fs /home/travis/build/broadinstitute/gatk/scripts/cnv_wdl/somatic/cnv_somatic_oncotate.wdl
 
 WORKING_DIR=/home/travis/build/broadinstitute
 
@@ -28,13 +25,12 @@ popd
 
 echo "Inserting docker image into json ========"
 CNV_CROMWELL_TEST_DIR="${WORKING_DIR}/gatk/scripts/cnv_cromwell_tests/somatic/"
-sed -r "s/__GATK_DOCKER__/broadinstitute\/gatk\:$HASH_TO_USE/g" ${CNV_CROMWELL_TEST_DIR}/cnv_somatic_pair_wes_tumor-only_workflow.json >cnv_somatic_pair_wes_tumor-only_workflow_mod.json
-sed -r "s/__GATK_DOCKER__/broadinstitute\/gatk\:$HASH_TO_USE/g" ${CNV_CROMWELL_TEST_DIR}/cnv_somatic_pair_wgs_tumor-only_workflow.json >cnv_somatic_pair_wgs_tumor-only_workflow_mod.json
-sed -r "s/__GATK_DOCKER__/broadinstitute\/gatk\:$HASH_TO_USE/g" ${CNV_CROMWELL_TEST_DIR}/cnv_somatic_pair_wes_workflow.json >cnv_somatic_pair_wes_workflow_mod.json
-sed -r "s/__GATK_DOCKER__/broadinstitute\/gatk\:$HASH_TO_USE/g" ${CNV_CROMWELL_TEST_DIR}/cnv_somatic_pair_wgs_workflow.json >cnv_somatic_pair_wgs_workflow_mod.json
 sed -r "s/__GATK_DOCKER__/broadinstitute\/gatk\:$HASH_TO_USE/g" ${CNV_CROMWELL_TEST_DIR}/cnv_somatic_panel_wes_workflow.json >cnv_somatic_panel_wes_workflow_mod.json
 sed -r "s/__GATK_DOCKER__/broadinstitute\/gatk\:$HASH_TO_USE/g" ${CNV_CROMWELL_TEST_DIR}/cnv_somatic_panel_wgs_workflow.json >cnv_somatic_panel_wgs_workflow_mod.json
-
+sed -r "s/__GATK_DOCKER__/broadinstitute\/gatk\:$HASH_TO_USE/g" ${CNV_CROMWELL_TEST_DIR}/cnv_somatic_panel_wes_do-gc_workflow.json >cnv_somatic_panel_wes_do-gc_workflow_mod.json
+sed -r "s/__GATK_DOCKER__/broadinstitute\/gatk\:$HASH_TO_USE/g" ${CNV_CROMWELL_TEST_DIR}/cnv_somatic_panel_wgs_do-gc_workflow.json >cnv_somatic_panel_wgs_do-gc_workflow_mod.json
+sed -r "s/__GATK_DOCKER__/broadinstitute\/gatk\:$HASH_TO_USE/g" ${CNV_CROMWELL_TEST_DIR}/cnv_somatic_pair_wes_workflow.json >cnv_somatic_pair_wes_workflow_mod.json
+sed -r "s/__GATK_DOCKER__/broadinstitute\/gatk\:$HASH_TO_USE/g" ${CNV_CROMWELL_TEST_DIR}/cnv_somatic_pair_wgs_workflow.json >cnv_somatic_pair_wgs_workflow_mod.json
 
 echo "Running ========"
 CROMWELL_JAR="cromwell-0.28.jar"
@@ -43,12 +39,12 @@ CROMWELL_JAR="cromwell-0.28.jar"
 java -jar ~/${CROMWELL_JAR} run /home/travis/build/broadinstitute/gatk/scripts/cnv_wdl/somatic/cnv_somatic_panel_workflow.wdl cnv_somatic_panel_wes_workflow_mod.json
 # Panel WGS
 java -jar ~/${CROMWELL_JAR} run /home/travis/build/broadinstitute/gatk/scripts/cnv_wdl/somatic/cnv_somatic_panel_workflow.wdl cnv_somatic_panel_wgs_workflow_mod.json
+# Panel WES w/ explicit GC correction
+java -jar ~/${CROMWELL_JAR} run /home/travis/build/broadinstitute/gatk/scripts/cnv_wdl/somatic/cnv_somatic_panel_workflow.wdl cnv_somatic_panel_wes_do-gc_workflow_mod.json
+# Panel WGS w/ explicit GC correction
+java -jar ~/${CROMWELL_JAR} run /home/travis/build/broadinstitute/gatk/scripts/cnv_wdl/somatic/cnv_somatic_panel_workflow.wdl cnv_somatic_panel_wgs_do-gc_workflow_mod.json
 
 # Pair WES
 java -jar ~/${CROMWELL_JAR} run /home/travis/build/broadinstitute/gatk/scripts/cnv_wdl/somatic/cnv_somatic_pair_workflow.wdl cnv_somatic_pair_wes_workflow_mod.json
 # Pair WGS
 java -jar ~/${CROMWELL_JAR} run /home/travis/build/broadinstitute/gatk/scripts/cnv_wdl/somatic/cnv_somatic_pair_workflow.wdl cnv_somatic_pair_wgs_workflow_mod.json
-# Pair WES tumor-only
-java -jar ~/${CROMWELL_JAR} run /home/travis/build/broadinstitute/gatk/scripts/cnv_wdl/somatic/cnv_somatic_pair_workflow.wdl cnv_somatic_pair_wes_tumor-only_workflow_mod.json
-# Pair WGS tumor-only
-java -jar ~/${CROMWELL_JAR} run /home/travis/build/broadinstitute/gatk/scripts/cnv_wdl/somatic/cnv_somatic_pair_workflow.wdl cnv_somatic_pair_wgs_tumor-only_workflow_mod.json

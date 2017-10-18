@@ -7,6 +7,7 @@ import org.broadinstitute.hellbender.cmdline.CommandLineProgram;
 import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
 import org.broadinstitute.hellbender.cmdline.programgroups.CopyNumberProgramGroup;
 import org.broadinstitute.hellbender.exceptions.UserException;
+import org.broadinstitute.hellbender.tools.copynumber.ModelSegments;
 import org.broadinstitute.hellbender.tools.copynumber.allelic.alleliccount.AllelicCount;
 import org.broadinstitute.hellbender.tools.copynumber.allelic.alleliccount.AllelicCountCollection;
 import org.broadinstitute.hellbender.tools.copynumber.coverage.copyratio.CopyRatio;
@@ -27,7 +28,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Plots segmented copy-ratio and minor-allele-fraction modeling results.
+ * Plots segmented copy-ratio and minor-allele-fraction modeling results from {@link ModelSegments}.
  *
  * <p>The order and representation of contigs in plots follows the contig ordering within the required reference sequence dictionary. </p>
  *
