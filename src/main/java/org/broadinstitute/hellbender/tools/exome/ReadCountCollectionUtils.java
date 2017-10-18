@@ -12,7 +12,9 @@ import org.apache.commons.math3.stat.descriptive.rank.Median;
 import org.apache.commons.math3.stat.descriptive.rank.Percentile;
 import org.apache.commons.math3.util.FastMath;
 import org.apache.logging.log4j.Logger;
+import org.broadinstitute.hdf5.HDF5File;
 import org.broadinstitute.hellbender.exceptions.UserException;
+import org.broadinstitute.hellbender.tools.copynumber.temporary.HDF5ReadCountCollection;
 import org.broadinstitute.hellbender.tools.exome.samplenamefinder.SampleNameFinder;
 import org.broadinstitute.hellbender.utils.MatrixSummaryUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
@@ -398,7 +400,7 @@ public final class ReadCountCollectionUtils {
         Utils.nonNull(byKeySorted, "Targets cannot be null.");
         Utils.nonNull(comments, "Comments cannot be null.");
 
-        final boolean areTargetIntervalsAllPopulated = byKeySorted.keySet().stream().allMatch(t -> t != null);
+        final boolean areTargetIntervalsAllPopulated = byKeySorted.keySet().stream().allMatch(Objects::nonNull);
         if (!areTargetIntervalsAllPopulated) {
             throw new UserException("Cannot write target coverage file with any null intervals.");
         }
@@ -409,9 +411,8 @@ public final class ReadCountCollectionUtils {
                 writer.writeComment(comment);
             }
 
-            for (final Locatable locatable : byKeySorted.keySet()) {
-                final SimpleInterval interval = new SimpleInterval(locatable);
-                final double coverage = byKeySorted.get(locatable).doubleValue();
+            for (final SimpleInterval interval : byKeySorted.keySet()) {
+                final double coverage = byKeySorted.get(interval).doubleValue();
                 writer.writeRecord(new ReadCountRecord.SingleSampleRecord(new Target(interval), coverage));
             }
         } catch (final IOException e) {

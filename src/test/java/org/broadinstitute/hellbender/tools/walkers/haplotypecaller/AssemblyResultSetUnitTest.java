@@ -175,21 +175,21 @@ public final class AssemblyResultSetUnitTest extends BaseTest{
 
 
     private static final Object[][] THREE_KS_GRAPH_AND_HAPLOTYPES = new Object[][] {
-            {"[ks=3]{REF: ACT}",new Object[] {"ACT"}},
-            {"[ks=3]{REF: ACT(3) -> T(1)      ->      G(2) -> A}" +
+            {"[ks=3]{REFERENCE_FILE: ACT}",new Object[] {"ACT"}},
+            {"[ks=3]{REFERENCE_FILE: ACT(3) -> T(1)      ->      G(2) -> A}" +
                     "{ (3) -> A -> G ->          (2) }" +
                     "{  (1) -> A -> G ->  (2) }",new Object[] {"ACTTGA","ACTAGGA","ACTTAGGA"}},
-            {"[ks=3]{REF: ACT -> C(1) -> G}{ACT -> C(1) -> G}{ACT -> C(1) -> G}", new Object[] {"ACTCG"}} ,
-            {"[ks=3]{REF: ACT -> A(1) -> G -> A(2) -> C -> G -> T }" +
+            {"[ks=3]{REFERENCE_FILE: ACT -> C(1) -> G}{ACT -> C(1) -> G}{ACT -> C(1) -> G}", new Object[] {"ACTCG"}} ,
+            {"[ks=3]{REFERENCE_FILE: ACT -> A(1) -> G -> A(2) -> C -> G -> T }" +
                     "{A(1) -> T -> A(2) }", new Object[] {"ACTAGACGT","ACTATACGT"}}  ,
-            {"[ks=3]{REF: ACT -> A -> T(2) -> C -> A -> G -> T -> A -> C -> G -> T -> A(1) -> T}" +
+            {"[ks=3]{REFERENCE_FILE: ACT -> A -> T(2) -> C -> A -> G -> T -> A -> C -> G -> T -> A(1) -> T}" +
                     "{ ACT -> A -> T(2) -> C -> T -> A -> C -> G -> T -> A(1) -> T}",
                            new Object[] {"ACTATCAGTACGTAT","ACTATCTACGTAT"}} ,
-            {"[ks=3]{REF: ACT -> A -> T    -> C -> A -> G -> T -> A -> C -> G -> T -> A    -> T}",
+            {"[ks=3]{REFERENCE_FILE: ACT -> A -> T    -> C -> A -> G -> T -> A -> C -> G -> T -> A    -> T}",
                            new Object[] {"ACTATCAGTACGTAT"}},
-            {"[ks=3]{REF: ACT -> A -> T(1) }" +
+            {"[ks=3]{REFERENCE_FILE: ACT -> A -> T(1) }" +
                     "{ ACT -> A -> T(1) }", new Object[] {"ACTAT"}},
-            {"[ks=3]{REF: TTT -> A(1) -> C -> T(2)}{ A(1) -> T(2) } ", new Object[] {"TTTACT","TTTAT"}}
+            {"[ks=3]{REFERENCE_FILE: TTT -> A(1) -> C -> T(2)}{ A(1) -> T(2) } ", new Object[] {"TTTACT","TTTAT"}}
     };
 
     private static final Object[][] TEN_KS_GRAPH_AND_HAPLOTYPES = new Object[][] {

@@ -64,7 +64,7 @@ public class StrandArtifactUnitTest {
             reads.add(read);
         }
 
-        // REF reads have good strand balance
+        // REFERENCE_FILE reads have good strand balance
         for (int i = numAltReads; i < numReads; i++) {
             final GATKRead read = ArtificialReadUtils.createArtificialRead(SAM_HEADER, "Read" + i, chromosomeIndex, alignmentStart,
                     "CCCCCCCCC".getBytes(), quals, "9M");
@@ -89,7 +89,7 @@ public class StrandArtifactUnitTest {
             matrix.set(altAlleleIndex, i, logLikelihoodOfBestAllele);
         }
 
-        // Analogously, make read_j a REF read
+        // Analogously, make read_j a REFERENCE_FILE read
         for (int j = numAltReads; j < numReads; j++) {
             matrix.set(refAlleleIndex, j, logLikelihoodOfBestAllele);
         }
@@ -148,7 +148,7 @@ public class StrandArtifactUnitTest {
             reads.add(read);
         }
 
-        // All of REF reads have good strand balance
+        // All of REFERENCE_FILE reads have good strand balance
         for (int i = numAltReads; i < numReads; i++) {
             final GATKRead read = ArtificialReadUtils.createArtificialRead(SAM_HEADER, "Read" + i, chromosomeIndex, alignmentStart,
                     "CCCCCCCCC".getBytes(), quals, "9M");
@@ -174,7 +174,7 @@ public class StrandArtifactUnitTest {
             matrix.set(altAlleleIndex, i, logLikelihoodOfBestAllele);
         }
 
-        // Analogously, make read_j a REF read
+        // Analogously, make read_j a REFERENCE_FILE read
         for (int j = numAltReads; j < numReads; j++) {
             matrix.set(refAlleleIndex, j, logLikelihoodOfBestAllele);
         }

@@ -116,7 +116,7 @@ public class UniqueAltReadCountUnitTest {
             matrix.set(altAlleleIndex, i, logLikelihoodOfBestAllele);
         }
 
-        // Analogously, make read_j a REF read
+        // Analogously, make read_j a REFERENCE_FILE read
         for (int j = numAltReads; j < numReads; j++) {
             matrix.set(refAlleleIndex, j, logLikelihoodOfBestAllele);
         }

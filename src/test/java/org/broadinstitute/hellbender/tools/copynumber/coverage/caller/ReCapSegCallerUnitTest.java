@@ -59,8 +59,8 @@ public final class ReCapSegCallerUnitTest extends BaseTest {
         denoisedCopyRatioValues.setRow(0, testData.stream().mapToDouble(x -> x).toArray());
         final CopyRatioCollection denoisedCopyRatios = new CopyRatioCollection(
                 sampleMetadata,
-                IntStream.range(0, intervals.size()).boxed()
-                        .map(i -> new CopyRatio(intervals.get(i), denoisedCopyRatioValues.getEntry(0, i)))
+                IntStream.range(0, intervals.size())
+                        .mapToObj(i -> new CopyRatio(intervals.get(i), denoisedCopyRatioValues.getEntry(0, i)))
                         .collect(Collectors.toList()));
 
         final CopyRatioSegmentCollection copyRatioSegments = new CopyRatioSegmentCollection(sampleMetadata,

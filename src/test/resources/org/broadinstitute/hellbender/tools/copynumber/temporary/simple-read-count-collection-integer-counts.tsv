@@ -1,0 +1,20 @@
+###fileFormat  = tsv
+###commandLine = SparkGenomeReadCounts  --keepXYMT false --binsize 10000 --writeHdf5 true --output SM-74NEG_20xy-downsampled.readCounts.tsv --reference Homo_sapiens_assembly19.truncated.fasta --input SM-74NEG_20xy-downsampled.bam --disableSequenceDictionaryValidation true --disableReadFilter NotDuplicateReadFilter --disableToolDefaultReadFilters false  --readValidationStringency SILENT --interval_set_rule UNION --interval_padding 0 --interval_exclusion_padding 0 --interval_merging_rule ALL --bamPartitionSize 0 --shardedOutput false --numReducers 0 --sparkMaster local[*] --help false --version false --showHidden false --verbosity INFO --QUIET false --use_jdk_deflater false --use_jdk_inflater false --gcs_max_retries 20
+###title = Coverage counts in 10000 base bins for WGS
+contig	start	stop	name	SM-74NEG
+20	1	10000	target_20_1_10000	0
+20	10001	20000	target_20_10001_20000	0
+20	20001	30000	target_20_20001_30000	0
+20	30001	40000	target_20_30001_40000	0
+20	40001	50000	target_20_40001_50000	0
+20	50001	60000	target_20_50001_60000	0
+20	60001	70000	target_20_60001_70000	94
+20	70001	80000	target_20_70001_80000	210
+20	80001	90000	target_20_80001_90000	22
+20	90001	100000	target_20_90001_100000	21
+20	100001	110000	target_20_100001_110000	24
+20	110001	120000	target_20_110001_120000	84
+20	120001	130000	target_20_120001_130000	247
+20	130001	140000	target_20_130001_140000	181
+20	140001	150000	target_20_140001_150000	27
+20	150001	160000	target_20_150001_160000	72

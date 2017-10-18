@@ -48,7 +48,7 @@ public final class HaplotypeCallerGenotypingEngineUnitTest extends BaseTest {
         }
 
         public String toString() {
-            return "REF:" + new String(ref) + ",ALT:" + new String(hap);
+            return "REFERENCE_FILE:" + new String(ref) + ",ALT:" + new String(hap);
         }
     }
 

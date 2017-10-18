@@ -23,7 +23,7 @@ public class RemoveNearbyIndelsIntegrationTest extends CommandLineProgramTest {
     private static final File INPUT_VCF = new File(TOOLS_TEST_DIRECTORY, "nearby_indels.vcf");
     /**
      * nearby_indels.vcf looks like this:
-     * #CHROM  POS     ID      REF     ALT
+     * #CHROM  POS     ID      REFERENCE_FILE     ALT
      * 20      48      .       C       GA
      * 20      53      .       T       AT
      * 20      59      .       G       C
@@ -35,7 +35,7 @@ public class RemoveNearbyIndelsIntegrationTest extends CommandLineProgramTest {
      * 20      100     .       C       A
      *
      * Reoving nearby indels with a threshold of 20 bp should yield:
-     * #CHROM  POS     ID      REF     ALT
+     * #CHROM  POS     ID      REFERENCE_FILE     ALT
      * 20      59      .       G       C
      * 20      71      .       G       T
      * 20      77      .       A       G

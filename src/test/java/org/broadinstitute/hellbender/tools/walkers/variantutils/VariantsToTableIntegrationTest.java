@@ -11,13 +11,13 @@ import java.util.Arrays;
 public final class VariantsToTableIntegrationTest extends CommandLineProgramTest {
     private String variantsToTableCmd(final String moreArgs) {
         return  " --variant " + getToolTestDataDir() + "soap_gatk_annotated.noChr_lines.vcf" +
-                " -F CHROM -F POS -F ID -F REF -F ALT -F QUAL -F FILTER -F TRANSITION -F DP -F SB -F set -F RankSumP -F refseq.functionalClass*" +
+                " -F CHROM -F POS -F ID -F REFERENCE_FILE -F ALT -F QUAL -F FILTER -F TRANSITION -F DP -F SB -F set -F RankSumP -F refseq.functionalClass*" +
                 " -O %s " + moreArgs;
     }
 
     private String variantsToTableMultiAllelicCmd(final String moreArgs) {
         return  " --variant " + getToolTestDataDir() + "multiallelic.vcf" +
-                " -F CHROM -F POS -F ID -F REF -F ALT -F QUAL -F MULTI-ALLELIC -F AC -F AF" +
+                " -F CHROM -F POS -F ID -F REFERENCE_FILE -F ALT -F QUAL -F MULTI-ALLELIC -F AC -F AF" +
                 " -O %s" + moreArgs;
     }
 
@@ -65,7 +65,7 @@ public final class VariantsToTableIntegrationTest extends CommandLineProgramTest
     @Test
     public void testNoSamples() throws IOException {
         final IntegrationTestSpec spec = new IntegrationTestSpec(
-                variantsToTableCmdNoSamples(" -F CHROM -F POS -F ID -F REF -F ALT -F QUAL -F FILTER -F TRANSITION -F EVENTLENGTH"),
+                variantsToTableCmdNoSamples(" -F CHROM -F POS -F ID -F REFERENCE_FILE -F ALT -F QUAL -F FILTER -F TRANSITION -F EVENTLENGTH"),
                 Arrays.asList(getToolTestDataDir() + "expected.vcfexample.noSamples.table"));
         spec.executeTest("testNoSamples", this);
     }
@@ -127,7 +127,7 @@ public final class VariantsToTableIntegrationTest extends CommandLineProgramTest
     public void testMultiallelicGenotypeFields() throws IOException {
         final IntegrationTestSpec spec = new IntegrationTestSpec(
                         " --variant " + getToolTestDataDir() + "multiallelic_gt.vcf" +
-                        " -F CHROM -F POS -F ID -F REF -F ALT -F QUAL -F MULTI-ALLELIC" +
+                        " -F CHROM -F POS -F ID -F REFERENCE_FILE -F ALT -F QUAL -F MULTI-ALLELIC" +
                         " -GF PL -GF AD" +
                         " -SMA" +
                         " -O %s",
@@ -159,7 +159,7 @@ public final class VariantsToTableIntegrationTest extends CommandLineProgramTest
     public void testMoltenOutput() throws IOException {
         final IntegrationTestSpec spec = new IntegrationTestSpec(
                         " --variant " + getToolTestDataDir() + "vcfexample2.vcf" +
-                        " -F CHROM -F POS -F ID -F REF -F ALT -F QUAL -F FILTER" +
+                        " -F CHROM -F POS -F ID -F REFERENCE_FILE -F ALT -F QUAL -F FILTER" +
                         " --moltenize" +
                         " -O %s",
                 Arrays.asList(getToolTestDataDir() + "expected.vcfexample2.moltenize.table"));
@@ -181,7 +181,7 @@ public final class VariantsToTableIntegrationTest extends CommandLineProgramTest
     public void testMoltenOutputWithMultipleAlleles() throws IOException {
         final IntegrationTestSpec spec = new IntegrationTestSpec(
                         " --variant " + getToolTestDataDir() + "multiallelic.vcf" +
-                        " -F CHROM -F POS -F ID -F REF -F ALT -F QUAL -F MULTI-ALLELIC -F AC -F AF" +
+                        " -F CHROM -F POS -F ID -F REFERENCE_FILE -F ALT -F QUAL -F MULTI-ALLELIC -F AC -F AF" +
                         " --moltenize -SMA" +
                         " -O %s",
                 Arrays.asList(getToolTestDataDir() + "expected.multiallelic.moltenize.SMA.table"));

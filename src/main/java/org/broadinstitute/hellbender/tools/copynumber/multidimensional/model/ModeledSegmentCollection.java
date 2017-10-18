@@ -15,7 +15,7 @@ import java.util.function.Function;
  * @author Samuel Lee &lt;slee@broadinstitute.org&gt;
  */
 public final class ModeledSegmentCollection extends SampleLocatableCollection<ModeledSegment> {
-    private static final String DOUBLE_FORMAT = "%6.6f";    //TODO replace this with MultidimensionalModeller.DOUBLE_FORMAT from sl_wgs_acnv branch
+    private static final String DOUBLE_FORMAT = "%6.8f"; //TODO replace with MultidimensionalModeller.DOUBLE_FORMAT
 
     enum ModeledSegmentTableColumn {
         CONTIG, 
