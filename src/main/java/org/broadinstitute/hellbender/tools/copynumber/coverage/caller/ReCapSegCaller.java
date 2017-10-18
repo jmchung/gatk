@@ -48,10 +48,10 @@ public final class ReCapSegCaller {
     private static LinkedHashMap<CopyRatioSegment,Set<CopyRatio>> constructSegmentToCopyRatiosMap(final CopyRatioCollection denoisedCopyRatios,
                                                                                                   final CopyRatioSegmentCollection copyRatioSegments) {
         final LinkedHashMap<CopyRatioSegment, Set<CopyRatio>> segmentToCopyRatiosMap = new LinkedHashMap<>();
-        final OverlapDetector<CopyRatio> copyRatioOverlapDetector = denoisedCopyRatios.getOverlapDetector();
+        final OverlapDetector<CopyRatio> copyRatioMidpointOverlapDetector = denoisedCopyRatios.getMidpointOverlapDetector();
         for (final CopyRatioSegment segment : copyRatioSegments.getRecords()) {
             final int numPointsExpected = segment.getNumPoints();
-            final Set<CopyRatio> copyRatiosInSegment = copyRatioOverlapDetector.getOverlaps(segment);
+            final Set<CopyRatio> copyRatiosInSegment = copyRatioMidpointOverlapDetector.getOverlaps(segment);
             if (copyRatiosInSegment.size() != numPointsExpected) {
                 throw new IllegalArgumentException("Denoised copy ratios and copy-ratio segments are not consistent.");
             }
