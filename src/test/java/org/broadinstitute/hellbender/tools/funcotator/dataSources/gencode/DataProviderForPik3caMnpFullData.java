@@ -35,10 +35,11 @@ public class DataProviderForPik3caMnpFullData {
     public static List<Object[]> providePik3caInDelData() {
         return Arrays.asList(
                 // TODO: FROM ONCOTATOR: Issue 174... uncomment the next line for a unit test that will fail protein change (at least)
-
-                // For insertions, the inserted bases occur just AFTER the given position.
-
                 // new Object[] {"PIK3CA", 3, 178948160, 178948168", GencodeFuncotation.VariantClassificaton.SPLICE_SITE, "DEL", "GAGAGGTGA", "-", "g.chr3:178948160_178948164delGAGAG", "+", "c.2936_splice",  "c.e20+1", "p.ER978fs"}, # This is actually a frame shift (p.ER978fs?), since 5 codon bases are deleted
+
+                // For insertions, the inserted bases occur just AFTER the given start/end position (because start and end are the same).
+                // For deletions, the deleted bases occur just AFTER the given start position.
+
                 new Object[]{"PIK3CA", 3, 178916619, 178916619, GencodeFuncotation.VariantClassification.IN_FRAME_INS,    GencodeFuncotation.VariantType.INS, "T",         "TCGA",   "g.chr3:178916619_178916620insCGA",   "+", "c.6_7insCGA",         "c.(7-9)cca>CGAcca",       "p.2_3insR"},
                 new Object[]{"PIK3CA", 3, 178948159, 178948159, GencodeFuncotation.VariantClassification.IN_FRAME_INS,    GencodeFuncotation.VariantType.INS, "T",         "TGAG",   "g.chr3:178948159_178948160insGAG",   "+", "c.2931_2932insGAG",   "c.(2932-2934)gag>GAGgag", "p.978_978E>EE"},
                 new Object[]{"PIK3CA", 3, 178916619, 178916619, GencodeFuncotation.VariantClassification.FRAME_SHIFT_INS, GencodeFuncotation.VariantType.INS, "T",         "TCG",    "g.chr3:178916619_178916620insCG",    "+", "c.6_7insCG",          "c.(7-9)ccafs",            "p.P3fs"},
@@ -53,11 +54,11 @@ public class DataProviderForPik3caMnpFullData {
                 new Object[]{"PIK3CA", 3, 178916937, 178916940, GencodeFuncotation.VariantClassification.IN_FRAME_DEL,    GencodeFuncotation.VariantType.DEL, "TGAA",      "T",      "g.chr3:178916938_178916940delGAA",   "+", "c.325_327delGAA",     "c.(325-327)gaadel",       "p.E110del"},
                 new Object[]{"PIK3CA", 3, 178948159, 178948162, GencodeFuncotation.VariantClassification.IN_FRAME_DEL,    GencodeFuncotation.VariantType.DEL, "TGAG",      "T",      "g.chr3:178948160_178948162delGAG",   "+", "c.2932_2934delGAG",   "c.(2932-2934)gagdel",     "p.E978del"},
                 new Object[]{"PIK3CA", 3, 178948153, 178948158, GencodeFuncotation.VariantClassification.FRAME_SHIFT_DEL, GencodeFuncotation.VariantType.DEL, "AGAATT",    "A",      "g.chr3:178948154_178948158delGAATT", "+", "c.2926_2930delGAATT", "c.(2926-2931)gaatttfs",   "p.EF976fs"},
-                new Object[]{"PIK3CA", 3, 178948153, 178948157, GencodeFuncotation.VariantClassification.FRAME_SHIFT_DEL, GencodeFuncotation.VariantType.DEL, "AGAAT",     "A",      "g.chr3:178948154_178948158delGAAT",  "+", "c.2926_2929delGAAT",  "c.(2926-2931)gaatttfs",   "p.EF976fs"},
+                new Object[]{"PIK3CA", 3, 178948153, 178948157, GencodeFuncotation.VariantClassification.FRAME_SHIFT_DEL, GencodeFuncotation.VariantType.DEL, "AGAAT",     "A",      "g.chr3:178948154_178948157delGAAT",  "+", "c.2926_2929delGAAT",  "c.(2926-2931)gaatttfs",   "p.EF976fs"},
                 new Object[]{"PIK3CA", 3, 178948159, 178948161, GencodeFuncotation.VariantClassification.FRAME_SHIFT_DEL, GencodeFuncotation.VariantType.DEL, "TGA",       "T",      "g.chr3:178948160_178948161delGA",    "+", "c.2932_2933delGA",    "c.(2932-2934)gagfs",      "p.E978fs"},
                 new Object[]{"PIK3CA", 3, 178948159, 178948164, GencodeFuncotation.VariantClassification.SPLICE_SITE,     GencodeFuncotation.VariantType.DEL, "TGAGAG",    "T",      "g.chr3:178948160_178948164delGAGAG", "+", "c.2936_splice",       "c.(2932-2937)gagagg>g",   "p.ER978fs"},
                 new Object[]{"PIK3CA", 3, 178948159, 178948167, GencodeFuncotation.VariantClassification.SPLICE_SITE,     GencodeFuncotation.VariantType.DEL, "TGAGAGGTG", "T",      "g.chr3:178948160_178948164delGAGAG", "+", "c.2936_splice",       "c.(2932-2937)gagagg>g",   "p.ER978fs"},
-                new Object[]{"PIK3CA", 3, 178948165, 178948168, GencodeFuncotation.VariantClassification.SPLICE_SITE,     GencodeFuncotation.VariantType.DEL, "GTGA",      "G",      "g.chr3:178948166_178948168delTGA",   "+", "c.2936_splice",       "c.e20+2",                 null}
+                new Object[]{"PIK3CA", 3, 178948165, 178948168, GencodeFuncotation.VariantClassification.SPLICE_SITE,     GencodeFuncotation.VariantType.DEL, "GTGA",      "G",      "g.chr3:178948166_178948168delTGA",   "+", null,                  "c.e20+2",                 null}
 
         );
     }

@@ -326,7 +326,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                                                              final GencodeGtfExonFeature exon) {
 
         // Setup the "trivial" fields of the gencodeFuncotation:
-        final GencodeFuncotation gencodeFuncotation = createGencodeFuncotationWithTrivialFieldsPopulated(variant, altAllele, gtfFeature, transcript);
+        final GencodeFuncotation gencodeFuncotation = createGencodeFuncotationWithTrivialFieldsPopulated(variant, altAllele, gtfFeature, transcript, exon);
 
         // Set the exon number:
         gencodeFuncotation.setTranscriptExon( exon.getExonNumber() );
@@ -428,8 +428,17 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                                                                       final GencodeGtfExonFeature exon,
                                                                       final FuncotatorUtils.SequenceComparison sequenceComparison ){
 
+        // Get our start position:
         final int startPos = sequenceComparison.getAlleleStart();
-        final int endPos = sequenceComparison.getAlleleStart() + altAllele.length() - 1;
+
+        // Determine end position based on whichever allele is longer:
+        final int endPos;
+        if ( altAllele.length() >= variant.getReference().length()  ) {
+            endPos = sequenceComparison.getAlleleStart() + altAllele.length() - 1;
+        }
+        else {
+            endPos = sequenceComparison.getAlleleStart() + variant.getReference().length() - 1;
+        }
 
         GencodeFuncotation.VariantClassification varClass = null;
 
@@ -457,10 +466,11 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         // Now check all other cases:
         if ( !hasBeenClassified ) {
 
-            if ((Math.abs(startPos - exon.getStart()) < spliceSiteVariantWindowBases) ||
-                    (Math.abs(endPos - exon.getStart()) < spliceSiteVariantWindowBases) ||
-                    (Math.abs(startPos - exon.getEnd()) < spliceSiteVariantWindowBases) ||
-                    (Math.abs(endPos - exon.getEnd()) < spliceSiteVariantWindowBases)) {
+            // Check for splice site variants.
+            // Here we check to see if a splice site comes anywhere within `spliceSiteVariantWindowBases` of a variant.
+            // We add and subtract 1 from the end points because the positons are 1-based & inclusive.
+            if ( (((startPos - spliceSiteVariantWindowBases + 1) <= exon.getStart()) && (exon.getStart() <= (spliceSiteVariantWindowBases + endPos - 1))) ||
+                 (((startPos - spliceSiteVariantWindowBases + 1) <= exon.getEnd()  ) && (exon.getEnd()   <= (spliceSiteVariantWindowBases + endPos - 1))) ) {
                 varClass = GencodeFuncotation.VariantClassification.SPLICE_SITE;
             }
             else if ((exon.getStartCodon() != null) && (exon.getStartCodon().overlaps(variant))) {
@@ -664,13 +674,15 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 // in the genome of our variant.
                 // Similarly in the case of a deletion we need to add back in the bases that were deleted to get the actual
                 // position in the genome of our variant.
-                final int offsetIndelAdjustment = 0;
+                final int offsetIndelAdjustment;
 //                if ( FuncotatorUtils.isDeletion(variant.getReference(), altAllele) ) {
 //                    offsetIndelAdjustment = altAllele.length() - variant.getReference().length();
 //                }
 //                else {
 //                    offsetIndelAdjustment = 0;
 //                }
+
+                offsetIndelAdjustment = 0;
 
                 gencodeFuncotation.setCodonChange(
                         FuncotatorUtils.createSpliceSiteCodonChange(variant.getStart(), exon.getExonNumber(), exon.getStart(), exon.getEnd(), strand, offsetIndelAdjustment)
@@ -701,7 +713,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         if ( transcript.contains(variant) ) {
             if ( transcript.getUtrs().size() > 0 ) {
                 for ( final GencodeGtfUTRFeature utr : transcript.getUtrs() ) {
-                    if ( utr.contains(variant) ) {
+                    if ( utr.overlaps(variant) ) {
                         subFeature = utr;
                         determinedRegionAlready = true;
                     }
@@ -712,15 +724,15 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
             // where this overlaps something more meaningful.
             // For example, see HG19 - chr19:8959608
             for (final GencodeGtfExonFeature exon : transcript.getExons()) {
-                if ((exon.getCds() != null) && (exon.getCds().contains(variant))) {
+                if ((exon.getCds() != null) && (exon.getCds().overlaps(variant))) {
                     subFeature = exon;
                     determinedRegionAlready = true;
                 }
-                else if ((exon.getStartCodon() != null) && (exon.getStartCodon().contains(variant))) {
+                else if ((exon.getStartCodon() != null) && (exon.getStartCodon().overlaps(variant))) {
                     subFeature = exon;
                     determinedRegionAlready = true;
                 }
-                else if ((exon.getStopCodon() != null) && (exon.getStopCodon().contains(variant))) {
+                else if ((exon.getStopCodon() != null) && (exon.getStopCodon().overlaps(variant))) {
                     subFeature = exon;
                     determinedRegionAlready = true;
                 }
@@ -871,10 +883,27 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @param transcript The current {@link GencodeGtfTranscriptFeature} containing our {@code alternateAllele}.
      * @return A trivially populated {@link GencodeFuncotation} object.
      */
+    private static GencodeFuncotation createGencodeFuncotationWithTrivialFieldsPopulated(final VariantContext variant,
+                                                                                         final Allele altAllele,
+                                                                                         final GencodeGtfGeneFeature gtfFeature,
+                                                                                         final GencodeGtfTranscriptFeature transcript) {
+        return createGencodeFuncotationWithTrivialFieldsPopulated(variant, altAllele, gtfFeature, transcript, null);
+    }
+
+    /**
+     * Creates a Gencode Funcotation with all trivial fields populated.
+     * @param variant The {@link VariantContext} for the current variant.
+     * @param altAllele The alternate {@link Allele} we are currently annotating.
+     * @param gtfFeature The current {@link GencodeGtfGeneFeature} read from the input feature file.
+     * @param transcript The current {@link GencodeGtfTranscriptFeature} containing our {@code alternateAllele}.
+     * @param exon The current {@link GencodeGtfExonFeature} containing our {@code alternateAllele}.
+     * @return A trivially populated {@link GencodeFuncotation} object.
+     */
      private static GencodeFuncotation createGencodeFuncotationWithTrivialFieldsPopulated(final VariantContext variant,
                                                                                   final Allele altAllele,
                                                                                   final GencodeGtfGeneFeature gtfFeature,
-                                                                                  final GencodeGtfTranscriptFeature transcript) {
+                                                                                  final GencodeGtfTranscriptFeature transcript,
+                                                                                  final GencodeGtfExonFeature exon) {
         final GencodeFuncotation gencodeFuncotation = new GencodeFuncotation();
 
         final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
@@ -904,7 +933,8 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         gencodeFuncotation.setTumorSeqAllele1( altAllele.getBaseString() );
         gencodeFuncotation.setTumorSeqAllele2( altAllele.getBaseString() );
 
-        gencodeFuncotation.setGenomeChange(getGenomeChangeString(variant, altAllele, gtfFeature));
+        gencodeFuncotation.setGenomeChange(getGenomeChangeString(variant, altAllele, gtfFeature, exon));
+
         gencodeFuncotation.setAnnotationTranscript( transcript.getTranscriptId() );
 
         gencodeFuncotation.setTranscriptPos(
@@ -949,12 +979,19 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
     /**
      * Creates a string representing the genome change given the variant, allele, and gene feature for this variant.
+     * NOTE: The genome change will only reflect positions and bases within an exon.
+     *       Positions beyond the ends of exons will be changed to the last position in the exon.
+     *       Bases beyond the ends of exons will be truncated from the resulting string.
      * @param variant {@link VariantContext} of which to create the change.
      * @param altAllele {@link Allele} representing the alternate allele for this variant.
      * @param gtfFeature {@link GencodeGtfGeneFeature} corresponding to this variant.
+     * @param exon {@link GencodeGtfExonFeature} corresponding to this variant.
      * @return A short {@link String} representation of the genomic change for the given variant, allele, and feature.
      */
-    private static String getGenomeChangeString(final VariantContext variant, final Allele altAllele, final GencodeGtfGeneFeature gtfFeature) {
+    private static String getGenomeChangeString(final VariantContext variant,
+                                                final Allele altAllele,
+                                                final GencodeGtfGeneFeature gtfFeature,
+                                                final GencodeGtfExonFeature exon) {
 
         // g.chr3:178916619_178916620insCGA
 
@@ -968,10 +1005,29 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         }
         // Check for deletion:
         else if ( variant.getReference().length() > altAllele.length() ) {
-            final String cleanAltAlleleString = FuncotatorUtils.getNonOverlappingAltAlleleBaseString( variant.getReference(), altAllele, true );
+
+            String cleanAltAlleleString = FuncotatorUtils.getNonOverlappingAltAlleleBaseString(variant.getReference(), altAllele, true);
+
+            final int startPos;
+            final int endPos;
+
+            // We handle the case where we have a coding region slightly differently than when we have only non-coding
+            // deleted bases:
+            if ( exon == null ) {
+                startPos = variant.getStart() + 1;
+                endPos = variant.getStart() + variant.getReference().length() - 1;
+            }
+            else {
+                startPos = (variant.getStart() < exon.getStart()) ? exon.getStart() + 1 : variant.getStart() + 1;
+                endPos = (variant.getEnd() > exon.getEnd()) ? exon.getEnd() : (variant.getStart() + variant.getReference().length() - 1);
+
+                if (cleanAltAlleleString.length() > (endPos - startPos + 1)) {
+                    cleanAltAlleleString = cleanAltAlleleString.substring(0, endPos - startPos + 1);
+                }
+            }
 
             return "g." + gtfFeature.getChromosomeName() +
-                    ":" + (variant.getStart() + 1) + "_" + ( variant.getStart() + variant.getReference().length() - 1) +
+                    ":" + startPos + "_" + endPos +
                     "del" + cleanAltAlleleString;
         }
         // Check for SNP:

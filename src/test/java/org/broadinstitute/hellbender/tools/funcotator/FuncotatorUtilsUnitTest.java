@@ -503,7 +503,6 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                 { Allele.create("A", true),     Allele.create("TT"),    true },
                 { Allele.create("AA", true),    Allele.create("TT"),    false },
                 { Allele.create("AA", true),    Allele.create("T"),     false },
-                { Allele.create("AAAAA", true), Allele.create("TTTTT"), false },
                 { Allele.create("A", true),     Allele.create("TTTTT"), true },
                 { Allele.create("AAAAA", true), Allele.create("T"),     false },
                 { Allele.create("AAAAA", true), Allele.create("TTTTT"), false },
@@ -517,10 +516,22 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                 { Allele.create("A", true),     Allele.create("TT"),    false },
                 { Allele.create("AA", true),    Allele.create("TT"),    false },
                 { Allele.create("AA", true),    Allele.create("T"),     true },
-                { Allele.create("AAAAA", true), Allele.create("TTTTT"), false },
                 { Allele.create("A", true),     Allele.create("TTTTT"), false },
                 { Allele.create("AAAAA", true), Allele.create("T"),     true },
                 { Allele.create("AAAAA", true), Allele.create("TTTTT"), false },
+        };
+    }
+
+    @DataProvider
+    Object[][] provideDataForTestIsOnp() {
+        return new Object[][] {
+                { Allele.create("A", true),     Allele.create("T"),     true },
+                { Allele.create("A", true),     Allele.create("TT"),    false },
+                { Allele.create("AA", true),    Allele.create("TT"),    true },
+                { Allele.create("AA", true),    Allele.create("T"),     false },
+                { Allele.create("A", true),     Allele.create("TTTTT"), false },
+                { Allele.create("AAAAA", true), Allele.create("T"),     false },
+                { Allele.create("AAAAA", true), Allele.create("TTTTT"), true },
         };
     }
 
@@ -893,6 +904,11 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @Test(dataProvider = "provideDataForTestIsDeletion")
     void testIsDeletion(final Allele ref, final Allele alt, final boolean expected) {
         Assert.assertEquals( FuncotatorUtils.isDeletion(ref, alt), expected );
+    }
+
+    @Test(dataProvider = "provideDataForTestIsOnp")
+    void testIsOnp(final Allele ref, final Allele alt, final boolean expected) {
+        Assert.assertEquals( FuncotatorUtils.isOnp(ref, alt), expected );
     }
 
 //    @Test(dataProvider = "provideReferenceAndExonListAndExpected")

@@ -238,6 +238,22 @@ public class FuncotatorUtils {
         return reference.length() > alternate.length();
     }
 
+    /**
+     * Determines whether the given reference and alternate alleles constitute an Oligo-Nucleotide Polymorphism (ONP).
+     * For Funcotator purposes, an ONP is a mutation/variant that is a substitution of one or more consecutive bases.
+     * @param reference The reference {@link Allele}.
+     * @param alternate The alternate / variant {@link Allele}.
+     * @return {@code true} if replacing the reference with the alternate results in an ONP.  {@code false} otherwise.
+     */
+    public static boolean isOnp(final Allele reference, final Allele alternate) {
+
+        Utils.nonNull(reference);
+        Utils.nonNull(alternate);
+
+        // If we have more bases in the alternate, we have an insertion:
+        return reference.length() == alternate.length();
+    }
+
 //    /**
 //     * Get the string of alternate bases that are different from the given reference alleles.
 //     * Assumes there is one contiguous string of changed bases between the two alleles.
@@ -538,8 +554,32 @@ public class FuncotatorUtils {
             final StringBuilder ref = new StringBuilder();
             final StringBuilder alt = new StringBuilder();
 
+            // Capitalize for insertion:
+            if (seqComp.getAlignedReferenceAllele().length() < seqComp.getAlignedAlternateAllele().length()) {
+                // Ref will always be all lower case:
+                ref.append(seqComp.getAlignedReferenceAllele().toLowerCase());
+
+                // Alt first char will be lower case:
+                alt.append( Character.toLowerCase(seqComp.getAlignedAlternateAllele().charAt(0)) );
+
+                // Alt middle characters will be upper case:
+                int i = 1;
+                for ( ; i < (seqComp.getAlignedAlternateAllele().length() - seqComp.getAlignedReferenceAllele().length() + 1); ++i ) {
+                    alt.append( Character.toUpperCase(seqComp.getAlignedAlternateAllele().charAt(i)) );
+                }
+
+                // Alt final characters (overlap with ref) will be lower case.
+                for ( ; i < seqComp.getAlignedAlternateAllele().length() ; ++i ) {
+                    alt.append( Character.toLowerCase(seqComp.getAlignedAlternateAllele().charAt(i)) );
+                }
+            }
+            // Capitalize for deletion:
+            else if (seqComp.getAlignedReferenceAllele().length() > seqComp.getAlignedAlternateAllele().length()) {
+                ref.append(seqComp.getAlignedReferenceAllele());
+                alt.append(seqComp.getAlignedAlternateAllele());
+            }
             // Capitalize the right parts of each string if they're of equal length:
-            if (seqComp.getAlignedReferenceAllele().length() == seqComp.getAlignedAlternateAllele().length()) {
+            else {
                 for (int i = 0; i < seqComp.getAlignedReferenceAllele().length(); ++i) {
                     if (seqComp.getAlignedReferenceAllele().charAt(i) != seqComp.getAlignedAlternateAllele().charAt(i)) {
                         ref.append(Character.toUpperCase(seqComp.getAlignedReferenceAllele().charAt(i)));
@@ -550,9 +590,6 @@ public class FuncotatorUtils {
                         alt.append(c);
                     }
                 }
-            } else {
-                ref.append(seqComp.getAlignedReferenceAllele());
-                alt.append(seqComp.getAlignedAlternateAllele());
             }
 
             if (seqComp.getAlignedCodingSequenceAlleleStart().equals(seqComp.getAlignedReferenceAlleleStop())) {
