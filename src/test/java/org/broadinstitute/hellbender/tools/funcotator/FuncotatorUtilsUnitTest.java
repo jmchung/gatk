@@ -899,16 +899,19 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @Test(dataProvider = "provideDataForTestIsInsertion")
     void testIsInsertion(final Allele ref, final Allele alt, final boolean expected) {
         Assert.assertEquals( FuncotatorUtils.isInsertion(ref, alt), expected );
+        Assert.assertEquals( FuncotatorUtils.isInsertion(ref.getBaseString(), alt.getBaseString()), expected );
     }
 
     @Test(dataProvider = "provideDataForTestIsDeletion")
     void testIsDeletion(final Allele ref, final Allele alt, final boolean expected) {
         Assert.assertEquals( FuncotatorUtils.isDeletion(ref, alt), expected );
+        Assert.assertEquals( FuncotatorUtils.isDeletion(ref.getBaseString(), alt.getBaseString()), expected );
     }
 
     @Test(dataProvider = "provideDataForTestIsOnp")
     void testIsOnp(final Allele ref, final Allele alt, final boolean expected) {
         Assert.assertEquals( FuncotatorUtils.isOnp(ref, alt), expected );
+        Assert.assertEquals( FuncotatorUtils.isOnp(ref.getBaseString(), alt.getBaseString()), expected );
     }
 
 //    @Test(dataProvider = "provideReferenceAndExonListAndExpected")

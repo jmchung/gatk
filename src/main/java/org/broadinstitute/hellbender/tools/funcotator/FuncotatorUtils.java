@@ -224,6 +224,36 @@ public class FuncotatorUtils {
     }
 
     /**
+     * Determines whether the given reference and alternate alleles constitute an insertion mutation.
+     * @param reference A {@link String} representing the reference allele.
+     * @param alternate A {@link String} representing the alternate / variant allele.
+     * @return {@code true} if replacing the reference with the alternate results in an insertion.  {@code false} otherwise.
+     */
+    public static boolean isInsertion(final String reference, final String alternate) {
+
+        Utils.nonNull(reference);
+        Utils.nonNull(alternate);
+
+        // If we have more bases in the alternate, we have an insertion:
+        return reference.length() < alternate.length();
+    }
+
+    /**
+     * Determines whether the given reference and alternate alleles constitute a deletion mutation.
+     * @param reference A {@link String} representing the reference allele.
+     * @param alternate A {@link String} representing the alternate / variant allele.
+     * @return {@code true} if replacing the reference with the alternate results in a deletion.  {@code false} otherwise.
+     */
+    public static boolean isDeletion(final String reference, final String alternate) {
+
+        Utils.nonNull(reference);
+        Utils.nonNull(alternate);
+
+        // If we have fewer bases in the alternate, we have a deletion:
+        return reference.length() > alternate.length();
+    }
+
+    /**
      * Determines whether the given reference and alternate alleles constitute a deletion mutation.
      * @param reference The reference {@link Allele}.
      * @param alternate The alternate / variant {@link Allele}.
@@ -246,6 +276,22 @@ public class FuncotatorUtils {
      * @return {@code true} if replacing the reference with the alternate results in an ONP.  {@code false} otherwise.
      */
     public static boolean isOnp(final Allele reference, final Allele alternate) {
+
+        Utils.nonNull(reference);
+        Utils.nonNull(alternate);
+
+        // If we have more bases in the alternate, we have an insertion:
+        return reference.length() == alternate.length();
+    }
+
+    /**
+     * Determines whether the given reference and alternate alleles constitute an Oligo-Nucleotide Polymorphism (ONP).
+     * For Funcotator purposes, an ONP is a mutation/variant that is a substitution of one or more consecutive bases.
+     * @param reference A {@link String} representing the reference allele.
+     * @param alternate A {@link String} representing the alternate / variant allele.
+     * @return {@code true} if replacing the reference with the alternate results in an ONP.  {@code false} otherwise.
+     */
+    public static boolean isOnp(final String reference, final String alternate) {
 
         Utils.nonNull(reference);
         Utils.nonNull(alternate);
@@ -556,21 +602,22 @@ public class FuncotatorUtils {
 
             // Capitalize for insertion:
             if (seqComp.getAlignedReferenceAllele().length() < seqComp.getAlignedAlternateAllele().length()) {
+
+                // Insertions alternate alleles have ref first, then the extra bases,
+                // so we capitalize only the extra bases.
+
                 // Ref will always be all lower case:
                 ref.append(seqComp.getAlignedReferenceAllele().toLowerCase());
 
-                // Alt first char will be lower case:
-                alt.append( Character.toLowerCase(seqComp.getAlignedAlternateAllele().charAt(0)) );
-
-                // Alt middle characters will be upper case:
-                int i = 1;
-                for ( ; i < (seqComp.getAlignedAlternateAllele().length() - seqComp.getAlignedReferenceAllele().length() + 1); ++i ) {
-                    alt.append( Character.toUpperCase(seqComp.getAlignedAlternateAllele().charAt(i)) );
+                // Add lower case ref allele:
+                int i = 0;
+                for ( ; i < seqComp.getAlignedReferenceAllele().length(); ++i ) {
+                    alt.append( Character.toLowerCase(seqComp.getAlignedAlternateAllele().charAt(i)) );
                 }
 
-                // Alt final characters (overlap with ref) will be lower case.
-                for ( ; i < seqComp.getAlignedAlternateAllele().length() ; ++i ) {
-                    alt.append( Character.toLowerCase(seqComp.getAlignedAlternateAllele().charAt(i)) );
+                // Alt allele chars will be upper case:
+                for ( ; i < seqComp.getAlignedAlternateAllele().length(); ++i ) {
+                    alt.append( Character.toUpperCase(seqComp.getAlignedAlternateAllele().charAt(i)) );
                 }
             }
             // Capitalize for deletion:
@@ -694,6 +741,8 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getProteinChangeStartPosition());
         Utils.nonNull(seqComp.getProteinChangeEndPosition());
         Utils.nonNull(seqComp.getAlternateAminoAcidSequence());
+        Utils.nonNull(seqComp.getReferenceAllele());
+        Utils.nonNull(seqComp.getAlternateAllele());
 
         String refAaSeq = seqComp.getReferenceAminoAcidSequence();
         String altAaSeq = seqComp.getAlternateAminoAcidSequence();
@@ -734,13 +783,27 @@ public class FuncotatorUtils {
             altAaSeq = altAaSeq.substring(startingDifference, altAaSeq.length() - endingDifference);
         }
 
-        if ( protChangeStartPos.equals(protChangeEndPos) ) {
-            return "p." + refAaSeq + protChangeStartPos +
-                    altAaSeq;
+        // Check for the ONP case:
+        if ( isOnp(seqComp.getReferenceAllele(), seqComp.getAlternateAllele()) ) {
+            if (protChangeStartPos.equals(protChangeEndPos)) {
+                return "p." + refAaSeq + protChangeStartPos +
+                        altAaSeq;
+            } else {
+                return "p." + protChangeStartPos
+                        + "_" + protChangeEndPos + refAaSeq + '>' + altAaSeq;
+            }
         }
+        // Check for the Frame Shift case:
+        else if ( isFrameshift(seqComp.getReferenceAllele(), seqComp.getAlternateAllele()) ) {
+            return "p." + refAaSeq + protChangeStartPos + "fs";
+        }
+        // Check for the Insertion case:
+        else if ( isInsertion(seqComp.getReferenceAllele(), seqComp.getAlternateAllele()) ) {
+            return "p." + protChangeStartPos + "_" + protChangeEndPos + "ins" + altAaSeq;
+        }
+        // Must be a deletion:
         else {
-            return "p." + protChangeStartPos
-                    + "_" + protChangeEndPos + refAaSeq + '>' + altAaSeq;
+            return "p." + refAaSeq + protChangeStartPos + "del";
         }
     }
 
@@ -753,15 +816,28 @@ public class FuncotatorUtils {
 
         Utils.nonNull(seqComp);
         Utils.nonNull(seqComp.getCodingSequenceAlleleStart());
-        Utils.nonNull(seqComp.getReferenceAminoAcidSequence());
-        Utils.nonNull(seqComp.getAlternateAminoAcidSequence());
+        Utils.nonNull(seqComp.getReferenceAllele());
+        Utils.nonNull(seqComp.getAlternateAllele());
 
-        if (seqComp.getAlternateAllele().length() > 1) {
-            return "c." + seqComp.getCodingSequenceAlleleStart() + "_" + (seqComp.getCodingSequenceAlleleStart() + seqComp.getReferenceAllele().length() - 1) +
-                    seqComp.getReferenceAllele() + ">" + seqComp.getAlternateAllele();
-        } else {
-            return "c." + seqComp.getCodingSequenceAlleleStart() +
-                    seqComp.getReferenceAllele() + ">" + seqComp.getAlternateAllele();
+        // Check for ONP:
+        if ( isOnp(seqComp.getReferenceAllele(), seqComp.getAlternateAllele()) ) {
+            if (seqComp.getAlternateAllele().length() > 1) {
+                return "c." + seqComp.getCodingSequenceAlleleStart() + "_" + (seqComp.getCodingSequenceAlleleStart() + seqComp.getReferenceAllele().length() - 1) +
+                        seqComp.getReferenceAllele() + ">" + seqComp.getAlternateAllele();
+            } else {
+                return "c." + seqComp.getCodingSequenceAlleleStart() +
+                        seqComp.getReferenceAllele() + ">" + seqComp.getAlternateAllele();
+            }
+        }
+        // Check for Insertion:
+        else if ( isInsertion(seqComp.getReferenceAllele(), seqComp.getAlternateAllele()) ) {
+            return "c." + seqComp.getCodingSequenceAlleleStart() + "_" + (seqComp.getCodingSequenceAlleleStart() + 1) +
+                    "ins" + seqComp.getAlternateAllele().substring(seqComp.getReferenceAllele().length()).toUpperCase();
+        }
+        // Must be a Deletion:
+        else {
+            return "c." + (seqComp.getCodingSequenceAlleleStart() + seqComp.getAlternateAllele().length()) + "_" + (seqComp.getCodingSequenceAlleleStart() + seqComp.getReferenceAllele().length() - 1) +
+                    "del" + seqComp.getReferenceAllele().substring(seqComp.getAlternateAllele().length()).toUpperCase();
         }
     }
 

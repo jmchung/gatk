@@ -191,8 +191,8 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
 
         // PIK3CA INDELs:
         outList.addAll( addReferenceDataToUnitTestData(DataProviderForPik3caMnpFullData.providePik3caInDelData(), HG19_CHR3_REFERENCE_FILE_NAME, pik3caFeatureReader, refDataSourceHg19Ch3, PIK3CA_GENCODE_TRANSCRIPT_FASTA_FILE ) );
-        //TODO: Uncomment this after you fix it!
-        //outList.addAll( addReferenceDataToUnitTestData(DataProviderForPik3caMnpFullData.providePik3caInDelData2(), HG19_CHR3_REFERENCE_FILE_NAME, pik3caFeatureReader, refDataSourceHg19Ch3, PIK3CA_GENCODE_TRANSCRIPT_FASTA_FILE ) );
+        // TODO: UNCOMMENT WHEN INDELS ARE READY:
+//        outList.addAll( addReferenceDataToUnitTestData(DataProviderForPik3caMnpFullData.providePik3caInDelData2(), HG19_CHR3_REFERENCE_FILE_NAME, pik3caFeatureReader, refDataSourceHg19Ch3, PIK3CA_GENCODE_TRANSCRIPT_FASTA_FILE ) );
 
 
         final Object[][] outArray = outList.toArray(new Object[][]{{}});
@@ -483,14 +483,14 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
 
             final GencodeFuncotation funcotation = funcotations.get(0);
 
+            Assert.assertEquals(funcotation.getHugoSymbol(),            expectedGeneName);
             Assert.assertEquals(funcotation.getVariantClassification(), expectedVariantClassification);
             Assert.assertEquals(funcotation.getVariantType(),           expectedVariantType);
             Assert.assertEquals(funcotation.getGenomeChange(),          expectedGenomeChange);
             Assert.assertEquals(funcotation.getTranscriptStrand(),      expectedStrand);
-            Assert.assertEquals(funcotation.getCodonChange(),           expectedCodonChange);
             Assert.assertEquals(funcotation.getcDnaChange(),            expectedCDnaChange);
+            Assert.assertEquals(funcotation.getCodonChange(),           expectedCodonChange);
             Assert.assertEquals(funcotation.getProteinChange(),         expectedProteinChange);
-            Assert.assertEquals(funcotation.getHugoSymbol(),            expectedGeneName);
         }
     }
 

@@ -687,6 +687,9 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 gencodeFuncotation.setCodonChange(
                         FuncotatorUtils.createSpliceSiteCodonChange(variant.getStart(), exon.getExonNumber(), exon.getStart(), exon.getEnd(), strand, offsetIndelAdjustment)
                 );
+//
+//                // Intronic splice sites get cDNA string handled in a special way:
+//                gencodeFuncotation.setcDnaChange( FuncotatorUtils.getCodingSequenceChangeStringForExonSpliceSite(exon.getStart()) );
             }
         }
 
