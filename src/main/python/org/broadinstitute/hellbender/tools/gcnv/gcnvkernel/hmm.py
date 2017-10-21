@@ -1,5 +1,5 @@
 import numpy as np
-import theano
+import theano as th
 import theano.tensor as tt
 import pymc3 as pm
 from typing import Optional, Tuple
@@ -7,7 +7,7 @@ from . import types
 
 
 class TheanoForwardBackward:
-    """ Implementation of the forward-backward algorithm using theano.scan """
+    """ Implementation of the forward-backward algorithm using th.scan """
     def __init__(self,
                  log_posterior_output: Optional[types.TensorSharedVariable],
                  update_type: str,
@@ -43,7 +43,7 @@ class TheanoForwardBackward:
         assert self.update_type == 'whole', "This instance of the class does not update as a whole"
         return self._update_log_posterior_theano_func(num_states, log_prior_c, log_trans_tcc, log_emission_tc)
 
-    @theano.configparser.change_flags(compute_test_value="ignore")
+    @th.configparser.change_flags(compute_test_value="ignore")
     def _get_compiled_log_posterior_calculator_slice(self, extended_output: bool):
         """ Returns a compiled theano function that updates log posterior probabilities.
 
@@ -75,11 +75,11 @@ class TheanoForwardBackward:
         else:
             outputs = None
         update_log_posterior_output = tt.set_subtensor(old_log_posterior_tc, admixed_log_posterior_tc)
-        return theano.function(inputs=[num_states, slice_index, log_prior_c, log_trans_tcc, log_emission_tc],
-                               outputs=outputs,
-                               updates=[(self.output_tensor, update_log_posterior_output)])
+        return th.function(inputs=[num_states, slice_index, log_prior_c, log_trans_tcc, log_emission_tc],
+                           outputs=outputs,
+                           updates=[(self.output_tensor, update_log_posterior_output)])
 
-    @theano.configparser.change_flags(compute_test_value="ignore")
+    @th.configparser.change_flags(compute_test_value="ignore")
     def _get_compiled_log_posterior_calculator_whole(self, extended_output: bool):
         """ Returns a compiled theano function that updates log posterior probabilities.
 
@@ -108,9 +108,9 @@ class TheanoForwardBackward:
             outputs = [update_norm_t, log_data_likelihood]
         else:
             outputs = None
-        return theano.function(inputs=[num_states, log_prior_c, log_trans_tcc, log_emission_tc],
-                               outputs=outputs,
-                               updates=[(old_log_posterior_tc, admixed_log_posterior_tc)])
+        return th.function(inputs=[num_states, log_prior_c, log_trans_tcc, log_emission_tc],
+                           outputs=outputs,
+                           updates=[(old_log_posterior_tc, admixed_log_posterior_tc)])
 
     @staticmethod
     def _get_jensen_shannon_divergence(log_p_1, log_p_2):
@@ -157,7 +157,7 @@ class TheanoForwardBackward:
         alpha_first = log_prior_c + log_emission_tc[0, :]
 
         # the rest of the forward table
-        alpha_outputs, alpha_updates = theano.scan(
+        alpha_outputs, alpha_updates = th.scan(
             fn=calculate_next_alpha,
             sequences=[log_trans_tcc, log_emission_tc[1:, :]],
             outputs_info=[alpha_first])
@@ -169,7 +169,7 @@ class TheanoForwardBackward:
         beta_last = tt.zeros_like(log_prior_c)
 
         # the rest of the backward table
-        beta_outputs, beta_updates = theano.scan(
+        beta_outputs, beta_updates = th.scan(
             fn=calculate_prev_beta,
             sequences=[log_trans_tcc, log_emission_tc[1:, :]],
             go_backwards=True,

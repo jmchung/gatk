@@ -1,5 +1,5 @@
-===================================
-GATK gCNV-theano computational core
-===================================
+==============================
+GATK gCNV computational kernel
+==============================
 
 To be written.

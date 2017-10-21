@@ -6,8 +6,8 @@ from typing import Deque, Tuple
 class NonStationaryLinearRegression:
     """ This class performs maximum-likelihood linear regression for sequentially observed data
     on an equally spaced grid. The data is assumed to be non-stationary. A window size needs
-    to be provided that determined the forgetting factor. This is a naive implementation of the
-    recursive least squares (RLS) algorithm.
+    to be provided that determined the forgetting factor. This is a non-recursive implementation of
+    the recursive least squares (RLS) algorithm.
     """
 
     def __init__(self, window: int = 50):

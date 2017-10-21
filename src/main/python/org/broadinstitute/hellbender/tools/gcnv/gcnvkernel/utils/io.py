@@ -3,7 +3,7 @@ import pandas as pd
 import logging
 from typing import List, Optional, Tuple
 
-from gcnv.utils.interval import Interval, IntervalAnnotation, interval_annotations_dict, interval_annotations_dtypes
+from .interval import Interval, IntervalAnnotation, interval_annotations_dict, interval_annotations_dtypes
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.INFO)
 

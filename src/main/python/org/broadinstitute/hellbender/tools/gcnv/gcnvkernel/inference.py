@@ -38,18 +38,19 @@ class NoisyELBOConvergenceTracker(Callback):
         self._lin_reg = NonStationaryLinearRegression(window=self.window)
         self._n_obs: int = 0
         self._n_obs_snr_under_threshold: int = 0
-        self.slope: float = None
-        self.snr: float = None
+        self.elpi: float = None  # effective loss per iteration
+        self.snr: float = None  # signal-to-noise ratio
+        self.variance: float = None  # variance of elbo in the window
+        self.drift: float = None  # absolute elbo change in the window
 
     def __call__(self, approx, loss, i):
         self._lin_reg.add_observation(loss)
         self._n_obs += 1
-        slope = self._lin_reg.get_slope()
-        variance = self._lin_reg.get_variance()
-        if slope is not None and variance is not None:
-            drift = np.abs(slope) * self.window
-            self.slope = np.abs(slope)
-            self.snr = drift / np.sqrt(2 * variance)
+        self.elpi = -self._lin_reg.get_slope()
+        self.variance = self._lin_reg.get_variance()
+        if self.elpi is not None and self.variance is not None:
+            self.drift = np.abs(self.elpi) * self.window
+            self.snr = self.drift / np.sqrt(2 * self.variance)
             if self.snr < self.snr_stop_trigger_threshold:
                 self._n_obs_snr_under_threshold += 1
             else:  # reset countdown
@@ -214,14 +215,14 @@ class LearnAndCall(InferenceTask):
                     loss = self.denoising_model_step_func() / self.elbo_normalization_factor
                     self.convergence_tracker(self.denoising_model_advi.approx, loss, i)
                     snr = self.convergence_tracker.snr
-                    slope = self.convergence_tracker.slope
+                    elpi = self.convergence_tracker.elpi
                     if snr is not None:
                         self.snr_hist.append(snr)
                     self.elbo_hist.append(-loss)
-                    progress_bar.set_description("(denoising) ELBO: {0:2.6}, SNR: {1}, slope: {2}".format(
+                    progress_bar.set_description("(denoising) ELBO: {0:2.6}, SNR: {1}, ELPI: {2}".format(
                         -loss,
                         "{0:2.2}".format(snr) if snr is not None else "N/A",
-                        "{0:2.2}".format(slope) if slope is not None else "N/A"))
+                        "{0:2.2}".format(elpi) if elpi is not None else "N/A"))
                     if self.param_tracker is not None \
                             and i % self.model_training_params.track_model_params_every == 0:
                         self.param_tracker(self.denoising_model_advi.approx, loss, i)

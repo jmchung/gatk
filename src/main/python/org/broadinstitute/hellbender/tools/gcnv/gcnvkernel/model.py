@@ -563,15 +563,15 @@ class LogEmissionPosteriorSampler:
 class HHMMClassAndCopyNumberCaller:
     """ This class updates copy number and class posteriors.
 
-        class_prior_k -► (tau_1) --► (tau_2) --► (tau_3) --► ...
-                            |           |           |
-                            |           |           |
-                            ▼           ▼           ▼
-                          (c_s1) --►  (c_s2) --►  (c_s3) --► ...
-                            |           |           |
-                            |           |           |
-                            ▼           ▼           ▼
-                           n_s1        n_s2        n_s3
+        class_prior_k --► (tau_1) --► (tau_2) --► (tau_3) --► ...
+                             |           |           |
+                             |           |           |
+                             ▼           ▼           ▼
+                           (c_s1) --►  (c_s2) --►  (c_s3) --► ...
+                             |           |           |
+                             |           |           |
+                             ▼           ▼           ▼
+                            n_s1        n_s2        n_s3
 
         We assume the variational ansatz \prod_s p(tau, c_s | n) ~ q(tau) \prod_s q(c_s)
         Accordingly, q(tau) and q(c_s) are determined by minimizing the KL divergence w.r.t. the true
