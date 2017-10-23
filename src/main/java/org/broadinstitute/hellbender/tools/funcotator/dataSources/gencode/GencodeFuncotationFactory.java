@@ -326,7 +326,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                                                              final GencodeGtfExonFeature exon) {
 
         // Setup the "trivial" fields of the gencodeFuncotation:
-        final GencodeFuncotation gencodeFuncotation = createGencodeFuncotationWithTrivialFieldsPopulated(variant, altAllele, gtfFeature, transcript, exon);
+        final GencodeFuncotation gencodeFuncotation = createGencodeFuncotationWithTrivialFieldsPopulated(variant, altAllele, gtfFeature, transcript);
 
         // Set the exon number:
         gencodeFuncotation.setTranscriptExon( exon.getExonNumber() );
@@ -669,20 +669,13 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 gencodeFuncotation.setVariantClassification(GencodeFuncotation.VariantClassification.SPLICE_SITE);
                 gencodeFuncotation.setSecondaryVariantClassification(GencodeFuncotation.VariantClassification.INTRON);
 
-                // Do we need to adjust the exon start / stop based on an indel?
-                // In the case of an insertion we need to remove the bases that were inserted to get to the actual positon
-                // in the genome of our variant.
-                // Similarly in the case of a deletion we need to add back in the bases that were deleted to get the actual
-                // position in the genome of our variant.
-                final int offsetIndelAdjustment;
-//                if ( FuncotatorUtils.isDeletion(variant.getReference(), altAllele) ) {
-//                    offsetIndelAdjustment = altAllele.length() - variant.getReference().length();
-//                }
-//                else {
-//                    offsetIndelAdjustment = 0;
-//                }
-
-                offsetIndelAdjustment = 0;
+                // In deletions we have added a base to the front because of VCF requirements, thus we add an
+                // offset of 1 to account for that:
+                // (TODO: come to think of it this is really bad, because we're tying our parsing / computations to a data format).
+                int offsetIndelAdjustment = 0;
+                if ( FuncotatorUtils.isDeletion(variant.getReference(), altAllele) ) {
+                    offsetIndelAdjustment = 1;
+                }
 
                 gencodeFuncotation.setCodonChange(
                         FuncotatorUtils.createSpliceSiteCodonChange(variant.getStart(), exon.getExonNumber(), exon.getStart(), exon.getEnd(), strand, offsetIndelAdjustment)
@@ -784,6 +777,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
             altAllele = Allele.create(ReadUtils.getBasesReverseComplement( alternateAllele.getBases() ), false);
         }
 
+        // TODO: In the case of an allele going through (from before to after) a splice site, you need to add more logic here to grab the INTRON reference bases.
         final String referenceCodingSequence;
         if ( transcriptFastaReferenceDataSource != null ) {
             referenceCodingSequence = getCodingSequenceFromTranscriptFasta( transcript.getTranscriptId(), transcriptIdMap, transcriptFastaReferenceDataSource );
@@ -889,27 +883,10 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @param transcript The current {@link GencodeGtfTranscriptFeature} containing our {@code alternateAllele}.
      * @return A trivially populated {@link GencodeFuncotation} object.
      */
-    private static GencodeFuncotation createGencodeFuncotationWithTrivialFieldsPopulated(final VariantContext variant,
-                                                                                         final Allele altAllele,
-                                                                                         final GencodeGtfGeneFeature gtfFeature,
-                                                                                         final GencodeGtfTranscriptFeature transcript) {
-        return createGencodeFuncotationWithTrivialFieldsPopulated(variant, altAllele, gtfFeature, transcript, null);
-    }
-
-    /**
-     * Creates a Gencode Funcotation with all trivial fields populated.
-     * @param variant The {@link VariantContext} for the current variant.
-     * @param altAllele The alternate {@link Allele} we are currently annotating.
-     * @param gtfFeature The current {@link GencodeGtfGeneFeature} read from the input feature file.
-     * @param transcript The current {@link GencodeGtfTranscriptFeature} containing our {@code alternateAllele}.
-     * @param exon The current {@link GencodeGtfExonFeature} containing our {@code alternateAllele}.
-     * @return A trivially populated {@link GencodeFuncotation} object.
-     */
      private static GencodeFuncotation createGencodeFuncotationWithTrivialFieldsPopulated(final VariantContext variant,
                                                                                   final Allele altAllele,
                                                                                   final GencodeGtfGeneFeature gtfFeature,
-                                                                                  final GencodeGtfTranscriptFeature transcript,
-                                                                                  final GencodeGtfExonFeature exon) {
+                                                                                  final GencodeGtfTranscriptFeature transcript) {
         final GencodeFuncotation gencodeFuncotation = new GencodeFuncotation();
 
         final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );

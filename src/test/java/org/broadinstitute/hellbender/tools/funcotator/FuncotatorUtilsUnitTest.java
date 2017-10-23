@@ -538,14 +538,29 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     }
 
     @DataProvider
+    Object[][] provideDataForTestIsIndel() {
+        return new Object[][] {
+                { Allele.create("A", true),     Allele.create("T"),     false },
+                { Allele.create("A", true),     Allele.create("TT"),    true },
+                { Allele.create("AA", true),    Allele.create("TT"),    false },
+                { Allele.create("AA", true),    Allele.create("T"),     true },
+                { Allele.create("A", true),     Allele.create("TTTTT"), true },
+                { Allele.create("AAAAA", true), Allele.create("T"),     true },
+                { Allele.create("AAAAA", true), Allele.create("TTTTT"), false },
+        };
+    }
+
+    @DataProvider
     Object[][] providePositionAndExpectedAlignedPosition() {
         return new Object[][] {
-                {1,1},
-                {2,1},
-                {3,1},
-                {4,4},
-                {5,4},
-                {6,4},
+                {   1,   1},
+                {   2,   1},
+                {   3,   1},
+                {   4,   4},
+                {   5,   4},
+                {   6,   4},
+                { 324, 322},
+                { 325, 325},
                 {1635,1633},
                 {1636,1636},
                 {1637,1636},
@@ -1027,6 +1042,12 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     void testIsOnp(final Allele ref, final Allele alt, final boolean expected) {
         Assert.assertEquals( FuncotatorUtils.isOnp(ref, alt), expected );
         Assert.assertEquals( FuncotatorUtils.isOnp(ref.getBaseString(), alt.getBaseString()), expected );
+    }
+
+    @Test(dataProvider = "provideDataForTestIsIndel")
+    void testIsIndel(final Allele ref, final Allele alt, final boolean expected ) {
+        Assert.assertEquals( FuncotatorUtils.isIndel(ref, alt), expected );
+        Assert.assertEquals( FuncotatorUtils.isIndel(ref.getBaseString(), alt.getBaseString()), expected );
     }
 
 //    @Test(dataProvider = "provideReferenceAndExonListAndExpected")

@@ -271,6 +271,38 @@ public class FuncotatorUtils {
     }
 
     /**
+     * Determines whether the given reference and alternate alleles constitute an insertion or deletion mutation.
+     * @param reference A {@link String} representing the reference allele.
+     * @param alternate A {@link String} representing the alternate / variant allele.
+     * @return {@code true} if replacing the reference with the alternate results in an insertion or deletion.  {@code false} otherwise.
+     */
+    public static boolean isIndel(final String reference, final String alternate) {
+
+        Utils.nonNull(reference);
+        Utils.nonNull(alternate);
+
+        // If we do not have the same number of bases in the reference and alternate alleles,
+        // then we have an indel:
+        return reference.length() != alternate.length();
+    }
+
+    /**
+     * Determines whether the given reference and alternate alleles constitute an insertion or deletion mutation.
+     * @param reference The reference {@link Allele}.
+     * @param alternate The alternate / variant {@link Allele}.
+     * @return {@code true} if replacing the reference with the alternate results in an insertion or deletion.  {@code false} otherwise.
+     */
+    public static boolean isIndel(final Allele reference, final Allele alternate) {
+
+        Utils.nonNull(reference);
+        Utils.nonNull(alternate);
+
+        // If we do not have the same number of bases in the reference and alternate alleles,
+        // then we have an indel:
+        return reference.length() != alternate.length();
+    }
+
+    /**
      * Determines whether the given reference and alternate alleles constitute an Oligo-Nucleotide Polymorphism (ONP).
      * For Funcotator purposes, an ONP is a mutation/variant that is a substitution of one or more consecutive bases.
      * @param reference The reference {@link Allele}.
@@ -592,18 +624,45 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getAlignedAlternateAllele());
         Utils.nonNull(seqComp.getCodingSequenceAlleleStart());
 
-        // Frame shifts have their own syntax which is simpler:
-        if ( FuncotatorUtils.isFrameshift(seqComp.getReferenceAllele(), seqComp.getAlternateAllele()) ) {
-            return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + "-" +
-                    seqComp.getAlignedReferenceAlleleStop() + ")" +
-                    seqComp.getReferenceAllele().toLowerCase() + "fs";
-        }
-        else {
-            final StringBuilder ref = new StringBuilder();
-            final StringBuilder alt = new StringBuilder();
+        final StringBuilder ref = new StringBuilder();
+        final StringBuilder alt = new StringBuilder();
 
-            // Capitalize for insertion:
-            if (seqComp.getAlignedReferenceAllele().length() < seqComp.getAlignedAlternateAllele().length()) {
+        // Handle the ONP case:
+        if ( isOnp(seqComp.getAlignedReferenceAllele(), seqComp.getAlignedAlternateAllele()) ) {
+
+            // Capitalize the right parts of each string if they're of equal length:
+            for (int i = 0; i < seqComp.getAlignedReferenceAllele().length(); ++i) {
+                if (seqComp.getAlignedReferenceAllele().charAt(i) != seqComp.getAlignedAlternateAllele().charAt(i)) {
+                    ref.append(Character.toUpperCase(seqComp.getAlignedReferenceAllele().charAt(i)));
+                    alt.append(Character.toUpperCase(seqComp.getAlignedAlternateAllele().charAt(i)));
+                } else {
+                    final char c = Character.toLowerCase(seqComp.getAlignedReferenceAllele().charAt(i));
+                    ref.append(c);
+                    alt.append(c);
+                }
+            }
+
+            // Construct and return the string:
+            if (seqComp.getAlignedCodingSequenceAlleleStart().equals(seqComp.getAlignedReferenceAlleleStop())) {
+                return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + ")" +
+                        ref.toString() + ">" + alt.toString();
+            } else {
+                return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + "-" +
+                        seqComp.getAlignedReferenceAlleleStop() + ")" +
+                        ref.toString() + ">" + alt.toString();
+            }
+        }
+        // Handle the insertion case:
+        else if ( isInsertion(seqComp.getAlignedReferenceAllele(), seqComp.getAlignedAlternateAllele()) ) {
+
+            // Check for frame shift syntax first:
+            if ( isFrameshift(seqComp.getAlignedReferenceAllele(), seqComp.getAlignedAlternateAllele()) ) {
+                return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + "-" +
+                        seqComp.getAlignedReferenceAlleleStop() + ")" +
+                        seqComp.getAlignedReferenceAllele().toLowerCase() + "fs";
+            }
+            else {
+                // Capitalize for insertion:
 
                 // Insertions alternate alleles have ref first, then the extra bases,
                 // so we capitalize only the extra bases.
@@ -621,34 +680,29 @@ public class FuncotatorUtils {
                 for ( ; i < seqComp.getAlignedAlternateAllele().length(); ++i ) {
                     alt.append( Character.toUpperCase(seqComp.getAlignedAlternateAllele().charAt(i)) );
                 }
+
+                // NOTE: We know that because of the way insertions are created
+                // (i.e. a base is added to the beginning of the string), we can ignore the first codon (3 bases) of the
+                // reference:
+                return "c.(" + (seqComp.getAlignedCodingSequenceAlleleStart() + 3) + "-" +
+                        (seqComp.getAlignedReferenceAlleleStop() + 3) + ")" +
+                        ref.toString() + ">" + alt.toString();
             }
-            // Capitalize for deletion:
-            else if (seqComp.getAlignedReferenceAllele().length() > seqComp.getAlignedAlternateAllele().length()) {
-                ref.append(seqComp.getAlignedReferenceAllele());
-                alt.append(seqComp.getAlignedAlternateAllele());
-            }
-            // Capitalize the right parts of each string if they're of equal length:
-            else {
-                for (int i = 0; i < seqComp.getAlignedReferenceAllele().length(); ++i) {
-                    if (seqComp.getAlignedReferenceAllele().charAt(i) != seqComp.getAlignedAlternateAllele().charAt(i)) {
-                        ref.append(Character.toUpperCase(seqComp.getAlignedReferenceAllele().charAt(i)));
-                        alt.append(Character.toUpperCase(seqComp.getAlignedAlternateAllele().charAt(i)));
-                    } else {
-                        final char c = Character.toLowerCase(seqComp.getAlignedReferenceAllele().charAt(i));
-                        ref.append(c);
-                        alt.append(c);
-                    }
-                }
+        }
+        // Handle the deletion case:
+        else {
+            // Check for frame shift syntax and return our string.
+            // NOTE: We know that because of the way deletions are created
+            // (i.e. a base is added to the beginning of the string), we can ignore the first codon (3 bases) of the
+            // reference:
+            String decorator = "del";
+            if ( isFrameshift(seqComp.getAlignedReferenceAllele(), seqComp.getAlignedAlternateAllele()) ) {
+                decorator = "fs";
             }
 
-            if (seqComp.getAlignedCodingSequenceAlleleStart().equals(seqComp.getAlignedReferenceAlleleStop())) {
-                return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + ")" +
-                        ref.toString() + ">" + alt.toString();
-            } else {
-                return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + "-" +
-                        seqComp.getAlignedReferenceAlleleStop() + ")" +
-                        ref.toString() + ">" + alt.toString();
-            }
+            return "c.(" + (seqComp.getAlignedCodingSequenceAlleleStart() + 3) + "-" +
+                    seqComp.getAlignedReferenceAlleleStop() + ")" +
+                    seqComp.getAlignedReferenceAllele().substring(3).toLowerCase() + decorator;
         }
     }
 
@@ -758,12 +812,14 @@ public class FuncotatorUtils {
         Integer protChangeStartPos = seqComp.getProteinChangeStartPosition();
         Integer protChangeEndPos = seqComp.getProteinChangeEndPosition();
 
-        // We should go through our strings and make sure we only render the parts of the protein that have actually
-        // changed.  This means that we keep track of the `same` and `different` parts of the sequences.
-        // `Same` parts at the front & back of the string are ignored.
-        // We keep them in the middle.
-        // Then we recompute the position in which the protein has changed.
-        if ( refAaSeq.length() == altAaSeq.length() ) {
+        // Check for the ONP case:
+        if ( isOnp(seqComp.getReferenceAllele(), seqComp.getAlternateAllele()) ) {
+
+            // We should go through our strings and make sure we only render the parts of the protein that have actually
+            // changed.  This means that we keep track of the `same` and `different` parts of the sequences.
+            // `Same` parts at the front & back of the string are ignored.
+            // We keep them in the middle.
+            // Then we recompute the position in which the protein has changed.
 
             boolean foundStartDiff = false;
             boolean foundEndDiff = false;
@@ -790,10 +846,7 @@ public class FuncotatorUtils {
             // Set the new ref and alt amino acid sequences:
             refAaSeq = refAaSeq.substring(startingDifference, refAaSeq.length() - endingDifference);
             altAaSeq = altAaSeq.substring(startingDifference, altAaSeq.length() - endingDifference);
-        }
 
-        // Check for the ONP case:
-        if ( isOnp(seqComp.getReferenceAllele(), seqComp.getAlternateAllele()) ) {
             if (protChangeStartPos.equals(protChangeEndPos)) {
                 return "p." + refAaSeq + protChangeStartPos +
                         altAaSeq;
@@ -802,17 +855,26 @@ public class FuncotatorUtils {
                         + "_" + protChangeEndPos + refAaSeq + '>' + altAaSeq;
             }
         }
-        // Check for the Frame Shift case:
-        else if ( isFrameshift(seqComp.getReferenceAllele(), seqComp.getAlternateAllele()) ) {
-            return "p." + refAaSeq + protChangeStartPos + "fs";
-        }
         // Check for the Insertion case:
         else if ( isInsertion(seqComp.getReferenceAllele(), seqComp.getAlternateAllele()) ) {
-            return "p." + protChangeStartPos + "_" + protChangeEndPos + "ins" + altAaSeq;
+            if ( isFrameshift(seqComp.getReferenceAllele(), seqComp.getAlternateAllele()) ) {
+                return "p." + refAaSeq + protChangeStartPos + "fs";
+            }
+            else {
+                return "p." + protChangeStartPos + "_" + protChangeEndPos + "ins" + altAaSeq;
+            }
         }
         // Must be a deletion:
         else {
-            return "p." + refAaSeq + protChangeStartPos + "del";
+
+            // NOTE: We know that because of the way deletions are created
+            // (i.e. a base is added to the beginning of the string), we can ignore the first amino acid (3 bases) of the
+            // reference:
+            String decorator = "del";
+            if ( isFrameshift(seqComp.getReferenceAllele(), seqComp.getAlternateAllele()) ) {
+                decorator = "fs";
+            }
+            return "p." + refAaSeq.substring(1) + (protChangeStartPos + 1) + decorator;
         }
     }
 
