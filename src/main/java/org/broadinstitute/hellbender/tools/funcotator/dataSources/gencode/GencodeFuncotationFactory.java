@@ -687,9 +687,6 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 gencodeFuncotation.setCodonChange(
                         FuncotatorUtils.createSpliceSiteCodonChange(variant.getStart(), exon.getExonNumber(), exon.getStart(), exon.getEnd(), strand, offsetIndelAdjustment)
                 );
-//
-//                // Intronic splice sites get cDNA string handled in a special way:
-//                gencodeFuncotation.setcDnaChange( FuncotatorUtils.getCodingSequenceChangeStringForExonSpliceSite(exon.getStart()) );
             }
         }
 
@@ -773,11 +770,12 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         sequenceComparison.setContig(variant.getContig());
 
         // Get the strand:
-        sequenceComparison.setStrand(Strand.toStrand( transcript.getGenomicStrand().toString() ));
+        final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
+        sequenceComparison.setStrand(strand);
 
         final Allele refAllele;
         final Allele altAllele;
-        if ( sequenceComparison.getStrand() == Strand.POSITIVE ) {
+        if ( strand == Strand.POSITIVE ) {
             refAllele = variant.getReference();
             altAllele = alternateAllele;
         }
@@ -791,7 +789,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
             referenceCodingSequence = getCodingSequenceFromTranscriptFasta( transcript.getTranscriptId(), transcriptIdMap, transcriptFastaReferenceDataSource );
         }
         else {
-            referenceCodingSequence = FuncotatorUtils.getCodingSequence(reference, exonPositionList, sequenceComparison.getStrand());
+            referenceCodingSequence = FuncotatorUtils.getCodingSequence(reference, exonPositionList, strand);
         }
 
         // Get the reference sequence in the coding region as described by the given exonPositionList:
@@ -810,7 +808,12 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Get the coding region start position (in the above computed reference coding region):
         sequenceComparison.setCodingSequenceAlleleStart(
-                FuncotatorUtils.getStartPositionInTranscript(variant, exonPositionList, sequenceComparison.getStrand())
+                FuncotatorUtils.getStartPositionInTranscript( variant, exonPositionList, strand )
+        );
+
+        // Get the overlapping exon start / stop as an interval from the given variant:
+        sequenceComparison.setExonPosition(
+                FuncotatorUtils.getOverlappingExonPositions( refAllele, altAllele, variant.getContig(), variant.getStart(), variant.getEnd(), strand, exonPositionList )
         );
 
         // Get the in-frame start position of the codon containing the given variant:
@@ -936,7 +939,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         gencodeFuncotation.setTumorSeqAllele1( altAllele.getBaseString() );
         gencodeFuncotation.setTumorSeqAllele2( altAllele.getBaseString() );
 
-        gencodeFuncotation.setGenomeChange(getGenomeChangeString(variant, altAllele, gtfFeature, exon));
+        gencodeFuncotation.setGenomeChange(getGenomeChangeString(variant, altAllele, gtfFeature));
 
         gencodeFuncotation.setAnnotationTranscript( transcript.getTranscriptId() );
 
@@ -988,15 +991,11 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
      * @param variant {@link VariantContext} of which to create the change.
      * @param altAllele {@link Allele} representing the alternate allele for this variant.
      * @param gtfFeature {@link GencodeGtfGeneFeature} corresponding to this variant.
-     * @param exon {@link GencodeGtfExonFeature} corresponding to this variant.
      * @return A short {@link String} representation of the genomic change for the given variant, allele, and feature.
      */
     private static String getGenomeChangeString(final VariantContext variant,
                                                 final Allele altAllele,
-                                                final GencodeGtfGeneFeature gtfFeature,
-                                                final GencodeGtfExonFeature exon) {
-
-        // g.chr3:178916619_178916620insCGA
+                                                final GencodeGtfGeneFeature gtfFeature) {
 
         // Check for insertion:
         if ( variant.getReference().length() < altAllele.length() ) {
@@ -1009,25 +1008,21 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         // Check for deletion:
         else if ( variant.getReference().length() > altAllele.length() ) {
 
-            String cleanAltAlleleString = FuncotatorUtils.getNonOverlappingAltAlleleBaseString(variant.getReference(), altAllele, true);
+            final String cleanAltAlleleString = FuncotatorUtils.getNonOverlappingAltAlleleBaseString(variant.getReference(), altAllele, true);
 
-            final int startPos;
-            final int endPos;
+            final int startPos = variant.getStart() + 1;
+            final int endPos = variant.getStart() + variant.getReference().length() - 1;
 
-            // We handle the case where we have a coding region slightly differently than when we have only non-coding
-            // deleted bases:
-            if ( exon == null ) {
-                startPos = variant.getStart() + 1;
-                endPos = variant.getStart() + variant.getReference().length() - 1;
-            }
-            else {
-                startPos = (variant.getStart() < exon.getStart()) ? exon.getStart() + 1 : variant.getStart() + 1;
-                endPos = (variant.getEnd() > exon.getEnd()) ? exon.getEnd() : (variant.getStart() + variant.getReference().length() - 1);
-
-                if (cleanAltAlleleString.length() > (endPos - startPos + 1)) {
-                    cleanAltAlleleString = cleanAltAlleleString.substring(0, endPos - startPos + 1);
-                }
-            }
+//            // We handle the case where we have a coding region slightly differently than when we have only non-coding
+//            // deleted bases:
+//            if ( exon != null ) {
+//                startPos = (variant.getStart() < exon.getStart()) ? exon.getStart() + 1 : variant.getStart() + 1;
+//                endPos = (variant.getEnd() > exon.getEnd()) ? exon.getEnd() : (variant.getStart() + variant.getReference().length() - 1);
+//
+//                if (cleanAltAlleleString.length() > (endPos - startPos + 1)) {
+//                    cleanAltAlleleString = cleanAltAlleleString.substring(0, endPos - startPos + 1);
+//                }
+//            }
 
             return "g." + gtfFeature.getChromosomeName() +
                     ":" + startPos + "_" + endPos +

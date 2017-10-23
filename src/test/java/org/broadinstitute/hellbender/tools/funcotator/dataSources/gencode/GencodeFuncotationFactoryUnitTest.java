@@ -483,14 +483,14 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
 
             final GencodeFuncotation funcotation = funcotations.get(0);
 
-            Assert.assertEquals(funcotation.getHugoSymbol(),            expectedGeneName);
-            Assert.assertEquals(funcotation.getVariantClassification(), expectedVariantClassification);
-            Assert.assertEquals(funcotation.getVariantType(),           expectedVariantType);
-            Assert.assertEquals(funcotation.getGenomeChange(),          expectedGenomeChange);
-            Assert.assertEquals(funcotation.getTranscriptStrand(),      expectedStrand);
-            Assert.assertEquals(funcotation.getcDnaChange(),            expectedCDnaChange);
-            Assert.assertEquals(funcotation.getCodonChange(),           expectedCodonChange);
-            Assert.assertEquals(funcotation.getProteinChange(),         expectedProteinChange);
+            Assert.assertEquals(funcotation.getHugoSymbol(),            expectedGeneName             , "Gene Name is not correct!");
+            Assert.assertEquals(funcotation.getVariantClassification(), expectedVariantClassification, "Variant Classification is not correct!");
+            Assert.assertEquals(funcotation.getVariantType(),           expectedVariantType          , "Variant Type is not correct!");
+            Assert.assertEquals(funcotation.getGenomeChange(),          expectedGenomeChange         , "Genome Change is not correct!");
+            Assert.assertEquals(funcotation.getTranscriptStrand(),      expectedStrand               , "Transcript Strand is not correct!");
+            Assert.assertEquals(funcotation.getcDnaChange(),            expectedCDnaChange           , "CDNA Change is not correct!");
+            Assert.assertEquals(funcotation.getCodonChange(),           expectedCodonChange          , "Codon Change is not correct!");
+            Assert.assertEquals(funcotation.getProteinChange(),         expectedProteinChange        , "Protein Change is not correct!");
         }
     }
 

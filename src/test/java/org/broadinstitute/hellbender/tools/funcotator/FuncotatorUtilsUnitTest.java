@@ -3,6 +3,7 @@ package org.broadinstitute.hellbender.tools.funcotator;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.tribble.annotation.Strand;
 import htsjdk.variant.variantcontext.Allele;
+import htsjdk.variant.variantcontext.VariantContext;
 import lombok.Data;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceFileSource;
@@ -16,6 +17,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -761,15 +763,18 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     @DataProvider
     Object[][] provideDataForGetProteinChangeString() {
 
+        //TODO: Add tests for INDELS, not just ONPs.
+
         return new Object[][] {
-                {"N",   1,  1,  "G", "p.N1G"},
-                {"NY",  1,  2, "GN", "p.1_2NY>GN"},
-                {"YY",  1,  2, "NY", "p.Y1N"},
-                {"NY",  1,  2, "NG", "p.Y2G"},
-                {"N",  71, 71,  "G", "p.N71G"},
-                {"NY", 71, 72, "GN", "p.71_72NY>GN"},
-                {"YY", 71, 72, "NY", "p.Y71N"},
-                {"NY", 71, 72, "NG", "p.Y72G"},
+                {"N",   1,  1,  "G", "AAT",    "GGT",    "p.N1G"},
+                {"NY",  1,  2, "GN", "AATTAT", "GGTAAT", "p.1_2NY>GN"},
+                {"YY",  1,  2, "NY", "TATTAT", "AATTAT", "p.Y1N"},
+                {"NY",  1,  2, "NG", "AATTAT", "AATGGT", "p.Y2G"},
+
+                {"N",  71, 71,  "G", "AAT",    "GGT",    "p.N71G"},
+                {"NY", 71, 72, "GN", "AATTAT", "GGTAAT", "p.71_72NY>GN"},
+                {"YY", 71, 72, "NY", "TATTAT", "AATTAT", "p.Y71N"},
+                {"NY", 71, 72, "NG", "AATTAT", "AATGGT", "p.Y72G"},
         };
     }
 
@@ -879,6 +884,116 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                 {1000, 3, 500, 1500, Strand.NEGATIVE,  -6, "c.e3+494"},
 
                 {1000, 5, 1500, 500, Strand.NEGATIVE,  -7, "c.e5+493"},
+        };
+    }
+
+    @DataProvider
+    Object[][] provideDataForTestGetOverlappingExonPositions() {
+//        refAllele, altAllele, contig, start, stop, strand, exonPositionList
+
+        final String contig = "chr3";
+
+        final List<SimpleInterval> exonPositionList = new ArrayList<>(10);
+
+        final SimpleInterval interval1 = new SimpleInterval(contig, 100, 199);
+        final SimpleInterval interval2 = new SimpleInterval(contig, 300, 399);
+        final SimpleInterval interval3 = new SimpleInterval(contig, 500, 599);
+        final SimpleInterval interval4 = new SimpleInterval(contig, 700, 799);
+        final SimpleInterval interval5 = new SimpleInterval(contig, 900, 999);
+
+        exonPositionList.add( interval1 );
+        exonPositionList.add( interval2 );
+        exonPositionList.add( interval3 );
+        exonPositionList.add( interval4 );
+        exonPositionList.add( interval5 );
+
+        return new Object[][] {
+                // + Strand:
+                { Allele.create("A", true),          Allele.create("T"),          contig,  50,  50, Strand.POSITIVE, exonPositionList, null },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 299, 299, Strand.POSITIVE, exonPositionList, null },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 400, 400, Strand.POSITIVE, exonPositionList, null },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig,  40,  49, Strand.POSITIVE, exonPositionList, null },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 290, 299, Strand.POSITIVE, exonPositionList, null },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 400, 409, Strand.POSITIVE, exonPositionList, null },
+
+                { Allele.create("A", true),          Allele.create("T"),          contig, 100, 100, Strand.POSITIVE, exonPositionList, interval1 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 150, 150, Strand.POSITIVE, exonPositionList, interval1 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 199, 199, Strand.POSITIVE, exonPositionList, interval1 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig,  91, 100, Strand.POSITIVE, exonPositionList, interval1 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 120, 129, Strand.POSITIVE, exonPositionList, interval1 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 199, 208, Strand.POSITIVE, exonPositionList, interval1 },
+
+                { Allele.create("A", true),          Allele.create("T"),          contig, 300, 300, Strand.POSITIVE, exonPositionList, interval2 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 350, 350, Strand.POSITIVE, exonPositionList, interval2 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 399, 399, Strand.POSITIVE, exonPositionList, interval2 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 291, 300, Strand.POSITIVE, exonPositionList, interval2 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 320, 329, Strand.POSITIVE, exonPositionList, interval2 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 399, 408, Strand.POSITIVE, exonPositionList, interval2 },
+
+                { Allele.create("A", true),          Allele.create("T"),          contig, 500, 500, Strand.POSITIVE, exonPositionList, interval3 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 550, 550, Strand.POSITIVE, exonPositionList, interval3 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 599, 599, Strand.POSITIVE, exonPositionList, interval3 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 491, 500, Strand.POSITIVE, exonPositionList, interval3 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 520, 529, Strand.POSITIVE, exonPositionList, interval3 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 599, 608, Strand.POSITIVE, exonPositionList, interval3 },
+
+                { Allele.create("A", true),          Allele.create("T"),          contig, 700, 700, Strand.POSITIVE, exonPositionList, interval4 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 750, 750, Strand.POSITIVE, exonPositionList, interval4 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 799, 799, Strand.POSITIVE, exonPositionList, interval4 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 691, 700, Strand.POSITIVE, exonPositionList, interval4 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 720, 729, Strand.POSITIVE, exonPositionList, interval4 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 799, 808, Strand.POSITIVE, exonPositionList, interval4 },
+
+                { Allele.create("A", true),          Allele.create("T"),          contig, 900,  900, Strand.POSITIVE, exonPositionList, interval5 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 950,  950, Strand.POSITIVE, exonPositionList, interval5 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 999,  999, Strand.POSITIVE, exonPositionList, interval5 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 891,  900, Strand.POSITIVE, exonPositionList, interval5 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 920,  929, Strand.POSITIVE, exonPositionList, interval5 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 999, 1008, Strand.POSITIVE, exonPositionList, interval5 },
+                
+                // - Strand:
+                { Allele.create("A", true),          Allele.create("T"),          contig,  50,  50, Strand.NEGATIVE, exonPositionList, null },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 299, 299, Strand.NEGATIVE, exonPositionList, null },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 400, 400, Strand.NEGATIVE, exonPositionList, null },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig,  40,  49, Strand.NEGATIVE, exonPositionList, null },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 290, 299, Strand.NEGATIVE, exonPositionList, null },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 400, 409, Strand.NEGATIVE, exonPositionList, null },
+
+                { Allele.create("A", true),          Allele.create("T"),          contig, 100, 100, Strand.NEGATIVE, exonPositionList, interval1 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 150, 150, Strand.NEGATIVE, exonPositionList, interval1 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 199, 199, Strand.NEGATIVE, exonPositionList, interval1 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig,  91, 100, Strand.NEGATIVE, exonPositionList, interval1 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 120, 129, Strand.NEGATIVE, exonPositionList, interval1 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 199, 208, Strand.NEGATIVE, exonPositionList, interval1 },
+
+                { Allele.create("A", true),          Allele.create("T"),          contig, 300, 300, Strand.NEGATIVE, exonPositionList, interval2 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 350, 350, Strand.NEGATIVE, exonPositionList, interval2 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 399, 399, Strand.NEGATIVE, exonPositionList, interval2 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 291, 300, Strand.NEGATIVE, exonPositionList, interval2 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 320, 329, Strand.NEGATIVE, exonPositionList, interval2 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 399, 408, Strand.NEGATIVE, exonPositionList, interval2 },
+
+                { Allele.create("A", true),          Allele.create("T"),          contig, 500, 500, Strand.NEGATIVE, exonPositionList, interval3 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 550, 550, Strand.NEGATIVE, exonPositionList, interval3 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 599, 599, Strand.NEGATIVE, exonPositionList, interval3 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 491, 500, Strand.NEGATIVE, exonPositionList, interval3 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 520, 529, Strand.NEGATIVE, exonPositionList, interval3 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 599, 608, Strand.NEGATIVE, exonPositionList, interval3 },
+
+                { Allele.create("A", true),          Allele.create("T"),          contig, 700, 700, Strand.NEGATIVE, exonPositionList, interval4 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 750, 750, Strand.NEGATIVE, exonPositionList, interval4 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 799, 799, Strand.NEGATIVE, exonPositionList, interval4 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 691, 700, Strand.NEGATIVE, exonPositionList, interval4 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 720, 729, Strand.NEGATIVE, exonPositionList, interval4 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 799, 808, Strand.NEGATIVE, exonPositionList, interval4 },
+
+                { Allele.create("A", true),          Allele.create("T"),          contig, 900,  900, Strand.NEGATIVE, exonPositionList, interval5 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 950,  950, Strand.NEGATIVE, exonPositionList, interval5 },
+                { Allele.create("A", true),          Allele.create("T"),          contig, 999,  999, Strand.NEGATIVE, exonPositionList, interval5 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 891,  900, Strand.NEGATIVE, exonPositionList, interval5 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 920,  929, Strand.NEGATIVE, exonPositionList, interval5 },
+                { Allele.create("ATGCATGCAT", true), Allele.create("GCATGCATGC"), contig, 999, 1008, Strand.NEGATIVE, exonPositionList, interval5 },
+
         };
     }
 
@@ -1052,6 +1167,8 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                                     final int protChangeStartPos,
                                     final int protChangeEndPos,
                                     final String altAminoAcidSeq,
+                                    final String refAllele,
+                                    final String altAllele,
                                     final String expected) {
 
         final FuncotatorUtils.SequenceComparison seqComp = new FuncotatorUtils.SequenceComparison();
@@ -1059,6 +1176,8 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
         seqComp.setProteinChangeStartPosition(protChangeStartPos);
         seqComp.setProteinChangeEndPosition(protChangeEndPos);
         seqComp.setAlternateAminoAcidSequence(altAminoAcidSeq);
+        seqComp.setReferenceAllele(refAllele);
+        seqComp.setAlternateAllele(altAllele);
 
         Assert.assertEquals( FuncotatorUtils.getProteinChangeString(seqComp), expected );
     }
@@ -1096,4 +1215,17 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
 
         Assert.assertEquals( FuncotatorUtils.createSpliceSiteCodonChange(variantStart, exonNumber, exonStart, exonEnd, strand, offsetIndelAdjustment), expected );
     }
+
+    @Test (dataProvider = "provideDataForTestGetOverlappingExonPositions")
+    void testGetOverlappingExonPositions(final Allele refAllele,
+                                         final Allele altAllele,
+                                         final String contig,
+                                         final int start,
+                                         final int stop,
+                                         final Strand strand,
+                                         final List<? extends htsjdk.samtools.util.Locatable> exonPositionList,
+                                         final SimpleInterval expected) {
+        Assert.assertEquals( FuncotatorUtils.getOverlappingExonPositions(refAllele, altAllele, contig, start, stop, strand, exonPositionList), expected);
+    }
+
 }

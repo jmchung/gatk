@@ -55,9 +55,11 @@ import htsjdk.samtools.util.Locatable;
 import htsjdk.samtools.util.SequenceUtil;
 import htsjdk.tribble.annotation.Strand;
 import htsjdk.variant.variantcontext.Allele;
+import htsjdk.variant.variantcontext.VariantContext;
 import org.apache.log4j.Logger;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.exceptions.GATKException;
+import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.read.ReadUtils;
@@ -744,6 +746,13 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp.getReferenceAllele());
         Utils.nonNull(seqComp.getAlternateAllele());
 
+        if ( seqComp.getReferenceAllele().length() == 0 ) {
+            throw new UserException("Reference allele cannot be empty.");
+        }
+        if ( seqComp.getAlternateAllele().length() == 0 ) {
+            throw new UserException("Alternate allele cannot be empty.");
+        }
+
         String refAaSeq = seqComp.getReferenceAminoAcidSequence();
         String altAaSeq = seqComp.getAlternateAminoAcidSequence();
         Integer protChangeStartPos = seqComp.getProteinChangeStartPosition();
@@ -809,6 +818,7 @@ public class FuncotatorUtils {
 
     /**
      * Get the coding sequence change string from the given {@link SequenceComparison}
+     * This method is assumed to be called only when the variant occurs in a coding region of the genome.
      * @param seqComp {@link SequenceComparison} from which to construct the coding sequence change string.
      * @return A {@link String} representing the coding sequence change between the ref and alt alleles in {@code seqComp}.
      */
@@ -836,8 +846,26 @@ public class FuncotatorUtils {
         }
         // Must be a Deletion:
         else {
-            return "c." + (seqComp.getCodingSequenceAlleleStart() + seqComp.getAlternateAllele().length()) + "_" + (seqComp.getCodingSequenceAlleleStart() + seqComp.getReferenceAllele().length() - 1) +
-                    "del" + seqComp.getReferenceAllele().substring(seqComp.getAlternateAllele().length()).toUpperCase();
+
+            int start = seqComp.getCodingSequenceAlleleStart() + seqComp.getAlternateAllele().length();
+            int end = seqComp.getCodingSequenceAlleleStart() + seqComp.getReferenceAllele().length() - 1;
+
+            // If we have exon information, and we SHOULD, we use it to trim the start/stop coordinates
+            // of the cDNA string to the extants of the coding region:
+            if ( (seqComp.getExonStartPosition() != null) && (seqComp.getExonEndPosition() != null) ) {
+                final int cdsExonStart = seqComp.getCodingSequenceAlleleStart() - (seqComp.getAlleleStart() - seqComp.getExonStartPosition());
+                final int cdsExonEnd   = cdsExonStart + (seqComp.getExonEndPosition() - seqComp.getExonStartPosition());
+
+                if ( start < cdsExonStart ) {
+                    start = cdsExonStart;
+                }
+                if ( end > cdsExonEnd ) {
+                    end = cdsExonEnd;
+                }
+            }
+
+            return "c." + start + "_" + end + "del" +
+                    seqComp.getReferenceAllele().substring(seqComp.getAlternateAllele().length()).toUpperCase();
         }
     }
 
@@ -1150,6 +1178,71 @@ public class FuncotatorUtils {
     }
 
     /**
+     * Get the overlapping exon start/stop as a {@link SimpleInterval} for the given altAllele / reference.
+     * @param refAllele {@link Allele} for the given {@code altAllele}.
+     * @param altAllele {@link Allele} to locate on an exon.
+     * @param contig Contig on which the altAllele occurs.
+     * @param variantStart Start position (1-based, inclusive) of the given {@code altAllele}.
+     * @param variantEnd End position (1-based, inclusive) of the given {@code altAllele}.
+     * @param exonPositionList List of exon start / stop positions to cross-reference with the given {@code altAllele}.
+     * @param strand The {@link Strand} on which the {@code altAllele} is located.
+     * @return A {@link SimpleInterval} containing the extants of the exon that overlaps the given altAllele.  {@code null} if no overlap occurs.
+     */
+    public static SimpleInterval getOverlappingExonPositions(final Allele refAllele,
+                                                             final Allele altAllele,
+                                                             final String contig,
+                                                             final int variantStart,
+                                                             final int variantEnd,
+                                                             final Strand strand,
+                                                             final List<? extends htsjdk.samtools.util.Locatable> exonPositionList) {
+        Utils.nonNull( refAllele );
+        Utils.nonNull( altAllele );
+        Utils.nonNull( contig );
+        Utils.nonNull( strand );
+        Utils.nonNull( exonPositionList );
+
+        if ( strand == Strand.NONE ) {
+            throw new GATKException("Cannot handle NONE strand.");
+        }
+
+        // Get the correct start / end positions:
+        int alleleStart = variantStart;
+        int alleleEnd   = variantEnd;
+
+        if ( refAllele.length() > refAllele.length() ) {
+            final int lengthAdjustment = (refAllele.length() - altAllele.length());
+            if ( strand == Strand.NEGATIVE ) {
+                alleleStart -= lengthAdjustment;
+            }
+            else {
+                alleleEnd   += lengthAdjustment;
+            }
+        }
+
+        // Create an interval so we can check for overlap:
+        final SimpleInterval variantInterval = new SimpleInterval( contig, alleleStart, alleleEnd );
+
+        int exonStart = -1;
+        int exonStop  = -1;
+
+        // Check for overlap:
+        for ( final Locatable exon : exonPositionList ) {
+            if ( variantInterval.overlaps(exon) ) {
+                exonStart = exon.getStart();
+                exonStop  = exon.getEnd();
+            }
+        }
+
+        // Since we set the start/stop together we only need to check one of these:
+        if ( exonStart == -1 ) {
+            return null;
+        }
+        else {
+            return new SimpleInterval( contig, exonStart, exonStop );
+        }
+    }
+
+    /**
      * A simple data object to hold a comparison between a reference sequence and an alternate allele.
      */
     public static class SequenceComparison {
@@ -1162,18 +1255,21 @@ public class FuncotatorUtils {
         private Integer codingSequenceAlleleStart        = null;
         private Integer alignedCodingSequenceAlleleStart = null;
 
+        private Integer exonStartPosition                = null;
+        private Integer exonEndPosition                  = null;
+
         private Integer proteinChangeStartPosition       = null;
         private Integer proteinChangeEndPosition         = null;
 
-        private String referenceAllele                   = null;
-        private String alignedReferenceAllele            = null;
+        private String  referenceAllele                  = null;
+        private String  alignedReferenceAllele           = null;
         private Integer alignedReferenceAlleleStop       = null;
-        private String referenceAminoAcidSequence        = null;
+        private String  referenceAminoAcidSequence       = null;
 
-        private String alternateAllele                   = null;
-        private String alignedAlternateAllele            = null;
+        private String  alternateAllele                  = null;
+        private String  alignedAlternateAllele           = null;
         private Integer alignedAlternateAlleleStop       = null;
-        private String alternateAminoAcidSequence        = null;
+        private String  alternateAminoAcidSequence       = null;
 
         // =============================================================================================================
 
@@ -1236,6 +1332,27 @@ public class FuncotatorUtils {
 
         public void setAlignedCodingSequenceAlleleStart(final Integer alignedCodingSequenceAlleleStart) {
             this.alignedCodingSequenceAlleleStart = alignedCodingSequenceAlleleStart;
+        }
+
+        public Integer getExonStartPosition() {
+            return exonStartPosition;
+        }
+
+        public void setExonStartPosition(final Integer exonStartPosition) {
+            this.exonStartPosition = exonStartPosition;
+        }
+
+        public Integer getExonEndPosition() {
+            return exonEndPosition;
+        }
+
+        public void setExonEndPosition(final Integer exonEndPosition) {
+            this.exonEndPosition = exonEndPosition;
+        }
+
+        public void setExonPosition( final SimpleInterval exonPosition ) {
+            this.exonStartPosition = exonPosition.getStart();
+            this.exonEndPosition = exonPosition.getEnd();
         }
 
         public Integer getProteinChangeStartPosition() {
