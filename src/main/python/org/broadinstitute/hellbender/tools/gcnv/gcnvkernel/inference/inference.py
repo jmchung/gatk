@@ -4,16 +4,19 @@ import logging
 import time
 import tqdm
 from pymc3.variational.callbacks import Callback
-from typing import List, Callable
+from typing import List, Tuple, Callable
 from abc import abstractmethod
 
-from . import config, types
-from .utils.rls import NonStationaryLinearRegression
-from .model import DenoisingModel, DenoisingModelConfig, LogEmissionPosteriorSampler, InitialModelParametersSupplier,\
-    SharedWorkspace, ModelTrainingParameters, CopyNumberCallingConfig, HHMMClassAndCopyNumberCaller
+from org.broadinstitute.hellbender.tools.gcnv.gcnvkernel import config, types
+from org.broadinstitute.hellbender.tools.gcnv.gcnvkernel.utils.rls import NonStationaryLinearRegression
+from org.broadinstitute.hellbender.tools.gcnv.gcnvkernel.models.denoising_calling import DenoisingModel, DenoisingModelConfig, LogCopyNumberEmissionPosteriorSampler,\
+    InitialModelParametersSupplier, SharedWorkspace, ModelTrainingParameters, CopyNumberCallingConfig,\
+    HHMMClassAndCopyNumberCaller
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.INFO)
+
+_log_copy_number_emission_sampling_task_name = "log copy number emission sampling task"
 
 
 class NoisyELBOConvergenceTracker(Callback):
@@ -38,7 +41,7 @@ class NoisyELBOConvergenceTracker(Callback):
         self._lin_reg = NonStationaryLinearRegression(window=self.window)
         self._n_obs: int = 0
         self._n_obs_snr_under_threshold: int = 0
-        self.elpi: float = None  # effective loss per iteration
+        self.eipi: float = None  # effective loss per iteration
         self.snr: float = None  # signal-to-noise ratio
         self.variance: float = None  # variance of elbo in the window
         self.drift: float = None  # absolute elbo change in the window
@@ -46,11 +49,11 @@ class NoisyELBOConvergenceTracker(Callback):
     def __call__(self, approx, loss, i):
         self._lin_reg.add_observation(loss)
         self._n_obs += 1
-        self.elpi = self._lin_reg.get_slope()
+        self.eipi = self._lin_reg.get_slope()
         self.variance = self._lin_reg.get_variance()
-        if self.elpi is not None and self.variance is not None:
-            self.elpi *= -1
-            self.drift = np.abs(self.elpi) * self.window
+        if self.eipi is not None and self.variance is not None:
+            self.eipi *= -1
+            self.drift = np.abs(self.eipi) * self.window
             self.snr = self.drift / np.sqrt(2 * self.variance)
             if self.snr < self.snr_stop_trigger_threshold:
                 self._n_obs_snr_under_threshold += 1
@@ -119,7 +122,14 @@ class InferenceTask:
 
 
 class LearnAndCall(InferenceTask):
-    """ The main class responsible for """
+    """
+    todo
+    """
+
+    sampling_task_name = _log_copy_number_emission_sampling_task_name
+    advi_task_name = "denoising"
+    calling_task_name = "calling"
+
     def __init__(self,
                  denoising_model_config: DenoisingModelConfig,
                  calling_config: CopyNumberCallingConfig,
@@ -139,8 +149,10 @@ class LearnAndCall(InferenceTask):
         self.copy_number_caller = HHMMClassAndCopyNumberCaller(calling_config, model_training_params, shared_workspace)
 
         _logger.info("Instantiating the sampler...")
-        self.log_emission_posterior_sampler = LogEmissionPosteriorSampler(
+        self.log_emission_posterior_sampler = LogCopyNumberEmissionPosteriorSampler(
             denoising_model_config, calling_config, model_training_params, shared_workspace, self.denoising_model)
+        self.log_emission_posterior_sampling_task = LogCopyNumberEmissionPosteriorSamplingTask(
+            model_training_params, calling_config, shared_workspace, self.log_emission_posterior_sampler)
 
         if self.model_training_params.track_model_params:
             _logger.info("Instantiating the parameter tracker...")
@@ -172,14 +184,6 @@ class LearnAndCall(InferenceTask):
         self.elbo_hist: List[float] = []
         self.snr_hist: List[float] = []
 
-    @staticmethod
-    def _create_param_tracker():
-        # todo perhaps we'd want to expose these?
-        param_list = ['alpha_u_log__', 'psi_t_log__', 'log_mean_bias_t', 'depth_s_log__', 'W_tu']
-        trans_list = [np.exp, np.exp, None, np.exp, None]
-        trans_param_list = ['alpha_u', 'psi_t', 'log_mean_bias_t', 'depth_s', 'W_tu']
-        return ParamTracker(param_list, trans_list, trans_param_list)
-
     def engage(self):
         try:
             for i_epoch in range(self.model_training_params.max_training_epochs):
@@ -202,12 +206,19 @@ class LearnAndCall(InferenceTask):
         _logger.info('The {0} for epoch {1} successfully finished in {2:.2f}s'.format(
             task_name, i_epoch, self._t1 - self._t0))
 
-    @staticmethod
-    def _log_interrupt(task_name: str, i_epoch: int):
+    def _log_interrupt(self, task_name: str, i_epoch: int):
         _logger.warning('The {0} for epoch {1} was interrupted'.format(task_name, i_epoch))
 
+    @staticmethod
+    def _create_param_tracker():
+        # todo perhaps we'd want to expose these?
+        param_list = ['alpha_u_log__', 'psi_t_log__', 'log_mean_bias_t', 'depth_s_log__', 'W_tu']
+        trans_list = [np.exp, np.exp, None, np.exp, None]
+        trans_param_list = ['alpha_u', 'psi_t', 'log_mean_bias_t', 'depth_s', 'W_tu']
+        return ParamTracker(param_list, trans_list, trans_param_list)
+
     def _update_denoising_parameters(self, i_epoch):
-        self._log_start("denoising task", i_epoch)
+        self._log_start(self.advi_task_name, i_epoch)
         max_advi_iters = self.model_training_params.max_advi_iter_subsequent_epochs if i_epoch > 0 \
             else self.model_training_params.max_advi_iter_first_epoch
         with tqdm.trange(max_advi_iters, desc="(denoising) starting...") as progress_bar:
@@ -216,14 +227,14 @@ class LearnAndCall(InferenceTask):
                     loss = self.denoising_model_step_func() / self.elbo_normalization_factor
                     self.convergence_tracker(self.denoising_model_advi.approx, loss, i)
                     snr = self.convergence_tracker.snr
-                    elpi = self.convergence_tracker.elpi
+                    eipi = self.convergence_tracker.eipi
                     if snr is not None:
                         self.snr_hist.append(snr)
                     self.elbo_hist.append(-loss)
-                    progress_bar.set_description("(denoising) ELBO: {0:2.6}, SNR: {1}, ELPI: {2}".format(
+                    progress_bar.set_description("(denoising) ELBO: {0:2.6}, SNR: {1}, EIPI: {2}".format(
                         -loss,
                         "{0:2.2}".format(snr) if snr is not None else "N/A",
-                        "{0:2.2}".format(elpi) if elpi is not None else "N/A"))
+                        "{0:2.2}".format(eipi) if eipi is not None else "N/A"))
                     if self.param_tracker is not None \
                             and i % self.model_training_params.track_model_params_every == 0:
                         self.param_tracker(self.denoising_model_advi.approx, loss, i)
@@ -240,64 +251,25 @@ class LearnAndCall(InferenceTask):
                 raise KeyboardInterrupt
 
     def _update_log_copy_number_emission_posterior(self, i_round):
-        self._log_start("sampling task", i_round)
-        shape = (self.shared_workspace.num_samples,
-                 self.shared_workspace.num_targets,
-                 self.calling_config.num_copy_number_states)
-        self.log_emission_posterior_sampler.update_approximation(self.denoising_model_advi.approx)
-        log_copy_number_emission_stc = self.shared_workspace.log_copy_number_emission_stc
-
-        log_copy_number_emission_stc.set_value(np.zeros(shape, dtype=types.floatX), borrow=config.borrow_numpy)
-        converged = False
-        median_rel_err = np.nan
-        with tqdm.trange(self.model_training_params.log_copy_number_emission_sampling_rounds,
-                         desc="(sampling)") as progress_bar:
-            try:
-                for i_round in progress_bar:
-                    new_log_copy_number_emission_pm_stc = np.mean(self.log_emission_posterior_sampler.draw(), axis=0)
-                    log_copy_number_emission_pm_update_stc =\
-                        (new_log_copy_number_emission_pm_stc - log_copy_number_emission_stc.get_value(borrow=True))\
-                        / (i_round + 1)
-                    log_copy_number_emission_stc.set_value(
-                        log_copy_number_emission_stc.get_value(borrow=True) + log_copy_number_emission_pm_update_stc,
-                        borrow=config.borrow_numpy)
-                    median_rel_err = np.median(np.abs(log_copy_number_emission_pm_update_stc
-                                                      / log_copy_number_emission_stc.get_value(borrow=True)).flatten())
-                    progress_bar.set_description("(sampling) median_rel_err: {0:2.6}".format(median_rel_err))
-                    if median_rel_err < self.model_training_params.log_copy_number_emission_sampling_median_rel_error:
-                        converged = True
-                        _logger.info('Log emission posterior sampling converged after {0} rounds of sampling with '
-                                     'median relative error {1:.3}.'.format(i_round + 1, median_rel_err))
-                        raise StopIteration
-
-            except StopIteration:
-                progress_bar.set_description("(sampling) [final] median_rel_err: {0:2.6}".format(median_rel_err))
-                progress_bar.refresh()
-                self._log_stop("sampling task", i_round)
-
-            except KeyboardInterrupt:
-                progress_bar.close()
-                self._log_interrupt("sampling task", i_round)
-                raise KeyboardInterrupt
-
-            finally:
-                if not converged:
-                    _logger.warning('Log emission posterior sampling did not converge (median relative error '
-                                    '= {0:.3}). Either increase sampling rounds ({1}) or number of samples per '
-                                    'round ({2})'
-                                    .format(median_rel_err,
-                                            self.model_training_params.log_copy_number_emission_sampling_rounds,
-                                            self.model_training_params.log_copy_number_emission_samples_per_round))
+        self._log_start(self.sampling_task_name, i_round)
+        try:
+            self.log_emission_posterior_sampling_task.engage(self.denoising_model_advi.approx)
+        except StopIteration:
+            self._log_stop(self.sampling_task_name, i_round)
+        except KeyboardInterrupt:
+            self._log_interrupt(self.sampling_task_name, i_round)
+            raise KeyboardInterrupt
 
     def _update_copy_number_posterior(self, i_epoch):
-        self._log_start("calling task", i_epoch)
+        self._log_start(self.calling_task_name, i_epoch)
         converged = False
         copy_number_update_summary = np.nan
         class_update_summary = np.nan
-        with tqdm.trange(self.model_training_params.max_calling_iters, desc="(calling)") as progress_bar:
+        with tqdm.trange(self.model_training_params.max_calling_iters,
+                         desc="({0})".format(self.calling_task_name)) as progress_bar:
             try:
                 for _ in progress_bar:
-                    progress_bar.set_description("(calling) ...")
+                    progress_bar.set_description("({0}) ...".format(self.calling_task_name))
                     (copy_number_update_s, copy_number_log_likelihoods_s,
                      class_update_summary, class_log_likelihood) = self.copy_number_caller.call(
                         copy_number_update_summary_statistic_reducer=
@@ -306,23 +278,27 @@ class LearnAndCall(InferenceTask):
                             self.model_training_params.caller_summary_statistics_reducer)
                     copy_number_update_summary = self.model_training_params\
                         .caller_summary_statistics_reducer(copy_number_update_s)
-                    progress_bar.set_description("(calling) q_c update: {0:2.6}, q_tau update: "
-                                                 "{1:2.6}".format(copy_number_update_summary, class_update_summary))
+                    progress_bar.set_description("({0}) q_c update: {1:2.6}, q_tau update: "
+                                                 "{2:2.6}".format(self.calling_task_name,
+                                                                  copy_number_update_summary,
+                                                                  class_update_summary))
                     if (copy_number_update_summary < self.model_training_params.copy_number_update_stop_threshold and
-                                class_update_summary < self.model_training_params.class_update_stop_threshold):
+                              class_update_summary < self.model_training_params.class_update_stop_threshold):
                         converged = True
                         raise StopIteration
 
             except StopIteration:
-                progress_bar.set_description("(calling) [final] q_c update: {0:2.6}, q_tau update: "
-                                             "{1:2.6}".format(copy_number_update_summary, class_update_summary))
+                progress_bar.set_description("({0}) [final] q_c update: {1:2.6}, q_tau update: "
+                                             "{2:2.6}".format(self.calling_task_name,
+                                                              copy_number_update_summary,
+                                                              class_update_summary))
                 progress_bar.refresh()
                 progress_bar.close()
-                self._log_stop("calling task", i_epoch)
+                self._log_stop(self.calling_task_name, i_epoch)
 
             except KeyboardInterrupt:
                 progress_bar.close()
-                self._log_interrupt("calling task", i_epoch)
+                self._log_interrupt(self.calling_task_name, i_epoch)
                 raise KeyboardInterrupt
 
             finally:
@@ -330,4 +306,109 @@ class LearnAndCall(InferenceTask):
                     _logger.warning('Copy number calling did not converge. Increase maximum rounds ({0})'
                                     .format(self.model_training_params.max_calling_iters))
 
+
+class ErrorControlledSamplingTask:
+    """
+    todo
+    """
+    def __init__(self,
+                 task_name: str,
+                 output_tensor: types.TensorSharedVariable,
+                 output_shape: Tuple[int],
+                 sampling_rounds: int,
+                 target_median_rel_err: float):
+        """
+        todo
+        :param task_name:
+        :param output_tensor:
+        :param output_shape:
+        :param sampling_rounds:
+        :param target_median_rel_err:
+        """
+        self.task_name = task_name
+        self.output_tensor = output_tensor
+        self.output_shape = output_shape
+        self.sampling_rounds = sampling_rounds
+        self.target_median_rel_err = target_median_rel_err
+
+    @abstractmethod
+    def _prepare(self, approx: pm.approximations.MeanField):
+        raise NotImplementedError
+
+    @abstractmethod
+    def _draw(self) -> np.ndarray:
+        raise NotImplementedError
+
+    def engage(self, approx: pm.approximations.MeanField):
+        self._prepare(approx)
+        self.output_tensor.set_value(np.zeros(self.output_shape, dtype=types.floatX), borrow=config.borrow_numpy)
+        converged = False
+        median_rel_err = np.nan
+        with tqdm.trange(self.sampling_rounds, desc="({0})".format(self.task_name)) as progress_bar:
+            try:
+                for i_round in progress_bar:
+                    mean_new_samples = np.mean(self._draw(), axis=0)
+                    output_update = (mean_new_samples - self.output_tensor.get_value(borrow=True)) / (i_round + 1)
+                    self.output_tensor.set_value(self.output_tensor.get_value(borrow=True) + output_update,
+                                                 borrow=config.borrow_numpy)
+                    median_rel_err = np.median(
+                        np.abs(output_update / self.output_tensor.get_value(borrow=True)).flatten())
+                    progress_bar.set_description("({0}) median_rel_err: {1:2.6}".format(
+                        self.task_name, median_rel_err))
+                    if median_rel_err < self.target_median_rel_err:
+                        converged = True
+                        _logger.info('{0} converged after {1} rounds with final '
+                                     'median relative error {2:.3}.'.format(self.task_name, i_round + 1,
+                                                                            median_rel_err))
+                        raise StopIteration
+
+            except StopIteration:
+                progress_bar.set_description("({0}) [final] median_rel_err: {1:2.6}".format(
+                    self.task_name, median_rel_err))
+                progress_bar.refresh()
+                raise StopIteration
+
+            except KeyboardInterrupt:
+                progress_bar.close()
+                raise KeyboardInterrupt
+
+            finally:
+                if not converged:
+                    _logger.warning('{0} did not converge (median relative error '
+                                    '= {1:.3}). Increase sampling rounds ({2}). Proceeding...'
+                                    .format(self.task_name, median_rel_err, self.sampling_rounds))
+
+
+class LogCopyNumberEmissionPosteriorSamplingTask(ErrorControlledSamplingTask):
+    """
+    todo
+    """
+    def __init__(self,
+                 model_training_params: ModelTrainingParameters,
+                 calling_config: CopyNumberCallingConfig,
+                 shared_workspace: SharedWorkspace,
+                 log_copy_number_emission_sampler: LogCopyNumberEmissionPosteriorSampler):
+        shape: Tuple[int] = (shared_workspace.num_samples, shared_workspace.num_targets,
+                             calling_config.num_copy_number_states)
+        super().__init__(_log_copy_number_emission_sampling_task_name,
+                         shared_workspace.log_copy_number_emission_stc,
+                         shape,
+                         model_training_params.log_copy_number_emission_sampling_rounds,
+                         model_training_params.log_copy_number_emission_sampling_median_rel_error)
+        self.log_copy_number_emission_sampler = log_copy_number_emission_sampler
+
+    def _prepare(self, approx):
+        self.log_copy_number_emission_sampler.update_approximation(approx)
+
+    def _draw(self):
+        return self.log_copy_number_emission_sampler.draw()
+
+
+# todo
+class DeterminePloidy(InferenceTask):
+    def __init__(self):
+        pass
+
+    def engage(self):
+        pass
 

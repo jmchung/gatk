@@ -3,7 +3,7 @@ import theano as th
 import theano.tensor as tt
 import pymc3 as pm
 from typing import Optional, Tuple
-from . import types
+from .. import types
 
 
 class TheanoForwardBackward:
