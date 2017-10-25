@@ -4,6 +4,7 @@ import theano.tensor as tt
 import pymc3 as pm
 from typing import Optional, Tuple
 from .. import types
+from . import commons
 
 
 class TheanoForwardBackward:
@@ -70,7 +71,7 @@ class TheanoForwardBackward:
 
         if extended_output:
             log_data_likelihood = log_data_likelihood_t[-1]  # in theory, they are all the same
-            update_norm_t = self._get_jensen_shannon_divergence(admixed_log_posterior_tc, old_log_posterior_tc)
+            update_norm_t = commons.get_jensen_shannon_divergence(admixed_log_posterior_tc, old_log_posterior_tc)
             outputs = [update_norm_t, log_data_likelihood]
         else:
             outputs = None
@@ -104,19 +105,13 @@ class TheanoForwardBackward:
                                                 old_log_posterior_tc + np.log(1.0 - self.admixing_rate))
         if extended_output:
             log_data_likelihood = log_data_likelihood_t[-1]  # in theory, they are all the same
-            update_norm_t = self._get_jensen_shannon_divergence(admixed_log_posterior_tc, old_log_posterior_tc)
+            update_norm_t = commons.get_jensen_shannon_divergence(admixed_log_posterior_tc, old_log_posterior_tc)
             outputs = [update_norm_t, log_data_likelihood]
         else:
             outputs = None
         return th.function(inputs=[num_states, log_prior_c, log_trans_tcc, log_emission_tc],
                            outputs=outputs,
                            updates=[(old_log_posterior_tc, admixed_log_posterior_tc)])
-
-    @staticmethod
-    def _get_jensen_shannon_divergence(log_p_1, log_p_2):
-        p_1 = tt.exp(log_p_1)
-        p_2 = tt.exp(log_p_2)
-        return 0.5 * tt.sum((p_1 * (log_p_1 - log_p_2) + p_2 * (log_p_2 - log_p_1)), axis=-1)
 
     @staticmethod
     def _get_symbolic_log_posterior(num_states: tt.iscalar,

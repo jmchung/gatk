@@ -2,7 +2,9 @@
 High priority
 =============
 
-- ploidy model
+- rewrite cohort learning and calling task using the general hybrid inference framework
+
+- [DONE] ploidy model
 
 - fix read depth and reference CN per contig per sample in the denoising model
 

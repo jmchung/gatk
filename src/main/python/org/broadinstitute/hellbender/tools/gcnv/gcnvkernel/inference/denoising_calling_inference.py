@@ -4,19 +4,71 @@ import logging
 import time
 import tqdm
 from pymc3.variational.callbacks import Callback
-from typing import List, Tuple, Callable
+from typing import List, Tuple, Callable, Optional
 from abc import abstractmethod
 
-from org.broadinstitute.hellbender.tools.gcnv.gcnvkernel import config, types
-from org.broadinstitute.hellbender.tools.gcnv.gcnvkernel.utils.rls import NonStationaryLinearRegression
-from org.broadinstitute.hellbender.tools.gcnv.gcnvkernel.models.denoising_calling import DenoisingModel, DenoisingModelConfig, LogCopyNumberEmissionPosteriorSampler,\
-    InitialModelParametersSupplier, SharedWorkspace, ModelTrainingParameters, CopyNumberCallingConfig,\
-    HHMMClassAndCopyNumberCaller
+from .. import config, types
+from ..utils.rls import NonStationaryLinearRegression
+from ..models.denoising_calling_model import DenoisingModel, DenoisingModelConfig,\
+    LogCopyNumberEmissionPosteriorSampler, InitialModelParametersSupplier,\
+    DenoisingCallingWorkspace, CopyNumberCallingConfig, HHMMClassAndCopyNumberCaller
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.INFO)
 
 _log_copy_number_emission_sampling_task_name = "log copy number emission sampling task"
+_log_ploidy_emission_sampling_task_name = "log ploidy emission sampling task"
+
+
+class HybridInferenceParameters:
+    """ Hybrid ADVI (for continuous RVs) + external calling (for discrete RVs) inference parameters """
+    def __init__(self,
+                 learning_rate: float = 0.2,
+                 obj_n_mc: int = 1,
+                 total_grad_norm_constraint: Optional[float] = None,
+                 log_emission_samples_per_round: int = 50,
+                 log_emission_sampling_median_rel_error: float = 5e-3,
+                 log_emission_sampling_rounds: int = 10,
+                 max_advi_iter_first_epoch: int = 500,
+                 max_advi_iter_subsequent_epochs: int = 300,
+                 max_training_epochs: int = 50,
+                 track_model_params: bool = True,
+                 track_model_params_every: int = 10,
+                 convergence_snr_averaging_window: int = 100,
+                 convergence_snr_trigger_threshold: float = 0.1,
+                 convergence_snr_countdown_window: int = 10,
+                 max_calling_iters: int = 10,
+                 caller_update_convergence_threshold: float = 1e-6,
+                 caller_admixing_rate: float = 0.75,
+                 caller_summary_statistics_reducer: Callable[[np.ndarray], float] = np.mean):
+        self.learning_rate = learning_rate
+        self.obj_n_mc = obj_n_mc
+        self.total_grad_norm_constraint = total_grad_norm_constraint
+        self.log_emission_samples_per_round = log_emission_samples_per_round
+        self.log_emission_sampling_median_rel_error = log_emission_sampling_median_rel_error
+        self.log_emission_sampling_rounds = log_emission_sampling_rounds
+        self.max_advi_iter_first_epoch = max_advi_iter_first_epoch
+        self.max_advi_iter_subsequent_epochs = max_advi_iter_subsequent_epochs
+        self.max_training_epochs = max_training_epochs
+        self.track_model_params = track_model_params
+        self.track_model_params_every = track_model_params_every
+        self.convergence_snr_averaging_window = convergence_snr_averaging_window
+        self.convergence_snr_trigger_threshold = convergence_snr_trigger_threshold
+        self.convergence_snr_countdown_window = convergence_snr_countdown_window
+        self.max_calling_iters = max_calling_iters
+        self.caller_update_convergence_threshold = caller_update_convergence_threshold
+        self.caller_admixing_rate = caller_admixing_rate
+        self.caller_summary_statistics_reducer = caller_summary_statistics_reducer
+
+        self._assert_params()
+
+    def _assert_params(self):
+        assert self.learning_rate >= 0
+        assert self.obj_n_mc >= 0
+        assert self.log_emission_samples_per_round >= 1
+        assert self.log_emission_sampling_rounds >= 1
+        assert 0.0 < self.log_emission_sampling_median_rel_error < 1.0
+        # todo (rest)
 
 
 class NoisyELBOConvergenceTracker(Callback):
@@ -121,7 +173,7 @@ class InferenceTask:
         raise NotImplementedError("Core breach imminent!")
 
 
-class LearnAndCall(InferenceTask):
+class CohortLearnAndCall(InferenceTask):
     """
     todo
     """
@@ -133,12 +185,12 @@ class LearnAndCall(InferenceTask):
     def __init__(self,
                  denoising_model_config: DenoisingModelConfig,
                  calling_config: CopyNumberCallingConfig,
-                 model_training_params: ModelTrainingParameters,
-                 shared_workspace: SharedWorkspace,
+                 hybrid_inference_params: HybridInferenceParameters,
+                 shared_workspace: DenoisingCallingWorkspace,
                  initial_param_supplier: InitialModelParametersSupplier):
         self.denoising_model_config = denoising_model_config
         self.calling_config = calling_config
-        self.model_training_params = model_training_params
+        self.hybrid_inference_params = hybrid_inference_params
         self.shared_workspace = shared_workspace
 
         _logger.info("Instantiating the denoising model...")
@@ -146,15 +198,15 @@ class LearnAndCall(InferenceTask):
                                               initial_param_supplier)
 
         _logger.info("Instantiating the copy number caller...")
-        self.copy_number_caller = HHMMClassAndCopyNumberCaller(calling_config, model_training_params, shared_workspace)
+        self.copy_number_caller = HHMMClassAndCopyNumberCaller(calling_config, hybrid_inference_params, shared_workspace)
 
         _logger.info("Instantiating the sampler...")
         self.log_emission_posterior_sampler = LogCopyNumberEmissionPosteriorSampler(
-            denoising_model_config, calling_config, model_training_params, shared_workspace, self.denoising_model)
+            denoising_model_config, calling_config, hybrid_inference_params, shared_workspace, self.denoising_model)
         self.log_emission_posterior_sampling_task = LogCopyNumberEmissionPosteriorSamplingTask(
-            model_training_params, calling_config, shared_workspace, self.log_emission_posterior_sampler)
+            hybrid_inference_params, calling_config, shared_workspace, self.log_emission_posterior_sampler)
 
-        if self.model_training_params.track_model_params:
+        if self.hybrid_inference_params.track_model_params:
             _logger.info("Instantiating the parameter tracker...")
             self.param_tracker = self._create_param_tracker()
         else:
@@ -162,19 +214,19 @@ class LearnAndCall(InferenceTask):
 
         _logger.info("Instantiating the convergence tracker...")
         self.convergence_tracker = NoisyELBOConvergenceTracker(
-            self.model_training_params.convergence_snr_averaging_window,
-            self.model_training_params.convergence_snr_trigger_threshold,
-            self.model_training_params.convergence_snr_countdown_window)
+            self.hybrid_inference_params.convergence_snr_averaging_window,
+            self.hybrid_inference_params.convergence_snr_trigger_threshold,
+            self.hybrid_inference_params.convergence_snr_countdown_window)
 
         _logger.info("Setting up ADVI...")
         with self.denoising_model:
             self.denoising_model_advi = pm.ADVI()
-            self.denoising_model_opt = pm.adamax(learning_rate=self.model_training_params.learning_rate)
+            self.denoising_model_opt = pm.adamax(learning_rate=self.hybrid_inference_params.learning_rate)
             self.denoising_model_step_func = self.denoising_model_advi.objective.step_function(
                 score=True,
                 obj_optimizer=self.denoising_model_opt,
-                total_grad_norm_constraint=self.model_training_params.total_grad_norm_constraint,
-                obj_n_mc=self.model_training_params.obj_n_mc)
+                total_grad_norm_constraint=self.hybrid_inference_params.total_grad_norm_constraint,
+                obj_n_mc=self.hybrid_inference_params.obj_n_mc)
 
         self.elbo_normalization_factor = shared_workspace.num_targets * shared_workspace.num_samples
 
@@ -186,7 +238,7 @@ class LearnAndCall(InferenceTask):
 
     def engage(self):
         try:
-            for i_epoch in range(self.model_training_params.max_training_epochs):
+            for i_epoch in range(self.hybrid_inference_params.max_training_epochs):
                 _logger.info("Starting epoch {0}...".format(i_epoch))
                 self._update_denoising_parameters(i_epoch)
                 self._update_log_copy_number_emission_posterior(i_epoch)
@@ -219,8 +271,8 @@ class LearnAndCall(InferenceTask):
 
     def _update_denoising_parameters(self, i_epoch):
         self._log_start(self.advi_task_name, i_epoch)
-        max_advi_iters = self.model_training_params.max_advi_iter_subsequent_epochs if i_epoch > 0 \
-            else self.model_training_params.max_advi_iter_first_epoch
+        max_advi_iters = self.hybrid_inference_params.max_advi_iter_subsequent_epochs if i_epoch > 0 \
+            else self.hybrid_inference_params.max_advi_iter_first_epoch
         with tqdm.trange(max_advi_iters, desc="(denoising) starting...") as progress_bar:
             try:
                 for i in progress_bar:
@@ -236,7 +288,7 @@ class LearnAndCall(InferenceTask):
                         "{0:2.2}".format(snr) if snr is not None else "N/A",
                         "{0:2.2}".format(eipi) if eipi is not None else "N/A"))
                     if self.param_tracker is not None \
-                            and i % self.model_training_params.track_model_params_every == 0:
+                            and i % self.hybrid_inference_params.track_model_params_every == 0:
                         self.param_tracker(self.denoising_model_advi.approx, loss, i)
 
             except StopIteration as ex:
@@ -265,7 +317,7 @@ class LearnAndCall(InferenceTask):
         converged = False
         copy_number_update_summary = np.nan
         class_update_summary = np.nan
-        with tqdm.trange(self.model_training_params.max_calling_iters,
+        with tqdm.trange(self.hybrid_inference_params.max_calling_iters,
                          desc="({0})".format(self.calling_task_name)) as progress_bar:
             try:
                 for _ in progress_bar:
@@ -273,17 +325,17 @@ class LearnAndCall(InferenceTask):
                     (copy_number_update_s, copy_number_log_likelihoods_s,
                      class_update_summary, class_log_likelihood) = self.copy_number_caller.call(
                         copy_number_update_summary_statistic_reducer=
-                            self.model_training_params.caller_summary_statistics_reducer,
+                            self.hybrid_inference_params.caller_summary_statistics_reducer,
                         class_update_summary_statistic_reducer=
-                            self.model_training_params.caller_summary_statistics_reducer)
-                    copy_number_update_summary = self.model_training_params\
+                            self.hybrid_inference_params.caller_summary_statistics_reducer)
+                    copy_number_update_summary = self.hybrid_inference_params\
                         .caller_summary_statistics_reducer(copy_number_update_s)
                     progress_bar.set_description("({0}) q_c update: {1:2.6}, q_tau update: "
                                                  "{2:2.6}".format(self.calling_task_name,
                                                                   copy_number_update_summary,
                                                                   class_update_summary))
-                    if (copy_number_update_summary < self.model_training_params.copy_number_update_stop_threshold and
-                              class_update_summary < self.model_training_params.class_update_stop_threshold):
+                    if (copy_number_update_summary < self.hybrid_inference_params.caller_update_convergence_threshold
+                        and class_update_summary < self.hybrid_inference_params.caller_update_convergence_threshold):
                         converged = True
                         raise StopIteration
 
@@ -304,7 +356,7 @@ class LearnAndCall(InferenceTask):
             finally:
                 if not converged:
                     _logger.warning('Copy number calling did not converge. Increase maximum rounds ({0})'
-                                    .format(self.model_training_params.max_calling_iters))
+                                    .format(self.hybrid_inference_params.max_calling_iters))
 
 
 class ErrorControlledSamplingTask:
@@ -384,17 +436,17 @@ class LogCopyNumberEmissionPosteriorSamplingTask(ErrorControlledSamplingTask):
     todo
     """
     def __init__(self,
-                 model_training_params: ModelTrainingParameters,
+                 hybrid_inference_params: HybridInferenceParameters,
                  calling_config: CopyNumberCallingConfig,
-                 shared_workspace: SharedWorkspace,
+                 shared_workspace: DenoisingCallingWorkspace,
                  log_copy_number_emission_sampler: LogCopyNumberEmissionPosteriorSampler):
         shape: Tuple[int] = (shared_workspace.num_samples, shared_workspace.num_targets,
                              calling_config.num_copy_number_states)
         super().__init__(_log_copy_number_emission_sampling_task_name,
                          shared_workspace.log_copy_number_emission_stc,
                          shape,
-                         model_training_params.log_copy_number_emission_sampling_rounds,
-                         model_training_params.log_copy_number_emission_sampling_median_rel_error)
+                         hybrid_inference_params.log_emission_sampling_rounds,
+                         hybrid_inference_params.log_emission_sampling_median_rel_error)
         self.log_copy_number_emission_sampler = log_copy_number_emission_sampler
 
     def _prepare(self, approx):
@@ -402,13 +454,4 @@ class LogCopyNumberEmissionPosteriorSamplingTask(ErrorControlledSamplingTask):
 
     def _draw(self):
         return self.log_copy_number_emission_sampler.draw()
-
-
-# todo
-class DeterminePloidy(InferenceTask):
-    def __init__(self):
-        pass
-
-    def engage(self):
-        pass
 

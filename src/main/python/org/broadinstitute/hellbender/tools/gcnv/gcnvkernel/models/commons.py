@@ -1,5 +1,6 @@
 import numpy as np
 import logging
+import theano.tensor as tt
 
 import pymc3.distributions.dist_math as pm_dist_math
 
@@ -54,3 +55,21 @@ def negative_binomial_logp(mu, alpha, value):
     return (pm_dist_math.binomln(value + alpha - 1, value)
             + pm_dist_math.logpow(mu / (mu + alpha), value)
             + pm_dist_math.logpow(alpha / (mu + alpha), alpha))
+
+
+def get_jensen_shannon_divergence(log_p_1, log_p_2):
+    """
+    todo
+    :param log_p_1:
+    :param log_p_2:
+    :return:
+    """
+    p_1 = tt.exp(log_p_1)
+    p_2 = tt.exp(log_p_2)
+    return 0.5 * tt.sum((p_1 * (log_p_1 - log_p_2) + p_2 * (log_p_2 - log_p_1)), axis=-1)
+
+
+def get_hellinger_distance(log_p_1, log_p_2):
+    p_1 = tt.exp(log_p_1)
+    p_2 = tt.exp(log_p_2)
+    return tt.sqrt(tt.sum(tt.sqr(tt.sqrt(p_1) - tt.sqrt(p_2)), axis=-1)) / tt.sqrt(2)

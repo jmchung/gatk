@@ -9,11 +9,12 @@ import logging
 from pymc3 import Model, Normal, Exponential, HalfFlat, Deterministic, Lognormal, DensityDist
 from . import commons
 
-from typing import List, Tuple, Optional, Callable
+from typing import List, Tuple, Callable
 from abc import abstractmethod
 from ..utils.interval import Interval, GCContentAnnotation
 from .hmm import TheanoForwardBackward
 from .. import config, types
+from ..inference.hybrid_inference_base import HybridInferenceParameters
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.INFO)
@@ -122,87 +123,13 @@ class CopyNumberCallingConfig:
                                                                              borrow=config.borrow_numpy)
 
 
-# todo doc
-class ModelTrainingParameters:
-    """ Model training parameters """
-    def __init__(self,
-                 learning_rate: float = 0.2,
-                 obj_n_mc: int = 1,
-                 total_grad_norm_constraint: Optional[float] = None,
-                 log_copy_number_emission_samples_per_round: int = 50,
-                 log_copy_number_emission_sampling_median_rel_error: float = 5e-3,
-                 log_copy_number_emission_sampling_rounds: int = 10,
-                 max_advi_iter_first_epoch: int = 500,
-                 max_advi_iter_subsequent_epochs: int = 300,
-                 max_training_epochs: int = 50,
-                 track_model_params: bool = True,
-                 track_model_params_every: int = 10,
-                 convergence_snr_averaging_window: int = 100,
-                 convergence_snr_trigger_threshold: float = 0.1,
-                 convergence_snr_countdown_window: int = 10,
-                 max_calling_iters: int = 10,
-                 copy_number_update_stop_threshold: float = 1e-6,
-                 class_update_stop_threshold: float = 1e-6,
-                 caller_admixing_rate: float = 0.75,
-                 caller_summary_statistics_reducer: Callable[[np.ndarray], float] = np.mean):
-        """
-        todo
-        :param learning_rate:
-        :param obj_n_mc:
-        :param total_grad_norm_constraint:
-        :param log_copy_number_emission_samples_per_round:
-        :param log_copy_number_emission_sampling_median_rel_error:
-        :param log_copy_number_emission_sampling_rounds:
-        :param max_advi_iter_first_epoch:
-        :param max_advi_iter_subsequent_epochs:
-        :param max_training_epochs:
-        :param track_model_params:
-        :param track_model_params_every:
-        :param convergence_snr_averaging_window:
-        :param convergence_snr_trigger_threshold:
-        :param convergence_snr_countdown_window:
-        :param max_calling_iters:
-        :param copy_number_update_stop_threshold:
-        :param class_update_stop_threshold:
-        """
-        self.learning_rate = learning_rate
-        self.obj_n_mc = obj_n_mc
-        self.total_grad_norm_constraint = total_grad_norm_constraint
-        self.log_copy_number_emission_samples_per_round = log_copy_number_emission_samples_per_round
-        self.log_copy_number_emission_sampling_median_rel_error = log_copy_number_emission_sampling_median_rel_error
-        self.log_copy_number_emission_sampling_rounds = log_copy_number_emission_sampling_rounds
-        self.max_advi_iter_first_epoch = max_advi_iter_first_epoch
-        self.max_advi_iter_subsequent_epochs = max_advi_iter_subsequent_epochs
-        self.max_training_epochs = max_training_epochs
-        self.track_model_params = track_model_params
-        self.track_model_params_every = track_model_params_every
-        self.convergence_snr_averaging_window = convergence_snr_averaging_window
-        self.convergence_snr_trigger_threshold = convergence_snr_trigger_threshold
-        self.convergence_snr_countdown_window = convergence_snr_countdown_window
-        self.max_calling_iters = max_calling_iters
-        self.copy_number_update_stop_threshold = copy_number_update_stop_threshold
-        self.class_update_stop_threshold = class_update_stop_threshold
-        self.caller_admixing_rate = caller_admixing_rate
-        self.caller_summary_statistics_reducer = caller_summary_statistics_reducer
-
-        self._assert_params()
-
-    def _assert_params(self):
-        assert self.learning_rate >= 0
-        assert self.obj_n_mc >= 0
-        assert self.log_copy_number_emission_samples_per_round >= 1
-        assert self.log_copy_number_emission_sampling_rounds >= 1
-        assert 0.0 < self.log_copy_number_emission_sampling_median_rel_error < 1.0
-        # todo (rest)
-
-
 class PosteriorInitializer:
     """ Base class for posterior initializers """
     @staticmethod
     @abstractmethod
     def initialize_posterior(denoising_config: DenoisingModelConfig,
                              calling_config: CopyNumberCallingConfig,
-                             shared_workspace: 'SharedWorkspace') -> None:
+                             shared_workspace: 'DenoisingCallingWorkspace') -> None:
         pass
 
 
@@ -211,7 +138,7 @@ class InitializeToPrior(PosteriorInitializer):
     @staticmethod
     def initialize_posterior(denoising_config: DenoisingModelConfig,
                              calling_config: CopyNumberCallingConfig,
-                             shared_workspace: 'SharedWorkspace'):
+                             shared_workspace: 'DenoisingCallingWorkspace'):
         # class log posterior probs
         log_q_tau_tk = np.tile(np.log(calling_config.class_probs_k.get_value(borrow=True)),
                                (shared_workspace.num_targets, 1))
@@ -223,7 +150,7 @@ class InitializeToPrior(PosteriorInitializer):
         shared_workspace.log_q_c_stc = th.shared(log_q_c_stc, name="log_q_c_stc", borrow=config.borrow_numpy)
 
 
-class SharedWorkspace:
+class DenoisingCallingWorkspace:
     """ This class contains objects (numpy arrays, theano tensors, etc) shared between the denoising model
     and the copy number caller """
     def __init__(self,
@@ -346,7 +273,7 @@ class InitialModelParametersSupplier:
     def __init__(self,
                  denoising_model_config: DenoisingModelConfig,
                  calling_config: CopyNumberCallingConfig,
-                 shared_workspace: SharedWorkspace):
+                 shared_workspace: DenoisingCallingWorkspace):
         self.denoising_model_config = denoising_model_config
         self.calling_config = calling_config
         self.shared_workspace = shared_workspace
@@ -369,7 +296,7 @@ class DefaultInitialModelParametersSupplier(InitialModelParametersSupplier):
     def __init__(self,
                  denoising_model_config: DenoisingModelConfig,
                  calling_config: CopyNumberCallingConfig,
-                 shared_workspace: SharedWorkspace):
+                 shared_workspace: DenoisingCallingWorkspace):
         super().__init__(denoising_model_config, calling_config, shared_workspace)
 
     def get_init_psi_t(self) -> np.ndarray:
@@ -391,7 +318,7 @@ class DenoisingModel(Model):
     def __init__(self,
                  denoising_model_config: DenoisingModelConfig,
                  calling_config: CopyNumberCallingConfig,
-                 shared_workspace: SharedWorkspace,
+                 shared_workspace: DenoisingCallingWorkspace,
                  test_value_supplier: InitialModelParametersSupplier):
         super().__init__()
 
@@ -512,12 +439,12 @@ class LogCopyNumberEmissionPosteriorSampler:
     def __init__(self,
                  denoising_model_config: DenoisingModelConfig,
                  calling_config: CopyNumberCallingConfig,
-                 training_params: ModelTrainingParameters,
-                 shared_workspace: SharedWorkspace,
+                 inference_params: HybridInferenceParameters,
+                 shared_workspace: DenoisingCallingWorkspace,
                  denoising_model: DenoisingModel):
         self.model_config = denoising_model_config
         self.calling_config = calling_config
-        self.training_params = training_params
+        self.inference_params = inference_params
         self.shared_workspace = shared_workspace
         self.denoising_model = denoising_model
         self._simultaneous_log_copy_number_emission_sampler = None
@@ -534,7 +461,7 @@ class LogCopyNumberEmissionPosteriorSampler:
 
     def _get_compiled_simultaneous_log_copy_number_emission_sampler(self, approx: pm.approximations.MeanField):
         """ For a given variational approximation, returns a compiled theano function that draws posterior samples
-        from the log emission """
+        from the log copy number emission """
         depth_bias_st = ((1.0 - self.model_config.mapping_error_rate)
                          * self.denoising_model['depth_s'].dimshuffle(0, 'x')
                          * self.denoising_model['bias_st'])
@@ -579,22 +506,22 @@ class HHMMClassAndCopyNumberCaller:
     """
     def __init__(self,
                  calling_config: CopyNumberCallingConfig,
-                 model_training_params: ModelTrainingParameters,
-                 shared_workspace: SharedWorkspace):
+                 inference_params: HybridInferenceParameters,
+                 shared_workspace: DenoisingCallingWorkspace):
         self.calling_config = calling_config
-        self.model_training_params = model_training_params
+        self.inference_params = inference_params
         self.shared_workspace = shared_workspace
 
         # compiled functions for forward-backward updates of copy number and class posteriors
         self._hmm_q_copy_number = TheanoForwardBackward(shared_workspace.log_q_c_stc, 'slice',
-                                                        self.model_training_params.caller_admixing_rate,
+                                                        self.inference_params.caller_admixing_rate,
                                                         True)
         self._hmm_q_class = TheanoForwardBackward(shared_workspace.log_q_tau_tk, 'whole',
-                                                  self.model_training_params.caller_admixing_rate,
+                                                  self.inference_params.caller_admixing_rate,
                                                   True)
 
         # compiled function for variational update of copy number HMM specs
-        self._update_copy_number_hmm_specs_theano_func = self._get_update_copy_number_hmm_specs_compiled_function()
+        self._update_copy_number_hmm_specs_theano_func = self._get_update_copy_number_hmm_specs_theano_func()
 
         # compiled function for update of class log emission
         self._update_log_class_emission_tk_theano_func = self._get_update_log_class_emission_tk_theano_func()
@@ -658,7 +585,7 @@ class HHMMClassAndCopyNumberCaller:
         return class_update_summary_statistic_reducer(output[0]), float(output[1])
 
     @th.configparser.change_flags(compute_test_value="ignore")
-    def _get_update_copy_number_hmm_specs_compiled_function(self):
+    def _get_update_copy_number_hmm_specs_theano_func(self):
         """ Returns a compiled function that calculates the class-averaged and probability-sum-normalized log copy
         number transition matrix and log copy number prior for the first state, and updates the corresponding
         placeholders in the shared workspace
