@@ -444,8 +444,8 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
                         new ReadsForQNamesFinder(broadcastQNamesMultiMap.value(), nIntervals,
                                 includeMappingLocation, readItr, filter).iterator(), false)
                 .combineByKey(x -> x,
-                                SVFastqUtils::combineLists,
-                                SVFastqUtils::combineLists,
+                                SVUtils::concatenateLists,
+                                SVUtils::concatenateLists,
                                 new HashPartitioner(nIntervals), false, null)
                 .map(localAssemblyHandler::apply)
                 .collect();

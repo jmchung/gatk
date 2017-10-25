@@ -48,15 +48,6 @@ public class SVFastqUtils {
 
     private static final Pattern SA_TAG_ALN_INTERVAL_SEPARATOR_PATTERN = Pattern.compile(HEADER_FIELD_LIST_SEPARATOR_STR);
 
-    /** Concatenate two lists. */
-    public static List<FastqRead> combineLists(final List<FastqRead> list1,
-                                               final List<FastqRead> list2) {
-        final List<FastqRead> result = new ArrayList<>(list1.size() + list2.size());
-        result.addAll(list1);
-        result.addAll(list2);
-        return result;
-    }
-
     public static final class Mapping implements Locatable {
 
         final List<AlignmentInterval> intervals;

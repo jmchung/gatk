@@ -50,6 +50,16 @@ public final class SVUtils {
         return kmers;
     }
 
+    /** Concatenate two lists. */
+    public static <T extends Object> List<T> concatenateLists(final List<T> list1, final List<T> list2) {
+        Utils.validateArg(list1.getClass().equals(list2.getClass()), "Lists to be concatenated are of different classes");
+
+        final List<T> result = new ArrayList<T>(list1.size() + list2.size());
+        result.addAll(list1);
+        result.addAll(list2);
+        return result;
+    }
+
     public static class IteratorFilter<T> implements Iterator<T> {
         private final Iterator<T> itr;
         private final Predicate<T> predicate;
