@@ -2,9 +2,23 @@
 High priority
 =============
 
-- [NOT GOOD] drop psi adjustment term in NB
-    * the term is not necessary; will be captured by mean bias
-    * on the other hand, it ruins the mean bias prior
+- ploidy model
+
+- fix read depth and reference CN per contig per sample in the denoising model
+
+- filter targets
+
+- pre-processor (python side)
+    1. take a cohort (or single-sample) and a list of target intervals
+        * for WGS, intervals must be equally spaced
+        * for WES, intervals must be either equally spaced within each exon or must be baits; the idea is that
+          we want more or less similar counts per interval
+
+    2. calculate counts summary statistics of counts per contig, including sex chromosomes
+        * total_count(sample, contig)
+        * median_count(sample, contig)
+        * mean_count(sample, contig)
+        * std_count(sample, contig)
 
 - multi-threading for forward-backward
 
@@ -13,6 +27,7 @@ High priority
 - read model params from disk
 
 - a case-sample denoising model
+    * refactor the current DenoisingModel?
 
 - a case-sample InferenceTask
 
@@ -24,11 +39,13 @@ High priority
 
 - generate learning plots
 
+
 - port notebook to pycharm
     * [DONE] model and inference
     * pre-processor
 
-- generate simulated data
+- generate realistic simulated data
+    * read depth, mean bias, covariates, etc. from a realistic analysis
     * a fraction of low-coverage targets
     * a fraction of correlated dropouts (bad baits)
     * GC bias
@@ -73,6 +90,10 @@ High priority
     * non-diploid CN in reference (perhaps we can handle this properly instead of blacklisting?)
     * very low mappability
     * regions near centromeres
+
+- [NOT GOOD] drop psi adjustment term in NB
+    * the term is not necessary; will be captured by mean bias
+    * on the other hand, it ruins the mean bias prior
 
 - [DONE] copy number prior inventory and Bayesian update
 

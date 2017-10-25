@@ -34,9 +34,8 @@ def _convert_targets_pd_to_interval_list(targets_pd: pd.DataFrame) -> List[Inter
     interval_list: List[Interval] = []
     columns = [str(x) for x in targets_pd.columns.values]
     assert all([required_column in columns for required_column in std_dtypes_dict.keys()]), "Some columns missing"
-    for contig, start, stop, name in zip(targets_pd['contig'], targets_pd['start'],
-                                         targets_pd['stop'], targets_pd['name']):
-        interval = Interval(contig, start, stop, name)
+    for contig, start, stop in zip(targets_pd['contig'], targets_pd['start'], targets_pd['stop']):
+        interval = Interval(contig, start, stop)
         interval_list.append(interval)
 
     for annotation_key in set(columns).intersection(interval_annotations_dict.keys()):
@@ -68,9 +67,9 @@ def load_read_counts_tsv_file(read_counts_tsv_file: str, read_counts_data_type=n
 
     targets_pd = counts_pd[list(std_dtypes_dict.keys())]
     targets_interval_list = _convert_targets_pd_to_interval_list(targets_pd)
-    counts_array_st: np.ndarray = counts_pd.loc[:, sample_names].as_matrix().T
+    n_st: np.ndarray = counts_pd.loc[:, sample_names].as_matrix().T
 
-    return counts_array_st, sample_names, targets_interval_list
+    return n_st, sample_names, targets_interval_list
 
 
 def load_targets_tsv_file(targets_tsv_file: str) -> List[Interval]:
@@ -79,26 +78,35 @@ def load_targets_tsv_file(targets_tsv_file: str) -> List[Interval]:
     return _convert_targets_pd_to_interval_list(targets_pd)
 
 
+# todo requires a unit test
 def load_data(read_counts_tsv_file: str, targets_tsv_file: Optional[str], **kwargs)\
         -> Tuple[np.ndarray, List[str], List[Interval]]:
-    """ Loads read count data and optionally a (annotated) targets file.
+    """ Loads read count data and optionally a (annotated) targets file. Returns the count matrix on
+    mutual targets. Targets will be sorted based on their key as the comparator -- see Interval.get_key()
+
     :param read_counts_tsv_file:
     :param targets_tsv_file:
     :param kwargs: (see load_read_counts_tsv_file)
     :return: a tuple of counts, sample names, and a list of intervals
     """
     _logger.info("Loading read counts file...")
-    counts_array_st, sample_names, counts_targets_interval_list = load_read_counts_tsv_file(read_counts_tsv_file,
-                                                                                            **kwargs)
-    out_targets_interval_list = counts_targets_interval_list
+    n_st, sample_names, counts_targets_interval_list = load_read_counts_tsv_file(read_counts_tsv_file, **kwargs)
+
+    mutual_targets_interval_set = set(counts_targets_interval_list)
     if targets_tsv_file is not None:
         _logger.info("Targets file provided; loading targets file...")
         loaded_targets_interval_list = load_targets_tsv_file(targets_tsv_file)
-        counts_targets_interval_set = set(counts_targets_interval_list)
-        mutual_targets_interval_list = [interval for interval in loaded_targets_interval_list
-                                        if interval in counts_targets_interval_set]
-        assert len(mutual_targets_interval_list) == len(counts_targets_interval_list),\
-            "Some of the targets in the read counts file are absent in the targets file"
-        out_targets_interval_list = mutual_targets_interval_list
+        mutual_targets_interval_set = set(loaded_targets_interval_list).intersection(set(counts_targets_interval_list))
+        assert len(mutual_targets_interval_set) == 0,\
+            "No mutual targets between the counts .tsv file and the targets .tsv file; cannot continue"
 
-    return counts_array_st, sample_names, out_targets_interval_list
+    _logger.info("Sorting target intervals...")
+    sorted_mutual_targets_interval_list = sorted(mutual_targets_interval_set)
+    counts_target_to_index_dict = {counts_targets_interval_list[ti].get_key(): ti
+                                   for ti in range(len(counts_targets_interval_list))}
+    index_in_counts_targets_interval_list = [counts_target_to_index_dict[target.get_key()]
+                                             for target in sorted_mutual_targets_interval_list]
+    out_n_st = n_st[:, index_in_counts_targets_interval_list]
+    out_targets_interval_list = sorted_mutual_targets_interval_list
+
+    return out_n_st, sample_names, out_targets_interval_list

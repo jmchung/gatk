@@ -46,9 +46,10 @@ class NoisyELBOConvergenceTracker(Callback):
     def __call__(self, approx, loss, i):
         self._lin_reg.add_observation(loss)
         self._n_obs += 1
-        self.elpi = -self._lin_reg.get_slope()
+        self.elpi = self._lin_reg.get_slope()
         self.variance = self._lin_reg.get_variance()
         if self.elpi is not None and self.variance is not None:
+            self.elpi *= -1
             self.drift = np.abs(self.elpi) * self.window
             self.snr = self.drift / np.sqrt(2 * self.variance)
             if self.snr < self.snr_stop_trigger_threshold:

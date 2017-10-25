@@ -6,8 +6,10 @@ import scipy.sparse as sp
 import pymc3 as pm
 import logging
 
-from pymc3 import Model, Normal, Exponential, NegativeBinomial, HalfFlat, Deterministic, Lognormal, DensityDist
-from typing import List, Tuple, Optional, Callable
+from pymc3 import Model, Normal, Exponential, Gamma, HalfFlat, Deterministic, Lognormal, DensityDist, Bound
+import pymc3.distributions.dist_math as pm_dist_math
+
+from typing import List, Tuple, Dict, Set, Optional, Callable
 from abc import abstractmethod
 from .utils.interval import Interval, GCContentAnnotation
 from .hmm import TheanoForwardBackward
@@ -15,6 +17,51 @@ from . import config, types
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.INFO)
+
+
+def _get_normalized_prob_vector(prob_vector: np.ndarray, prob_sum_tol: float) -> np.ndarray:
+    """
+    todo
+    :param prob_vector:
+    :param prob_sum_tol:
+    :return:
+    """
+    assert all(prob_vector >= 0), "probabilities must be non-negative"
+    prob_sum = np.sum(prob_vector)
+    if np.abs(prob_sum - 1.0) < prob_sum_tol:
+        return prob_vector
+    else:
+        _logger.warning("The given probability vector ({0}) was not normalized to unity within the provided "
+                        "tolerance ({1}); sum = {2}; normalizing and proceeding.".format(
+            prob_vector, prob_sum_tol, prob_sum))
+        return prob_vector / prob_sum
+
+
+def _poisson_logp(mu, value):
+    """
+    Poisson log probability
+    :param mu: poisson mean
+    :param value: observed
+    :return: theano tensor
+    """
+    log_prob = pm_dist_math.bound(pm_dist_math.logpow(mu, value) - pm_dist_math.factln(value) - mu,
+                                  mu >= 0, value >= 0)
+    return tt.switch(tt.eq(mu, 0) * tt.eq(value, 0), 0, log_prob)  # Return zero when mu and value are both zero
+
+
+def _negative_binomial_logp(mu, alpha, value):
+    """
+    Negative binomial log probability
+    :param mu: mean
+    :param alpha: inverse over-dispersion
+    :param value: observed
+    :return: theano tensor
+    """
+    log_prob = pm_dist_math.bound(pm_dist_math.binomln(value + alpha - 1, value)
+                                  + pm_dist_math.logpow(mu / (mu + alpha), value)
+                                  + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
+                                  value >= 0, mu > 0, alpha > 0)
+    return log_prob
 
 
 class DenoisingModelConfig:
@@ -76,8 +123,7 @@ class CopyNumberCallingConfig:
                  pi_kc: np.ndarray,
                  class_probs_k: np.ndarray,
                  class_coherence_k: np.ndarray,
-                 copy_number_coherence_c: np.ndarray,
-                 prob_sum_tol: float = 1e-10):
+                 copy_number_coherence_c: np.ndarray):
         """
         :param pi_kc: each row represents a copy number class
         :param class_probs_k: prior probabilities for choosing a class
@@ -90,9 +136,9 @@ class CopyNumberCallingConfig:
         num_copy_number_classes: int = _pi_kc.shape[0]
         num_copy_number_states: int = _pi_kc.shape[1]
 
-        _class_probs_k = self._get_normalized_prob_vector(
+        _class_probs_k = _get_normalized_prob_vector(
             np.asarray(class_probs_k, dtype=types.floatX).reshape((num_copy_number_classes,)),
-            prob_sum_tol)
+            config.prob_sum_tol)
 
         _class_coherence_k: np.ndarray = np.asarray(class_coherence_k, dtype=types.floatX).reshape(
             (num_copy_number_classes,))
@@ -101,7 +147,7 @@ class CopyNumberCallingConfig:
             (num_copy_number_states,))
 
         for k in range(num_copy_number_classes):
-            _pi_kc[k, :] = self._get_normalized_prob_vector(_pi_kc[k, :], prob_sum_tol)
+            _pi_kc[k, :] = _get_normalized_prob_vector(_pi_kc[k, :], config.prob_sum_tol)
 
         # calculate copy number prior mean
         _pi_c = np.dot(_pi_kc.T, _class_probs_k).reshape((num_copy_number_states,))
@@ -119,17 +165,6 @@ class CopyNumberCallingConfig:
         self.copy_number_coherence_c: types.TensorSharedVariable = th.shared(_copy_number_coherence_c,
                                                                              name="copy_number_coherence_c",
                                                                              borrow=config.borrow_numpy)
-
-    @staticmethod
-    def _get_normalized_prob_vector(prob_vector: np.ndarray, prob_sum_tol: float) -> np.ndarray:
-        assert all(prob_vector >= 0), "probabilities must be non-negative"
-        prob_sum = np.sum(prob_vector)
-        if np.abs(prob_sum - 1.0) < prob_sum_tol:
-            return prob_vector
-        else:
-            _logger.warning("The given probability vector was not normalized to unity within the provided "
-                            "tolerance ({0}); vector = {1}".format(prob_sum_tol, prob_sum))
-            return prob_vector / prob_sum
 
 
 # todo doc
@@ -483,9 +518,9 @@ class DenoisingModel(Model):
             eps_st = (mapping_error_rate * depth_s).dimshuffle(0, 'x')
             mu_adj_fact_st = tt.exp(0.5 * psi_t).dimshuffle('x', 0)
             alpha_st = tt.inv((tt.exp(psi_t) - 1.0)).dimshuffle('x', 0)
-            log_copy_number_emission_stc = tt.stack([NegativeBinomial.dist(mu=c * mu_adj_fact_st * depth_bias_st + eps_st,
-                                                               alpha=alpha_st).logp(n_st)
-                                         for c in range(num_copy_number_states)]).dimshuffle(1, 2, 0)
+            log_copy_number_emission_stc = tt.stack([_negative_binomial_logp(
+                c * mu_adj_fact_st * depth_bias_st + eps_st, alpha_st, n_st)
+                for c in range(num_copy_number_states)]).dimshuffle(1, 2, 0)
             q_c_stc = tt.exp(log_q_c_stc)
             return tt.sum(q_c_stc * (log_copy_number_emission_stc - log_q_c_stc))
 
@@ -509,9 +544,8 @@ class DenoisingModel(Model):
             mu_adj_fact_st = tt.exp(0.5 * psi_t).dimshuffle('x', 0)
             alpha_st = tt.inv((tt.exp(psi_t) - 1.0)).dimshuffle('x', 0)
             c_argmax_st = tt.argmax(log_q_c_stc, axis=2)
-            log_copy_number_emission_st = NegativeBinomial.dist(
-                mu=c_argmax_st * mu_adj_fact_st * depth_bias_st + eps_st,
-                alpha=alpha_st).logp(n_st)
+            log_copy_number_emission_st = _negative_binomial_logp(
+                c_argmax_st * mu_adj_fact_st * depth_bias_st + eps_st, alpha_st, n_st)
             return tt.sum(log_copy_number_emission_st)
 
         return _eval_logp
@@ -552,9 +586,10 @@ class LogEmissionPosteriorSampler:
         eps_st = self.model_config.mapping_error_rate * self.denoising_model['depth_s'].dimshuffle(0, 'x')
         mu_adj_fact_st = tt.exp(0.5 * self.denoising_model['psi_t']).dimshuffle('x', 0)
         alpha_st = tt.inv((tt.exp(self.denoising_model['psi_t']) - 1.0)).dimshuffle('x', 0)
-        log_copy_number_emission_stc = tt.stack([NegativeBinomial.dist(
-            mu=c * mu_adj_fact_st * depth_bias_st + eps_st, alpha=alpha_st).logp(self.shared_workspace.n_st)
-                                     for c in range(self.calling_config.num_copy_number_states)]).dimshuffle(1, 2, 0)
+        log_copy_number_emission_stc = tt.stack([_negative_binomial_logp(
+            c * mu_adj_fact_st * depth_bias_st + eps_st,
+            alpha_st, self.shared_workspace.n_st)
+            for c in range(self.calling_config.num_copy_number_states)]).dimshuffle(1, 2, 0)
         log_copy_number_emission_stc_sampler = approx.sample_node(
             log_copy_number_emission_stc, size=self.training_params.log_copy_number_emission_samples_per_round)
         return th.function(inputs=[], outputs=log_copy_number_emission_stc_sampler)
@@ -740,3 +775,142 @@ class HHMMClassAndCopyNumberCaller:
 
         return th.function(inputs=[], outputs=[], updates=[
             (self.shared_workspace.log_class_emission_tk, log_class_emission_tk)])
+
+
+class ContigPloidyDeterminationConfig:
+    """
+    todo
+
+    mention that good priors are extremely important
+    """
+    def __init__(self,
+                 contig_prior_ploidy_map: Dict[str, np.ndarray],
+                 mean_bias_mu: float = 1.0,
+                 mean_bias_sd: float = 1e-2,
+                 mapping_error_rate: float = 1e-2):
+        self.mean_bias_mu = mean_bias_mu
+        self.mean_bias_sd = mean_bias_sd
+        self.mapping_error_rate = mapping_error_rate
+        self.contig_prior_ploidy_map, self.num_ploidy_states = self._get_validated_contig_prior_ploidy_map(
+            contig_prior_ploidy_map)
+        self.contig_set = set(contig_prior_ploidy_map.keys())
+
+    @staticmethod
+    def _get_validated_contig_prior_ploidy_map(given_contig_prior_ploidy_map: Dict[str, np.ndarray]):
+        given_contigs = set(given_contig_prior_ploidy_map.keys())
+        num_ploidy_states = 0
+        for contig in given_contigs:
+            num_ploidy_states = max(num_ploidy_states, given_contig_prior_ploidy_map[contig].size)
+        validated_contig_prior_ploidy_map: Dict[str, np.ndarray] = dict()
+        for contig in given_contigs:
+            validated_prior = _get_normalized_prob_vector(given_contig_prior_ploidy_map[contig].flatten(),
+                                                          config.prob_sum_tol)
+            padded_validated_prior = np.zeros((num_ploidy_states,), dtype=types.floatX)
+            padded_validated_prior[:validated_prior.size] = validated_prior[:]
+            validated_contig_prior_ploidy_map[contig] = padded_validated_prior
+        return validated_contig_prior_ploidy_map, num_ploidy_states
+
+
+class ContigPloidyDeterminationWorkspace:
+    def __init__(self,
+                 ploidy_config: ContigPloidyDeterminationConfig,
+                 n_st: np.ndarray,
+                 targets_interval_list: List[Interval]):
+        self.targets_interval_list = targets_interval_list
+        self.ploidy_config = ploidy_config
+        self.contig_set = self._get_contig_set_from_interval_list(targets_interval_list)
+        self.contig_list = sorted(list(self.contig_set))
+        self.num_contigs = len(self.contig_list)
+        self.num_samples: int = n_st.shape[0]
+        assert all([contig in ploidy_config.contig_set for contig in self.contig_set]),\
+            "Some contigs do not have ploidy priors; cannot continue."
+
+        self.contig_target_indices: Dict[str, List[int]] =\
+            {contig: [ti for ti in range(len(targets_interval_list))
+                      if targets_interval_list[ti].contig == contig]
+             for contig in self.contig_set}
+
+        # number of targets per contig
+        t_j = np.asarray([len(self.contig_target_indices[self.contig_list[j]])
+                          for j in range(self.num_contigs)], dtype=np.int)
+        self.t_j: types.TensorSharedVariable = th.shared(t_j, name='t_j', borrow=config.borrow_numpy)
+
+        # total count per contig
+        n_sj = np.zeros((self.num_samples, self.num_contigs), dtype=np.int)
+        for j in range(self.num_contigs):
+            n_sj[:, j] = np.sum(n_st[:, self.contig_target_indices[self.contig_list[j]]], axis=1)
+        self.n_sj: types.TensorSharedVariable = th.shared(n_sj, name='n_sj', borrow=config.borrow_numpy)
+
+        # total count per sample
+        n_s = np.sum(self.n_sj, axis=1)
+        self.n_s: types.TensorSharedVariable = th.shared(n_s, name='n_s', borrow=config.borrow_numpy)
+
+        # integer ploidy values
+        int_ploidy_values_k = np.arange(0, ploidy_config.num_ploidy_states, dtype=np.int)
+        self.int_ploidy_values_k = th.shared(int_ploidy_values_k, name='int_ploidy_values_k',
+                                             borrow=config.borrow_numpy)
+
+        # ploidy priors
+        p_kappa_jk = np.zeros((self.num_contigs, self.ploidy_config.num_ploidy_states), dtype=types.floatX)
+        for j in range(self.num_contigs):
+            p_kappa_jk[j, :] = ploidy_config.contig_prior_ploidy_map[self.contig_list[j]][:]
+        log_p_kappa_jk = np.log(p_kappa_jk)
+        self.log_p_kappa_jk: types.TensorSharedVariable = th.shared(log_p_kappa_jk, name='log_p_kappa_jk',
+                                                                    borrow=config.borrow_numpy)
+
+        # ploidy log posteriors (placeholder)
+        log_q_kappa_sjk = np.tile(log_p_kappa_jk, (self.num_samples, 1, 1))
+        self.log_q_kappa_sjk: types.TensorSharedVariable = th.shared(
+            log_q_kappa_sjk, name='log_q_kappa_sjk', borrow=config.borrow_numpy)
+
+        # mean ploidy (placeholder)
+        mean_ploidy_j = np.dot(p_kappa_jk, int_ploidy_values_k)
+        mean_ploidy_sj = np.tile(mean_ploidy_j, (self.num_samples, 1))
+        self.mean_ploidy_sj: types.TensorSharedVariable = th.shared(
+            mean_ploidy_sj, name='mean_ploidy_sj', borrow=config.borrow_numpy)
+
+        # exclusion mask
+        contig_exclusion_mask_jj = np.ones((self.num_contigs, self.num_contigs), dtype=np.int)\
+                                   - np.eye(self.num_contigs, dtype=np.int)
+        self.contig_exclusion_mask_jj = th.shared(contig_exclusion_mask_jj, name='contig_exclusion_mask_jj')
+
+    @staticmethod
+    def _get_contig_set_from_interval_list(targets_interval_list: List[Interval]) -> Set[str]:
+        return {target.contig for target in targets_interval_list}
+
+
+class PloidyDeterminationBiasModel(Model):
+    PositiveNormal = Bound(Normal, lower=0)  # how cool is this?
+
+    def __init__(self,
+                 ploidy_config: ContigPloidyDeterminationConfig,
+                 ploidy_workspace: ContigPloidyDeterminationWorkspace):
+        super().__init__()
+        mean_ploidy_sj = ploidy_workspace.mean_ploidy_sj
+        t_j = ploidy_workspace.t_j
+        contig_exclusion_mask_jj = ploidy_workspace.contig_exclusion_mask_jj
+        n_s = ploidy_workspace.n_s
+        n_sj = ploidy_workspace.n_sj
+        kappa_k = ploidy_workspace.int_ploidy_values_k
+        q_kappa_sjk = tt.exp(ploidy_workspace.log_q_kappa_sjk)
+
+        mean_bias_j = self.PositiveNormal(name='mean_bias_j',
+                                          mu=ploidy_config.mean_bias_mu,
+                                          sd=ploidy_config.mean_bias_sd,
+                                          shape=ploidy_workspace.num_contigs)
+
+        gamma_sj = mean_ploidy_sj * t_j.dimshuffle('x', 0) * mean_bias_j.dimshuffle('x', 0)
+
+        # gamma_rest_sj \equiv sum_{j' \neq j} gamma_sj
+        gamma_rest_sj = tt.dot(gamma_sj, contig_exclusion_mask_jj)
+
+        # modeling per-contig counts as poisson
+        lam_num_sjk = n_s.dimshuffle(0, 'x', 'x') * t_j.dimshuffle('x', 0, 'x') * kappa_k.dimshuffle('x', 'x', 0)
+        lam_den_sjk = gamma_rest_sj.dimshuffle(0, 1, 'x') + lam_num_sjk
+        lam_sjk = lam_num_sjk / lam_den_sjk
+
+        def _get_contig_counts_logp(n_sj):
+            logp_sjk = _poisson_logp(lam_sjk, n_sj.dimshuffle(0, 1, 'x'))
+            return tt.sum(q_kappa_sjk * logp_sjk)
+
+        DensityDist(name='n_sj_obs', logp=_get_contig_counts_logp, observed=n_sj)

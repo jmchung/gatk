@@ -1,50 +1,36 @@
 import numpy as np
 from abc import abstractmethod
 from typing import Dict
-
-
-class IntervalAnnotation:
-    def __init__(self, raw_value):
-        self.parsed_value = self.parse(raw_value)
-
-    def get_value(self):
-        return self.parsed_value
-
-    @staticmethod
-    @abstractmethod
-    def parse(raw_value):
-        pass
-
-    @staticmethod
-    @abstractmethod
-    def get_key() -> str:
-        pass
+from copy import deepcopy
 
 
 class Interval:
     """ This class represents a genomic interval along with annotations
+    Note:
+        Equality test and hashing is based on get_key() which excludes target name
     """
-    def __init__(self, contig: str, start: int, stop: int, name: str):
+    def __init__(self, contig: str, start: int, stop: int):
         self.contig: str = str(contig)
         self.start: int = int(start)
         self.stop: int = int(stop)
-        if name is None:
-            self.name: str = contig + "_" + str(start) + "_" + str(stop)
-        else:
-            self.name: str = str(name)
-        self._key = (self.contig, self.start, self.stop)
         self.annotations = dict()
+        self._hash = hash(self.get_key())
 
-    def add_annotation(self, key: str, annotation: IntervalAnnotation):
+    def get_key(self):
+        return self.contig, self.start, self.stop
+
+    def add_annotation(self, key: str, annotation: 'IntervalAnnotation'):
         self.annotations[key] = annotation
 
     def get_annotation(self, key: str):
         return self.annotations[key].get_value()
 
-    def get_padded(self, padding: int):
+    def get_padded(self, padding: int, keep_annotations=False) -> 'Interval':
         assert padding >= 0, "padding must be >= 0"
-        return Interval(self.contig, self.start - padding, self.stop + padding,
-                        self.name + "_symm_pad_" + str(padding))
+        padded_interval = Interval(self.contig, self.start - padding, self.stop + padding)
+        if keep_annotations:
+            padded_interval.annotations = deepcopy(self.annotations)
+        return padded_interval
 
     def overlaps_with(self, other):
         assert isinstance(other, Interval), "the other object is not an interval!"
@@ -66,19 +52,49 @@ class Interval:
             return np.abs(self.get_midpoint() - other.get_midpoint())
 
     def __eq__(self, other):
-        return self._key == other._key
+        return self.get_key() == other.get_key()
+
+    def __ne__(self, other):
+        return self.get_key() != other.get_key()
 
     def __lt__(self, other):
-        return self._key.__lt__(other._key)
+        return self.get_key() < other.get_key()
+
+    def __gt__(self, other):
+        return self.get_key() > other.get_key()
+
+    def __le__(self, other):
+        return self.get_key() <= other.get_key()
+
+    def __ge__(self, other):
+        return self.get_key() >= other.get_key()
 
     def __hash__(self):
-        return hash(self._key)
+        return self._hash
 
     def __str__(self):
-        return str(self._key)
+        return str(self.get_key())
 
     def __repr__(self):
         return self.__str__()
+
+
+class IntervalAnnotation:
+    def __init__(self, raw_value):
+        self.parsed_value = self.parse(raw_value)
+
+    def get_value(self):
+        return self.parsed_value
+
+    @staticmethod
+    @abstractmethod
+    def parse(raw_value):
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def get_key() -> str:
+        pass
 
 
 class GCContentAnnotation(IntervalAnnotation):
@@ -98,10 +114,28 @@ class GCContentAnnotation(IntervalAnnotation):
     def get_key():
         return "GC_CONTENT"
 
+
+class NameAnnotation(IntervalAnnotation):
+    """ This class represents name annotation that can be added to an Interval
+    """
+    def __init__(self, name: str):
+        super().__init__(name)
+
+    @staticmethod
+    def parse(raw_value):
+        return str(raw_value)
+
+    @staticmethod
+    def get_key():
+        return "name"
+
+
 interval_annotations_dict: Dict[str, IntervalAnnotation] = {
-    GCContentAnnotation.get_key(): GCContentAnnotation
+    GCContentAnnotation.get_key(): GCContentAnnotation,
+    NameAnnotation.get_key(): NameAnnotation
 }
 
 interval_annotations_dtypes: Dict[str, object] = {
-    GCContentAnnotation.get_key(): float
+    GCContentAnnotation.get_key(): float,
+    NameAnnotation.get_key(): str
 }
