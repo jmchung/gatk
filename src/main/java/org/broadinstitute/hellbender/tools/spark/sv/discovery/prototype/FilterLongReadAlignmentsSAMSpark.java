@@ -24,7 +24,6 @@ import org.broadinstitute.hellbender.tools.spark.sv.discovery.AlignedContig;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.AlignmentInterval;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.ChimericAlignment;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.GappedAlignmentSplitter;
-import org.broadinstitute.hellbender.tools.spark.sv.utils.SVFileUtils;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVUtils;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SvCigarUtils;
 import org.broadinstitute.hellbender.utils.Utils;
@@ -89,22 +88,28 @@ public final class FilterLongReadAlignmentsSAMSpark extends GATKSparkTool {
     @Override
     protected void runTool(final JavaSparkContext ctx) {
 
-        final JavaRDD<GATKRead> reads = getReads();
-        final SAMFileHeader header = getHeaderForReads();
+        try {
+            final JavaRDD<GATKRead> reads = getReads();
+            final SAMFileHeader header = getHeaderForReads();
 
-        SVFileUtils.writeLinesToSingleFile(
-                filterByScore(reads, header, nonCanonicalContigNamesFile, localLogger)
-                        .sortBy(tig -> tig.contigName, true, reads.getNumPartitions()/100) // num partition is purely guess
-                        .mapToPair(contig -> new Tuple2<>(contig.contigName,
-                                contig.alignmentIntervals.stream().map(AlignmentInterval::toPackedString).collect(Collectors.toList())))
-                        .map(FilterLongReadAlignmentsSAMSpark::formatContigInfo).collect().iterator(),
-                outputFilePrefix + "_newFiltering.ai");
+            Files.write(Paths.get(outputFilePrefix + "_newFiltering.ai"),
+                    () -> filterByScore(reads, header, nonCanonicalContigNamesFile, localLogger)
+                            .sortBy(tig -> tig.contigName, true, reads.getNumPartitions() / 100) // num partition is purely guess
+                            .mapToPair(contig -> new Tuple2<>(contig.contigName,
+                                    contig.alignmentIntervals.stream().map(AlignmentInterval::toPackedString).collect(Collectors.toList())))
+                            .map(FilterLongReadAlignmentsSAMSpark::formatContigInfo)
+                            .map(s -> (CharSequence)s).collect().iterator()
+            );
 
-        if (runOldFilteringToo) {
-            SVFileUtils.writeLinesToSingleFile(
-                    oldWayOfFiltering(reads, header, localLogger).map(FilterLongReadAlignmentsSAMSpark::formatContigInfo)
-                    .collect().iterator(),
-                    outputFilePrefix + "_oldFiltering.ai");
+            if (runOldFilteringToo) {
+                Files.write(Paths.get(outputFilePrefix + "_oldFiltering.ai"),
+                        () -> oldWayOfFiltering(reads, header, localLogger)
+                                .map(FilterLongReadAlignmentsSAMSpark::formatContigInfo)
+                                .map(s -> (CharSequence)s).collect().iterator()
+                );
+            }
+        } catch (final IOException ioe) {
+            throw new GATKException("Could not save filtering results to file", ioe);
         }
     }
 

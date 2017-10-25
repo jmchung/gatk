@@ -3,6 +3,7 @@ package org.broadinstitute.hellbender.tools.spark.sv.evidence;
 import com.google.common.annotations.VisibleForTesting;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMSequenceDictionary;
+import org.apache.spark.HashPartitioner;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.broadinstitute.barclay.argparser.Argument;
@@ -15,7 +16,10 @@ import org.broadinstitute.hellbender.engine.spark.GATKSparkTool;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDiscoveryArgumentCollection;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.*;
+import org.broadinstitute.hellbender.tools.spark.utils.HopscotchMap;
+import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.gcs.BucketUtils;
+import scala.Tuple2;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -32,6 +36,9 @@ import java.util.List;
         programGroup = StructuralVariationSparkProgramGroup.class)
 @BetaFeature
 public final class FindBadGenomicKmersSpark extends GATKSparkTool {
+    public static final int REF_RECORD_LEN = 10000;
+    // assuming we have ~1Gb/core, we can process ~1M kmers per partition
+    public static final int REF_RECORDS_PER_PARTITION = 1024*1024 / REF_RECORD_LEN;
     private static final long serialVersionUID = 1L;
     @VisibleForTesting static final int MAX_KMER_FREQ = 3;
 
@@ -66,7 +73,7 @@ public final class FindBadGenomicKmersSpark extends GATKSparkTool {
             killList = SVUtils.uniquify(killList, processFasta(kSize, maxDUSTScore, highCopyFastaFilename));
         }
 
-        SVFileUtils.writeKmersFile(kSize, outputFile, killList);
+        SVFileUtils.writeKmersFile(outputFile, kSize, killList);
     }
 
     /** Find high copy number kmers in the reference sequence */
@@ -77,11 +84,63 @@ public final class FindBadGenomicKmersSpark extends GATKSparkTool {
                                              final ReferenceMultiSource ref,
                                              final SAMSequenceDictionary readsDict ) {
         // Generate reference sequence RDD.
-        final JavaRDD<byte[]> refRDD = SVReferenceUtils.getRefRDD(ctx, kSize, ref, readsDict,
-                                                        SVReferenceUtils.REF_RECORD_LEN, SVReferenceUtils.REF_RECORDS_PER_PARTITION);
+        final SAMSequenceDictionary dict = ref.getReferenceSequenceDictionary(readsDict);
+        if ( dict == null ) throw new GATKException("No reference dictionary available");
+        final JavaRDD<byte[]> refRDD = SVReferenceUtils.getReferenceBasesRDD(ctx, kSize, ref, dict,
+                                                        REF_RECORD_LEN, REF_RECORDS_PER_PARTITION);
 
         // Find the high copy number kmers
-        return SVReferenceUtils.processRefRDD(kSize, maxDUSTScore, MAX_KMER_FREQ, refRDD);
+        return collectUbiquitousKmersInReference(kSize, maxDUSTScore, MAX_KMER_FREQ, refRDD);
+    }
+
+    /**
+     * Do a map/reduce on an RDD of genomic sequences:
+     * Kmerize, mapping to a pair <kmer,1>, reduce by summing values by key, filter out <kmer,N> where
+     * N <= MAX_KMER_FREQ, and collect the high frequency kmers back in the driver.
+     */
+    public static List<SVKmer> collectUbiquitousKmersInReference(final int kSize,
+                                                                 final int maxDUSTScore,
+                                                                 final int maxKmerFreq,
+                                                                 final JavaRDD<byte[]> refRDD) {
+        Utils.nonNull(refRDD, "reference bases RDD is null");
+        Utils.validateArg(kSize > 0, "provided kmer size is non positive");
+        Utils.validateArg(maxDUSTScore > 0, "provided DUST filter score is non positive");
+        Utils.validateArg(maxKmerFreq > 0, "provided kmer frequency is non positive");
+
+        final int nPartitions = refRDD.getNumPartitions();
+        final int hashSize = 2*REF_RECORDS_PER_PARTITION;
+        return refRDD
+                .mapPartitions(seqItr -> {
+                    final HopscotchMap<SVKmer, Integer, KmerAndCount> kmerCounts = new HopscotchMap<>(hashSize);
+                    while ( seqItr.hasNext() ) {
+                        final byte[] seq = seqItr.next();
+                        SVDUSTFilteredKmerizer.canonicalStream(seq, kSize, maxDUSTScore, new SVKmerLong())
+                                .forEach(kmer -> {
+                                    final KmerAndCount entry = kmerCounts.find(kmer);
+                                    if ( entry == null ) kmerCounts.add(new KmerAndCount((SVKmerLong)kmer));
+                                    else entry.bumpCount();
+                                });
+                    }
+                    return kmerCounts.iterator();
+                })
+                .mapToPair(entry -> new Tuple2<>(entry.getKey(), entry.getValue()))
+                .partitionBy(new HashPartitioner(nPartitions))
+                .mapPartitions(pairItr -> {
+                    final HopscotchMap<SVKmer, Integer, KmerAndCount> kmerCounts =
+                            new HopscotchMap<>(hashSize);
+                    while ( pairItr.hasNext() ) {
+                        final Tuple2<SVKmer, Integer> pair = pairItr.next();
+                        final SVKmer kmer = pair._1();
+                        final int count = pair._2();
+                        KmerAndCount entry = kmerCounts.find(kmer);
+                        if ( entry == null ) kmerCounts.add(new KmerAndCount((SVKmerLong)kmer, count));
+                        else entry.bumpCount(count);
+                    }
+                    return kmerCounts.stream()
+                            .filter(kmerAndCount -> kmerAndCount.grabCount() > maxKmerFreq)
+                            .map(KmerAndCount::getKey).iterator();
+                })
+                .collect();
     }
 
     @VisibleForTesting static List<SVKmer> processFasta( final int kSize,

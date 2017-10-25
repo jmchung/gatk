@@ -2,9 +2,9 @@ package org.broadinstitute.hellbender.tools.spark.sv.integration;
 
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
+import org.apache.commons.io.FileUtils;
 import org.broadinstitute.hellbender.CommandLineProgramTest;
 import org.broadinstitute.hellbender.engine.ReadsDataSource;
-import org.broadinstitute.hellbender.tools.spark.sv.utils.SVFileUtils;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.io.IOUtils;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
@@ -13,6 +13,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -22,11 +23,11 @@ import java.util.stream.Collectors;
 public final class ExtractOriginalAlignmentRecordsByNameSparkIntegrationTest extends CommandLineProgramTest {
 
     @Test(groups = "sv")
-    public void testExtractOriginalAlignmentRecordsByNameSparkRunnableLocal() {
+    public void testExtractOriginalAlignmentRecordsByNameSparkRunnableLocal() throws IOException {
 
         final File tempWorkingDir = BaseTest.createTempDir("extractOriginalAlignmentRecordsByNameSparkIntegrationTest");
 
-        SVFileUtils.writeLinesToSingleFile(Collections.singleton("asm013903:tig00002").iterator(), tempWorkingDir + "/names.txt");
+        FileUtils.writeLines(new File(tempWorkingDir, "names.txt"), Collections.singleton("asm013903:tig00002"));
 
         final SAMFileHeader expectedHeader;
         final List<SAMRecord> expectedRecords;

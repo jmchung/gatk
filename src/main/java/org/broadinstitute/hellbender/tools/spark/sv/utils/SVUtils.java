@@ -2,6 +2,7 @@ package org.broadinstitute.hellbender.tools.spark.sv.utils;
 
 import org.broadinstitute.hellbender.tools.spark.utils.HopscotchSet;
 import org.broadinstitute.hellbender.tools.spark.utils.LongIterator;
+import org.broadinstitute.hellbender.utils.Utils;
 
 import java.math.BigInteger;
 import java.util.*;
@@ -40,6 +41,9 @@ public final class SVUtils {
     }
 
     public static Collection<SVKmer> uniquify(final Collection<SVKmer> coll1, final Collection<SVKmer> coll2) {
+        Utils.nonNull(coll1, "first collection of kmers is null");
+        Utils.nonNull(coll2, "second collection of kmers is null");
+
         final HopscotchSet<SVKmer> kmers = new HopscotchSet<>(coll1.size() + coll2.size());
         kmers.addAll(coll1);
         kmers.addAll(coll2);

@@ -26,7 +26,7 @@ public final class KmerCounter {
         this.kmersPerPartitionGuess = kmersPerPartitionGuess;
     }
 
-    public Iterator<KmerAndCount> apply(final Iterator<GATKRead> readItr ) {
+    public Iterator<KmerAndCount> apply( final Iterator<GATKRead> readItr ) {
         final HopscotchMap<SVKmer, Integer, KmerAndCount> counts = new HopscotchMap<>(kmersPerPartitionGuess);
         while ( readItr.hasNext() ) {
             final GATKRead read = readItr.next();

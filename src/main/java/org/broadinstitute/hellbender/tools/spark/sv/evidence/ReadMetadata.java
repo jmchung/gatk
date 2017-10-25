@@ -11,9 +11,9 @@ import htsjdk.samtools.SAMSequenceRecord;
 import org.apache.spark.api.java.JavaRDD;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVUtils;
-import org.broadinstitute.hellbender.tools.spark.sv.utils.SvCigarUtils;
 import org.broadinstitute.hellbender.tools.spark.utils.IntHistogram;
 import org.broadinstitute.hellbender.utils.gcs.BucketUtils;
+import org.broadinstitute.hellbender.utils.read.CigarUtils;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
 
 import java.io.BufferedWriter;
@@ -438,7 +438,7 @@ public class ReadMetadata {
                 final boolean isTestable = filter.isTemplateLenTestable(mappedRead);
                 libraryNameToStatisticsMap
                         .computeIfAbsent(libraryName, key -> new LibraryRawStatistics(maxTrackedFragmentLength))
-                        .addRead(SvCigarUtils.getTotalAlignmentLength(mappedRead.getCigar()), mappedRead.getFragmentLength(), isTestable);
+                        .addRead(CigarUtils.countAlignedBases(mappedRead.getCigar()), mappedRead.getFragmentLength(), isTestable);
                 if ( !mappedReadItr.hasNext() ) break;
                 mappedRead = mappedReadItr.next();
             }

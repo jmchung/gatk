@@ -143,13 +143,6 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
         // write alignments of the assembled contigs
         AlignedAssemblyOrExcuse.writeAssemblySAMFile(alignedAssemblyOrExcuseList, header, params.assembliesSortOrder, outputAssemblyAlignments);
         log("Wrote SAM file of aligned contigs.", toolLogger);
-//        // write the output file
-//        final SAMFileHeader cleanHeader = new SAMFileHeader(header.getSequenceDictionary());
-//        cleanHeader.setSortOrder(params.assembliesSortOrder);
-//
-//        AlignedAssemblyOrExcuse.writeSAMFile(outputAssemblyAlignments, cleanHeader, alignedAssemblyOrExcuseList,
-//                params.assembliesSortOrder == SAMFileHeader.SortOrder.queryname);
-//        log("Wrote SAM file of aligned contigs.", toolLogger);
 
         return new AssembledEvidenceResults(evidenceScanResults.readMetadata, alignedAssemblyOrExcuseList, evidenceScanResults.evidenceTargetLinks);
     }
@@ -407,9 +400,7 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
             final Logger logger)
     {
         final Set<SVKmer> kmerKillSet =
-                SVFileUtils.readKmersFile(params.kSize,
-                                        params.kmersToIgnoreFile,
-                                        new SVKmerLong(params.kSize));
+                SVFileUtils.readKmersFile(params.kmersToIgnoreFile, params.kSize);
         if ( params.adapterSequence != null ) {
             SVKmerizer.stream(params.adapterSequence, params.kSize, 0, new SVKmerLong())
                     .forEach(kmer -> kmerKillSet.add(kmer.canonical(params.kSize)));

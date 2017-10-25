@@ -6,6 +6,7 @@ import org.broadinstitute.hellbender.tools.spark.sv.utils.SVUtils;
 import org.broadinstitute.hellbender.utils.BaseUtils;
 
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * Utils to move data from a BwaMemAlignment into a GATKRead, or into a SAM tag.
@@ -129,5 +130,23 @@ public class BwaMemAlignmentUtils {
         return refNames.get(alignment.getRefId())+","+(alignment.getRefStart()+1)+","+
                 (SAMFlag.READ_REVERSE_STRAND.isSet(alignment.getSamFlag())?"-":"+")+","+
                 alignment.getCigar().replace('H','S')+","+alignment.getMapQual()+","+alignment.getNMismatches()+";";
+    }
+
+    public static Stream<SAMRecord> toSAMStreamForRead(final String readName, final byte[] contigSequence,
+                                                       final List<BwaMemAlignment> alignments,
+                                                       final SAMFileHeader header, final List<String> refNames) {
+        if ( alignments.isEmpty() ) return Stream.empty();
+
+        final Map<BwaMemAlignment,String> saTagMap = createSATags(alignments,refNames);
+
+        return alignments.stream()
+                .map(alignment -> {
+                    final SAMRecord samRecord =
+                            applyAlignment(readName, contigSequence, null, null, alignment,
+                                    refNames, header, false, false);
+                    final String saTag = saTagMap.get(alignment);
+                    if ( saTag != null ) samRecord.setAttribute("SA", saTag);
+                    return samRecord;
+                });
     }
 }

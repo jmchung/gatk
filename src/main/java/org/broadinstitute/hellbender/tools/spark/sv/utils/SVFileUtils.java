@@ -15,42 +15,31 @@ public final class SVFileUtils {
     private static final String REFERENCE_GAP_INTERVAL_FILE_COMMENT_LINE_PROMPT = "#";
 
     /**
-     * Creates a directory, in local FS, HDFS, or Google buckets to write to.
+     * Creates a directory, in local FS, HDFS, or Google buckets to write individual files in.
      */
-    public static boolean createDirToWriteTo(final String pathString) {
-        try {
-            Utils.nonNull(pathString);
-            if ( java.nio.file.Files.exists(java.nio.file.Paths.get(pathString)) )
-                throw new IOException("Directory to be created already exists: " + pathString);
+    public static void createDirectory(final String pathString) throws IOException {
+        Utils.nonNull(pathString);
 
-            final boolean isSuccessful;
-            if (BucketUtils.isHadoopUrl(pathString)) {
-                isSuccessful = org.apache.hadoop.fs.FileSystem.get(new org.apache.hadoop.conf.Configuration()).mkdirs(new org.apache.hadoop.fs.Path(pathString));
-            } else {
-                final java.nio.file.Path dir = java.nio.file.Files.createDirectory(IOUtils.getPath(pathString));
-                isSuccessful = java.nio.file.Files.isDirectory(dir) && java.nio.file.Files.isWritable(dir);
-            }
-            return isSuccessful;
-        } catch (final IOException x) {
-            throw new GATKException("Could not create directory: " + pathString, x);
+        if (BucketUtils.isHadoopUrl(pathString)) {
+            final boolean isSuccessful = org.apache.hadoop.fs.FileSystem.get(new org.apache.hadoop.conf.Configuration())
+                            .mkdirs(new org.apache.hadoop.fs.Path(pathString));
+            if (!isSuccessful)
+                throw new IOException("Dir creation failed: " + pathString);
+        } else {
+            final java.nio.file.Path dir = java.nio.file.Files.createDirectory(IOUtils.getPath(pathString)); // createDirectory checks and throws if a file with same name exists
+            final boolean isSuccessful = java.nio.file.Files.isDirectory(dir) && java.nio.file.Files.isWritable(dir);
+            if (!isSuccessful)
+                throw new IOException("File created is either not a directory or not writable: " + pathString);
         }
     }
 
-    public static void writeLinesToSingleFile(final Iterator<String> linesToWrite, final String fileName) {
-        try ( final OutputStream writer =
-                      new BufferedOutputStream(BucketUtils.createFile(fileName)) ) {
-            while (linesToWrite.hasNext()) {
-                writer.write(linesToWrite.next().getBytes()); writer.write('\n');
-            }
-        } catch ( final IOException ioe ) {
-            throw new GATKException("Can't write "+fileName, ioe);
-        }
-    }
-
-    public static void writeSAMFile(final Iterator<SAMRecord> alignments, final SAMFileHeader header, final String outputName,
+    public static void writeSAMFile(final String outputName, final Iterator<SAMRecord> alignments, final SAMFileHeader header,
                                     final boolean preOrdered) {
+        Utils.nonNull(alignments, "provided alignments to write out is null");
+        Utils.nonNull(header, "provided header for outputting sam file is null");
+        Utils.nonNull(outputName, "provided output name is null");
 
-        try (final SAMFileWriter writer = getSAMFileWriter(outputName, header, preOrdered) ) {
+        try (final SAMFileWriter writer = getSAMFileWriter(outputName, header, preOrdered)) {
             alignments.forEachRemaining(writer::addAlignment);
         } catch ( final UncheckedIOException ie) {
             throw new GATKException("Can't write SAM file to the specified location: " + outputName, ie);
@@ -62,15 +51,14 @@ public final class SVFileUtils {
         if ( idx < 0) {
             throw new IllegalArgumentException("Provided path doesn't have a proper extension: " + outputName);
         }
-        final String fileExtension = outputName.substring(idx+1, outputName.length());
         final SAMFileWriterFactory factory = new SAMFileWriterFactory()
                 .setCreateIndex(preOrdered && header.getSortOrder()== SAMFileHeader.SortOrder.coordinate);
-        final OutputStream outputStream = BucketUtils.createFile(outputName);
 
+        final String fileExtension = outputName.substring(idx+1, outputName.length());
         if (fileExtension.endsWith(SamReader.Type.BAM_TYPE.fileExtension())) {
-            return factory.makeBAMWriter(header, preOrdered, outputStream);
+            return factory.makeBAMWriter(header, preOrdered, BucketUtils.createFile(outputName));
         } else if (fileExtension.endsWith(SamReader.Type.SAM_TYPE.fileExtension())) {
-            return factory.makeSAMWriter(header, preOrdered, outputStream);
+            return factory.makeSAMWriter(header, preOrdered, BucketUtils.createFile(outputName));
         } else if (fileExtension.endsWith(SamReader.Type.CRAM_TYPE.fileExtension())) {
             throw new UnsupportedOperationException("We currently don't support CRAM output");
         } else {
@@ -84,19 +72,21 @@ public final class SVFileUtils {
      * {@link org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDiscoveryArgumentCollection.FindBreakpointEvidenceSparkArgumentCollection#KMER_SIZE}
      * characters long, and must match [ACGT]*.
      */
-    public static Set<SVKmer> readKmersFile(final int kSize, final String kmersFile,
-                                            final SVKmer kmer ) {
+    public static Set<SVKmer> readKmersFile(final String kmersFilePath, final int kSize) {
+        Utils.nonNull(kmersFilePath, "provided path for file containing kmers is null");
+        Utils.validateArg(kSize > 0, "provided k-size is non positive: " + kSize);
+
         final Set<SVKmer> kmers;
 
         try ( final BufferedReader rdr =
-                      new BufferedReader(new InputStreamReader(BucketUtils.openFile(kmersFile))) ) {
-            final long fileLength = BucketUtils.fileSize(kmersFile);
+                      new BufferedReader(new InputStreamReader(BucketUtils.openFile(kmersFilePath))) ) {
+            final long fileLength = BucketUtils.fileSize(kmersFilePath);
             kmers = new HopscotchSet<>((int)(fileLength/(kSize+1)));
             String line;
             while ( (line = rdr.readLine()) != null ) {
                 if ( line.length() != kSize ) {
                     throw new GATKException("SVKmer kill set contains a line of length " + line.length() +
-                            " but we were expecting K=" + kSize);
+                            " but we were expecting K = " + kSize);
                 }
 
                 final SVKmerizer kmerizer = new SVKmerizer(line, kSize, 1, new SVKmerLong(kSize));
@@ -108,35 +98,37 @@ public final class SVFileUtils {
             }
         }
         catch ( final IOException ioe ) {
-            throw new GATKException("Unable to read kmers from "+kmersFile, ioe);
+            throw new GATKException("Unable to read kmers from "+kmersFilePath, ioe);
         }
 
         return kmers;
     }
 
     /** Write kmers to file. */
-    public static <KType extends SVKmer> void writeKmersFile(final int kSize, final String kmersFile,
-                                                             final Collection<KType> kmers ) {
+    public static <KType extends SVKmer> void writeKmersFile(final String kmersFilePath, final int kSize,
+                                                             final Collection<KType> kmers) {
         try ( final Writer writer =
-                      new BufferedWriter(new OutputStreamWriter(BucketUtils.createFile(kmersFile))) ) {
+                      new BufferedWriter(new OutputStreamWriter(BucketUtils.createFile(kmersFilePath))) ) {
             for ( final KType kmer : kmers ) {
                 writer.write(kmer.toString(kSize));
                 writer.write('\n');
             }
         }
         catch ( final IOException ioe ) {
-            throw new GATKException("Unable to write kmers to "+kmersFile, ioe);
+            throw new GATKException("Unable to write kmers to "+kmersFilePath, ioe);
         }
     }
 
     /** Read intervals from file. */
-    public static List<SVInterval> readIntervalsFile(final String intervalsFile,
+    public static List<SVInterval> readIntervalsFile(final String intervalsFilePath,
                                                      final Map<String, Integer> contigNameMap ) {
+        Utils.nonNull(intervalsFilePath, "provided intervals file path is null");
+        Utils.nonNull(contigNameMap, "provided map for contig index lookup is null");
+
         final List<SVInterval> intervals;
         try ( final BufferedReader rdr =
-                      new BufferedReader(new InputStreamReader(BucketUtils.openFile(intervalsFile))) ) {
-            final int INTERVAL_FILE_LINE_LENGTH_GUESS = 25;
-            final long sizeGuess = BucketUtils.fileSize(intervalsFile)/INTERVAL_FILE_LINE_LENGTH_GUESS;
+                      new BufferedReader(new InputStreamReader(BucketUtils.openFile(intervalsFilePath))) ) {
+            final long sizeGuess = BucketUtils.fileSize(intervalsFilePath)/25; // 25 is a guess on file line length
             intervals = new ArrayList<>((int)sizeGuess);
             String line;
             int lineNo = 0;
@@ -147,7 +139,7 @@ public final class SVFileUtils {
                 }
                 final String[] tokens = line.split("\t");
                 if ( tokens.length != 3 ) {
-                    throw new GATKException("Interval file "+intervalsFile+" line "+
+                    throw new GATKException("Interval file "+intervalsFilePath+" line "+
                             lineNo+" did not contain 3 columns: "+line);
                 }
                 try {
@@ -158,27 +150,27 @@ public final class SVFileUtils {
                     intervals.add(new SVInterval(contigId, start, end));
                 }
                 catch ( final Exception e ) {
-                    throw new GATKException("Unable to parse interval file "+intervalsFile+" line "+lineNo+": "+line, e);
+                    throw new GATKException("Unable to parse interval file "+intervalsFilePath+" line "+lineNo+": "+line, e);
                 }
             }
         }
         catch ( final IOException ioe ) {
-            throw new GATKException("Unable to read intervals from "+intervalsFile, ioe);
+            throw new GATKException("Unable to read intervals from "+intervalsFilePath, ioe);
         }
         return intervals;
     }
 
     /** Write intervals to a file. */
-    public static void writeIntervalsFile( final String intervalsFile,
+    public static void writeIntervalsFile( final String intervalsFilePath,
                                            final Collection<SVInterval> intervals, final List<String> contigNames ) {
         try (final OutputStreamWriter writer = new OutputStreamWriter(new BufferedOutputStream(
-                BucketUtils.createFile(intervalsFile)))) {
+                BucketUtils.createFile(intervalsFilePath)))) {
             for (final SVInterval interval : intervals) {
                 final String seqName = contigNames.get(interval.getContig());
                 writer.write(seqName + "\t" + interval.getStart() + "\t" + interval.getEnd() + "\n");
             }
         } catch (final IOException ioe) {
-            throw new GATKException("Can't write intervals file " + intervalsFile, ioe);
+            throw new GATKException("Can't write intervals file " + intervalsFilePath, ioe);
         }
     }
 }

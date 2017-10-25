@@ -19,6 +19,7 @@ import org.broadinstitute.hellbender.engine.filters.ReadFilter;
 import org.broadinstitute.hellbender.engine.filters.ReadFilterLibrary;
 import org.broadinstitute.hellbender.engine.spark.GATKSparkTool;
 import org.broadinstitute.hellbender.exceptions.GATKException;
+import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDiscoveryArgumentCollection;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.AlignedContig;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.AlignmentInterval;
@@ -27,6 +28,7 @@ import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
 import scala.Tuple2;
 
+import java.io.IOException;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -102,8 +104,11 @@ public final class SvDiscoverFromLocalAssemblyContigAlignmentsSpark extends GATK
         final EnumMap<RawTypes, JavaRDD<AlignedContig>> contigsByPossibleRawTypes =
                 divertReadsByPossiblyRawTypes(contigsWithAlignmentsReconstructed, localLogger);
 
-        if ( !SVFileUtils.createDirToWriteTo(outputDir) )
-            throw new GATKException("Could not create directory " + outputDir + " to write results to.");
+        try {
+            SVFileUtils.createDirectory(outputDir);
+        } catch (final IOException x) {
+            throw new UserException.CouldNotCreateOutputFile("Could not create file at path:" + outputDir + " due to " + x.getMessage(), x);
+        }
 
         if (writeSAMFiles) {
             final Broadcast<SAMFileHeader> headerBroadcast = ctx.broadcast(headerForReads);
@@ -222,8 +227,8 @@ public final class SvDiscoverFromLocalAssemblyContigAlignmentsSpark extends GATK
         toolLogger.info(filteredReadNames.size() + " long reads indicating " + rawTypeString);
         final JavaRDD<SAMRecord> splitLongReads = originalContigs.filter(read -> filteredReadNames.contains(read.getName()))
                 .map(read -> read.convertToSAMRecord(headerBroadcast.getValue()));
-        SVFileUtils.writeSAMFile(splitLongReads.collect().iterator(), headerBroadcast.getValue(),
-                outputDir+"/"+rawTypeString+".sam", false);
+        SVFileUtils.writeSAMFile(outputDir+"/"+rawTypeString+".sam", splitLongReads.collect().iterator(), headerBroadcast.getValue(),
+                false);
     }
 
     static String onErrorStringRepForAlignedContig(final AlignedContig contig) {

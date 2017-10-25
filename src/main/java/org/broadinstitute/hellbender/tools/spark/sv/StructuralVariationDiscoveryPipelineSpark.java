@@ -19,7 +19,7 @@ import org.broadinstitute.hellbender.tools.spark.sv.evidence.AlignedAssemblyOrEx
 import org.broadinstitute.hellbender.tools.spark.sv.evidence.EvidenceTargetLink;
 import org.broadinstitute.hellbender.tools.spark.sv.evidence.FindBreakpointEvidenceSpark;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.PairedStrandedIntervalTree;
-import org.broadinstitute.hellbender.tools.spark.sv.utils.SVReferenceUtils;
+import org.broadinstitute.hellbender.utils.SequenceDictionaryUtils;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.bwa.BwaMemAlignment;
 import org.broadinstitute.hellbender.utils.bwa.BwaMemAlignmentUtils;
@@ -162,7 +162,7 @@ public class StructuralVariationDiscoveryPipelineSpark extends GATKSparkTool {
                                                                                    final Logger toolLogger) {
 
             final SAMFileHeader cleanHeader = new SAMFileHeader(header.getSequenceDictionary());
-            final List<String> refNames = SVReferenceUtils.getRefNames(header);
+            final List<String> refNames = SequenceDictionaryUtils.getContigNamesList(header.getSequenceDictionary());
 
             return ctx.parallelize(alignedAssemblyOrExcuseList)
                     .filter(AlignedAssemblyOrExcuse::isNotFailure)
@@ -173,9 +173,12 @@ public class StructuralVariationDiscoveryPipelineSpark extends GATKSparkTool {
                                 final int nContigs = assembly.getNContigs();
                                 return IntStream.range(0, nContigs)
                                         .mapToObj(contigIdx ->
-                                                AlignedAssemblyOrExcuse.toSAMStreamForOneContig(cleanHeader, refNames,
-                                                        assemblyId, contigIdx, assembly.getContig(contigIdx).getSequence(),
-                                                        allAlignmentsOfThisAssembly.get(contigIdx))
+                                                BwaMemAlignmentUtils.toSAMStreamForRead(
+                                                        AlignedAssemblyOrExcuse.formatContigName(assemblyId, contigIdx),
+                                                        assembly.getContig(contigIdx).getSequence(),
+                                                        allAlignmentsOfThisAssembly.get(contigIdx),
+                                                        cleanHeader, refNames
+                                                )
                                         ).iterator();
                             }
                     )

@@ -104,13 +104,13 @@ public final class FindBreakpointEvidenceSparkUnitTest extends BaseTest {
         for ( final KmerAndInterval kmerAndInterval : actualKmerAndIntervalSet ) {
             actualKmers.add(kmerAndInterval.getKey());
         }
-        final Set<SVKmer> expectedKmers = SVFileUtils.readKmersFile(params.kSize, kmersFile, kmer);
+        final Set<SVKmer> expectedKmers = SVFileUtils.readKmersFile(kmersFile, params.kSize);
         Assert.assertEquals(actualKmers, expectedKmers);
     }
 
     @Test(groups = "sv")
     public void getAssemblyQNamesTest() {
-        final Set<SVKmer> expectedKmers = SVFileUtils.readKmersFile(params.kSize, kmersFile, new SVKmerLong(params.kSize));
+        final Set<SVKmer> expectedKmers = SVFileUtils.readKmersFile(kmersFile, params.kSize);
         final HopscotchUniqueMultiMap<SVKmer, Integer, KmerAndInterval> kmerAndIntervalSet =
                 new HopscotchUniqueMultiMap<>(expectedKmers.size());
         expectedKmers.stream().

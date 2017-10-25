@@ -18,7 +18,7 @@ public final class KmerAndCount extends SVKmerLong implements Map.Entry<SVKmer, 
 
     public KmerAndCount( final SVKmerLong kmer ) { this(kmer,1); }
 
-    KmerAndCount( final SVKmerLong kmer, final int count ) {
+    public KmerAndCount( final SVKmerLong kmer, final int count ) {
         super(kmer);
         this.count = count;
     }

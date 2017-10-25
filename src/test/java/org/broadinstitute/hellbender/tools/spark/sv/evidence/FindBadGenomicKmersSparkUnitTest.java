@@ -12,7 +12,6 @@ import org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDiscovery
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVKmer;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVKmerLong;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVKmerizer;
-import org.broadinstitute.hellbender.tools.spark.sv.utils.SVReferenceUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.Assert;
@@ -45,7 +44,7 @@ public class FindBadGenomicKmersSparkUnitTest extends BaseTest {
         sequenceChunks.add(polyT);
 
         final JavaRDD<byte[]> refRDD = SparkContextFactory.getTestSparkContext().parallelize(sequenceChunks);
-        final List<SVKmer> badKmers = SVReferenceUtils.processRefRDD(KMER_SIZE,
+        final List<SVKmer> badKmers = FindBadGenomicKmersSpark.collectUbiquitousKmersInReference(KMER_SIZE,
                                                                              Integer.MAX_VALUE,
                                                                              FindBadGenomicKmersSpark.MAX_KMER_FREQ,
                                                                              refRDD);
