@@ -8,7 +8,6 @@ import htsjdk.tribble.Feature;
 import htsjdk.tribble.annotation.Strand;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
-import org.apache.hadoop.yarn.webapp.hamlet.Hamlet;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceDataSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
@@ -428,6 +427,12 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                                                                       final GencodeGtfExonFeature exon,
                                                                       final FuncotatorUtils.SequenceComparison sequenceComparison ){
 
+        Utils.nonNull(variant);
+        Utils.nonNull(altAllele);
+        Utils.nonNull(variantType);
+        Utils.nonNull(exon);
+        Utils.nonNull(sequenceComparison);
+
         // Get our start position:
         final int startPos = sequenceComparison.getAlleleStart();
 
@@ -440,6 +445,9 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
             endPos = sequenceComparison.getAlleleStart() + variant.getReference().length() - 1;
         }
 
+        // Calculate the number of inserted bases so we can account for them in the splice site calculations:
+        final int numInsertedBases = (altAllele.length() > variant.getReference().length()) ? altAllele.length() - variant.getReference().length() : 0;
+
         GencodeFuncotation.VariantClassification varClass = null;
 
         boolean hasBeenClassified = false;
@@ -449,8 +457,8 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
             boolean foundStop = false;
 
-            for (int i = 0 ; i < sequenceComparison.getAlignedAlternateAllele().length(); i+=3 ){
-                final String codon = sequenceComparison.getAlignedAlternateAllele().substring(i, i+3);
+            for (int i = 0; i < sequenceComparison.getAlignedCodingSequenceAlternateAllele().length(); i+=3 ){
+                final String codon = sequenceComparison.getAlignedCodingSequenceAlternateAllele().substring(i, i+3);
                 if (FuncotatorUtils.getEukaryoticAminoAcidByCodon(codon) == AminoAcid.STOP_CODON) {
                     foundStop = true;
                     break;
@@ -469,8 +477,8 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
             // Check for splice site variants.
             // Here we check to see if a splice site comes anywhere within `spliceSiteVariantWindowBases` of a variant.
             // We add and subtract 1 from the end points because the positons are 1-based & inclusive.
-            if ( (((startPos - spliceSiteVariantWindowBases + 1) <= exon.getStart()) && (exon.getStart() <= (spliceSiteVariantWindowBases + endPos - 1))) ||
-                 (((startPos - spliceSiteVariantWindowBases + 1) <= exon.getEnd()  ) && (exon.getEnd()   <= (spliceSiteVariantWindowBases + endPos - 1))) ) {
+            if ( (((startPos - spliceSiteVariantWindowBases + 1) <= exon.getStart()) && (exon.getStart() <= (spliceSiteVariantWindowBases - numInsertedBases + endPos - 1))) ||
+                 (((startPos - spliceSiteVariantWindowBases + 1) <= exon.getEnd()  ) && (exon.getEnd()   <= (spliceSiteVariantWindowBases - numInsertedBases + endPos - 1))) ) {
                 varClass = GencodeFuncotation.VariantClassification.SPLICE_SITE;
             }
             else if ((exon.getStartCodon() != null) && (exon.getStartCodon().overlaps(variant))) {
@@ -766,28 +774,58 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         final Strand strand = Strand.toStrand( transcript.getGenomicStrand().toString() );
         sequenceComparison.setStrand(strand);
 
+        // Get the alleles from the inputs
+        // Also get the reference sequence for the variant region
+        // (spanning the entire length of both the reference and the variant, regardless of which is longer).
         final Allele refAllele;
         final Allele altAllele;
+
+        // TODO: Make this a parameter:
+        final int referenceWindow = 10;
+        final String referenceBases;
+
         if ( strand == Strand.POSITIVE ) {
             refAllele = variant.getReference();
             altAllele = alternateAllele;
+
+            // Calculate our window to include any extra bases but also have the right referenceWindow:
+            final int endWindow = refAllele.length() >= altAllele.length() ? referenceWindow + refAllele.length() - 1: referenceWindow + altAllele.length() - 1;
+
+            // Set our reference window:
+            reference.setWindow(referenceWindow, endWindow);
+
+            // Get the reference sequence:
+            referenceBases = new String(reference.getBases());
         }
         else {
             refAllele = Allele.create(ReadUtils.getBasesReverseComplement( variant.getReference().getBases() ), true);
             altAllele = Allele.create(ReadUtils.getBasesReverseComplement( alternateAllele.getBases() ), false);
+
+            // Calculate our window to include any extra bases but also have the right referenceWindow:
+            final int endWindow = refAllele.length() >= altAllele.length() ? referenceWindow + refAllele.length() - 1: referenceWindow + altAllele.length() - 1;
+
+            // Set our reference window:
+            reference.setWindow(referenceWindow, endWindow);
+
+            // Get the reference sequence:
+            referenceBases = ReadUtils.getBasesReverseComplement(reference.getBases());
         }
 
-        // TODO: In the case of an allele going through (from before to after) a splice site, you need to add more logic here to grab the INTRON reference bases.
+        // Set our reference sequence in the SequenceComparison:
+        sequenceComparison.setReferenceBases( referenceBases );
+        sequenceComparison.setReferenceWindow( referenceWindow );
+
+        // Get the coding sequence for the transcript:
         final String referenceCodingSequence;
         if ( transcriptFastaReferenceDataSource != null ) {
             referenceCodingSequence = getCodingSequenceFromTranscriptFasta( transcript.getTranscriptId(), transcriptIdMap, transcriptFastaReferenceDataSource );
         }
         else {
-            referenceCodingSequence = FuncotatorUtils.getCodingSequence(reference, exonPositionList, strand);
+            referenceCodingSequence = FuncotatorUtils.getCodingSequence( reference, exonPositionList, strand );
         }
 
         // Get the reference sequence in the coding region as described by the given exonPositionList:
-        sequenceComparison.setWholeReferenceSequence(new ReferenceSequence(transcript.getTranscriptId(),transcript.getStart(),referenceCodingSequence.getBytes()));
+        sequenceComparison.setReferenceCodingSequence(new ReferenceSequence(transcript.getTranscriptId(),transcript.getStart(),referenceCodingSequence.getBytes()));
 
         // Get the ref allele:
         sequenceComparison.setReferenceAllele(refAllele.getBaseString());
@@ -797,7 +835,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Get the allele transcript start position:
         sequenceComparison.setTranscriptAlleleStart(
-                FuncotatorUtils.getCodingSequenceAlleleStartPosition( variant.getStart(), transcript.getStart(), transcript.getEnd(), sequenceComparison.getStrand() )
+                FuncotatorUtils.getTranscriptAlleleStartPosition( variant.getStart(), transcript.getStart(), transcript.getEnd(), sequenceComparison.getStrand() )
         );
 
         // Get the coding region start position (in the above computed reference coding region):
@@ -823,7 +861,19 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Get the in-frame/codon-aligned region containing the reference allele:
         sequenceComparison.setAlignedReferenceAllele(
-                FuncotatorUtils.getAlignedAllele(sequenceComparison.getWholeReferenceSequence().getBaseString(),
+                FuncotatorUtils.getAlignedRefAllele(
+                        referenceBases,
+                        referenceWindow,
+                        refAllele,
+                        sequenceComparison.getCodingSequenceAlleleStart(),
+                        sequenceComparison.getAlignedCodingSequenceAlleleStart())
+        );
+
+        // Get the in-frame/codon-aligned CODING region containing the reference allele:
+        // NOTE: We are calling this with Strand.POSITIVE because we have already reverse complemented the reference sequence.
+        sequenceComparison.setAlignedCodingSequenceReferenceAllele(
+                FuncotatorUtils.getAlignedCodingSequenceAllele(
+                        sequenceComparison.getReferenceCodingSequence().getBaseString(),
                         sequenceComparison.getAlignedCodingSequenceAlleleStart(),
                         sequenceComparison.getAlignedReferenceAlleleStop(),
                         refAllele,
@@ -831,16 +881,17 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                         Strand.POSITIVE )
         );
 
+        // TODO: Check from here down for where you should use the coding sequence VS the raw reference alleles:
+
         // Get the amino acid sequence of the reference allele:
         sequenceComparison.setReferenceAminoAcidSequence(
-                FuncotatorUtils.createAminoAcidSequence( sequenceComparison.getAlignedReferenceAllele() )
+                FuncotatorUtils.createAminoAcidSequence( sequenceComparison.getAlignedCodingSequenceReferenceAllele() )
         );
 
         // Get the starting protein position of this variant.
         sequenceComparison.setProteinChangeStartPosition(
                 FuncotatorUtils.getProteinChangePosition( sequenceComparison.getAlignedCodingSequenceAlleleStart() )
         );
-
 
         // Set our alternate allele:
         sequenceComparison.setAlternateAllele( altAllele.getBaseString() );
@@ -855,8 +906,17 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         // Get the aligned alternate allele:
         final int alignedRefAlleleStartPos = sequenceComparison.getCodingSequenceAlleleStart() - sequenceComparison.getAlignedCodingSequenceAlleleStart() + 1;
         sequenceComparison.setAlignedAlternateAllele(
-                FuncotatorUtils.getAlternateCodingSequence(
+                FuncotatorUtils.getAlternateSequence(
                         sequenceComparison.getAlignedReferenceAllele(),
+                        alignedRefAlleleStartPos,
+                        refAllele,
+                        altAllele )
+        );
+
+        // Get the aligned coding sequence alternate allele:
+        sequenceComparison.setAlignedCodingSequenceAlternateAllele(
+                FuncotatorUtils.getAlternateSequence(
+                        sequenceComparison.getAlignedCodingSequenceReferenceAllele(),
                         alignedRefAlleleStartPos,
                         refAllele,
                         altAllele )
@@ -864,12 +924,12 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
         // Set our alternate amino acid sequence:
         sequenceComparison.setAlternateAminoAcidSequence(
-                FuncotatorUtils.createAminoAcidSequence(sequenceComparison.getAlignedAlternateAllele())
+                FuncotatorUtils.createAminoAcidSequence(sequenceComparison.getAlignedCodingSequenceAlternateAllele())
         );
 
         // Set our protein end position:
         sequenceComparison.setProteinChangeEndPosition(
-                FuncotatorUtils.getProteinChangeEndPosition(sequenceComparison.getProteinChangeStartPosition(), sequenceComparison.getAlignedAlternateAllele().length())
+                FuncotatorUtils.getProteinChangeEndPosition(sequenceComparison.getProteinChangeStartPosition(), sequenceComparison.getAlignedCodingSequenceAlternateAllele().length())
         );
 
         return sequenceComparison;
@@ -921,7 +981,7 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
         gencodeFuncotation.setAnnotationTranscript( transcript.getTranscriptId() );
 
         gencodeFuncotation.setTranscriptPos(
-             FuncotatorUtils.getCodingSequenceAlleleStartPosition( variant.getStart(), transcript.getStart(), transcript.getEnd(), strand )
+             FuncotatorUtils.getTranscriptAlleleStartPosition( variant.getStart(), transcript.getStart(), transcript.getEnd(), strand )
         );
 
         gencodeFuncotation.setOtherTranscripts(

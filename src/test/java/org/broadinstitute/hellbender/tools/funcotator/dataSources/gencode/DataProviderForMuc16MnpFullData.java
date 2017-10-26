@@ -2066,7 +2066,10 @@ public class DataProviderForMuc16MnpFullData {
                 new Object[]{"MUC16", 19, 9065944, 9065945, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.DNP, "CC", "TT", "g.chr19:9065944_9065945CC>TT", "-", "c.21501_21502GG>AA", "c.(21499-21504)aaGGac>aaAAac", "p.D7168N"},
                 new Object[]{"MUC16", 19, 9046027, 9046028, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.DNP, "GG", "AA", "g.chr19:9046027_9046028GG>AA", "-", "c.35603_35604CC>TT", "c.(35602-35604)tCC>tTT", "p.S11868F"},
                 new Object[]{"MUC16", 19, 9063951, 9063952, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.DNP, "CC", "TT", "g.chr19:9063951_9063952CC>TT", "-", "c.23494_23495GG>AA", "c.(23494-23496)GGa>AAa", "p.G7832K"},
+
+                // Check the case that our input ref allele is NOT the same as the reference genome:
                 new Object[]{"MUC16", 19, 8996322, 8996322, GencodeFuncotation.VariantClassification.SPLICE_SITE, GencodeFuncotation.VariantType.SNP, "C", "A", "g.chr19:8996322C>A", "-", "c.41250G>T", "c.(41248-41250)aaG>aaT", "p.K13750N"},
+
                 new Object[]{"MUC16", 19, 9005204, 9005205, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.DNP, "GG", "AA", "g.chr19:9005204_9005205GG>AA", "-", "c.39872_39873CC>TT", "c.(39871-39873)cCC>cTT", "p.P13291L"},
                 new Object[]{"MUC16", 19, 9008192, 9008193, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.DNP, "CC", "TT", "g.chr19:9008192_9008193CC>TT", "-", "c.39359_39360GG>AA", "c.(39358-39360)cGG>cAA", "p.R13120Q"},
                 new Object[]{"MUC16", 19, 8999533, 8999534, GencodeFuncotation.VariantClassification.MISSENSE, GencodeFuncotation.VariantType.DNP, "CC", "TT", "g.chr19:8999533_8999534CC>TT", "-", "c.40641_40642GG>AA", "c.(40639-40644)gtGGat>gtAAat", "p.D13548N"},

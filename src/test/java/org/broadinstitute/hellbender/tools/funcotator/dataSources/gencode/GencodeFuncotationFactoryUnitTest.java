@@ -191,6 +191,7 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
 
         // PIK3CA INDELs:
         outList.addAll( addReferenceDataToUnitTestData(DataProviderForPik3caMnpFullData.providePik3caInDelData(), HG19_CHR3_REFERENCE_FILE_NAME, pik3caFeatureReader, refDataSourceHg19Ch3, PIK3CA_GENCODE_TRANSCRIPT_FASTA_FILE ) );
+
         // TODO: UNCOMMENT WHEN INDELS ARE READY:
 //        outList.addAll( addReferenceDataToUnitTestData(DataProviderForPik3caMnpFullData.providePik3caInDelData2(), HG19_CHR3_REFERENCE_FILE_NAME, pik3caFeatureReader, refDataSourceHg19Ch3, PIK3CA_GENCODE_TRANSCRIPT_FASTA_FILE ) );
 
@@ -483,14 +484,48 @@ public class GencodeFuncotationFactoryUnitTest extends BaseTest {
 
             final GencodeFuncotation funcotation = funcotations.get(0);
 
-            Assert.assertEquals(funcotation.getHugoSymbol(),            expectedGeneName             , "Gene Name is not correct!");
-            Assert.assertEquals(funcotation.getVariantClassification(), expectedVariantClassification, "Variant Classification is not correct!");
-            Assert.assertEquals(funcotation.getVariantType(),           expectedVariantType          , "Variant Type is not correct!");
-            Assert.assertEquals(funcotation.getGenomeChange(),          expectedGenomeChange         , "Genome Change is not correct!");
-            Assert.assertEquals(funcotation.getTranscriptStrand(),      expectedStrand               , "Transcript Strand is not correct!");
-            Assert.assertEquals(funcotation.getcDnaChange(),            expectedCDnaChange           , "CDNA Change is not correct!");
-            Assert.assertEquals(funcotation.getCodonChange(),           expectedCodonChange          , "Codon Change is not correct!");
-            Assert.assertEquals(funcotation.getProteinChange(),         expectedProteinChange        , "Protein Change is not correct!");
+            final boolean geneNameCorrect              = Objects.equals( funcotation.getHugoSymbol(), expectedGeneName );
+            final boolean variantClassificationCorrect = Objects.equals( funcotation.getVariantClassification(), expectedVariantClassification );
+            final boolean variantTypeCorrect           = Objects.equals( funcotation.getVariantType(), expectedVariantType );
+            final boolean genomeChangeCorrect          = Objects.equals( funcotation.getGenomeChange(), expectedGenomeChange );
+            final boolean strandCorrect                = Objects.equals( funcotation.getTranscriptStrand(), expectedStrand );
+            final boolean cDnaChangeCorrect            = Objects.equals( funcotation.getcDnaChange(), expectedCDnaChange );
+            final boolean codonChangeCorrect           = Objects.equals( funcotation.getCodonChange(), expectedCodonChange );
+            final boolean proteinChangeCorrect         = Objects.equals( funcotation.getProteinChange(), expectedProteinChange );
+
+            final StringBuilder errorMessageStringBuilder = new StringBuilder();
+
+            if (!geneNameCorrect) {
+                errorMessageStringBuilder.append("\n\tGene Name is not correct!\n\t\tExpected:  [" + expectedGeneName + "]\n\t\tBut found: [" + funcotation.getHugoSymbol() + "]");
+            }
+            if (!variantClassificationCorrect) {
+                errorMessageStringBuilder.append("\n\tVariant Classification is not correct!\n\t\tExpected:  [" + expectedVariantClassification + "]\n\t\tBut found: [" + funcotation.getVariantClassification() + "]");
+            }
+            if (!variantTypeCorrect) {
+                errorMessageStringBuilder.append("\n\tVariant Type is not correct!\n\t\tExpected:  [" + expectedVariantType + "]\n\t\tBut found: [" + funcotation.getVariantType() + "]");
+            }
+            if (!genomeChangeCorrect) {
+                errorMessageStringBuilder.append("\n\tGenome Change is not correct!\n\t\tExpected:  [" + expectedGenomeChange + "]\n\t\tBut found: [" + funcotation.getGenomeChange() + "]");
+            }
+            if (!strandCorrect) {
+                errorMessageStringBuilder.append("\n\tStrand is not correct!\n\t\tExpected:  [" + expectedStrand + "]\n\t\tBut found: [" + funcotation.getTranscriptStrand() + "]");
+            }
+            if (!cDnaChangeCorrect) {
+                errorMessageStringBuilder.append("\n\tCDna Change is not correct!\n\t\tExpected:  [" + expectedCDnaChange + "]\n\t\tBut found: [" + funcotation.getcDnaChange() + "]");
+            }
+            if (!codonChangeCorrect) {
+                errorMessageStringBuilder.append("\n\tCodon Change is not correct!\n\t\tExpected:  [" + expectedCodonChange + "]\n\t\tBut found: [" + funcotation.getCodonChange() + "]");
+            }
+            if (!proteinChangeCorrect) {
+                errorMessageStringBuilder.append("\n\tProtein Change is not correct!\n\t\tExpected:  [" + expectedProteinChange + "]\n\t\tBut found: [" + funcotation.getProteinChange() + "]");
+            }
+
+            Assert.assertTrue(
+                    geneNameCorrect && variantClassificationCorrect && variantTypeCorrect &&
+                    genomeChangeCorrect && strandCorrect && cDnaChangeCorrect && codonChangeCorrect && proteinChangeCorrect,
+                    errorMessageStringBuilder.toString() + "\n"
+            );
+            
         }
     }
 

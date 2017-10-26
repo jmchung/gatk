@@ -3,13 +3,10 @@ package org.broadinstitute.hellbender.tools.funcotator;
 import htsjdk.samtools.util.Locatable;
 import htsjdk.tribble.annotation.Strand;
 import htsjdk.variant.variantcontext.Allele;
-import htsjdk.variant.variantcontext.VariantContext;
-import lombok.Data;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceFileSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
-import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.read.ReadUtils;
 import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.Assert;
@@ -586,7 +583,7 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     }
 
     @DataProvider
-    Object[][] provideDataForGetAlternateCodingSequence() {
+    Object[][] provideDataForGetAlternateSequence() {
         return new Object[][] {
                 {
                     "01234567890A1234567890123456789", 12, Allele.create((byte)'A'), Allele.create((byte)'A'), "01234567890A1234567890123456789"
@@ -808,7 +805,7 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     }
 
     @DataProvider
-    Object[][] provideDataForGetAlignedAllele() {
+    Object[][] provideDataForGetAlignedCodingSequenceAllele() {
 
         final String seq = "ATGAAAGGGGTGCCTATGCTAGATAGACAGATAGTGTGTGTGTGTGTGCGCGCGCGCGCGCGTTGTTAG";
 
@@ -853,7 +850,36 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
     }
 
     @DataProvider
-    Object[][] provideDataForGetCodingSequenceAlleleStartPosition() {
+    Object[][] provideDataForTestGetAlignedRefAllele() {
+
+//        final String referenceSnippet,
+//        final int referencePadding,
+//        final Allele refAllele,
+//        final int codingSequenceRefAlleleStart,
+//        final int alignedRefAlleleStart
+//        expected
+
+//                                                 11111111112222222222333333333344444444445555555555666666
+//                                       012345678901234567890123456789012345678901234567890123456789012345
+        final String referenceSnippet = "AAATTTGGGCCCATGATATAGGCGCCGTAGCAGTAGATAGCCCCCCAACCGGGGCCCGGGTTTAAA";
+
+        return new Object[][] {
+                {referenceSnippet, 0, Allele.create("A", true), 3, 1, "AAA"},
+                {referenceSnippet, 0, Allele.create("AA", true), 2, 1, "AAA"},
+                {referenceSnippet, 0, Allele.create("AAA", true), 1, 1, "AAA"},
+
+                {referenceSnippet, 0, Allele.create("G", true), 9, 7, "GGG"},
+                {referenceSnippet, 0, Allele.create("GG", true), 8, 7, "GGG"},
+                {referenceSnippet, 0, Allele.create("GGG", true), 7, 7, "GGG"},
+
+                {referenceSnippet, 0, Allele.create("GC", true), 9, 7, "GGGCCC"},
+
+                {referenceSnippet, 8, Allele.create("T", true), 6, 4, "CAT"},
+        };
+    }
+
+    @DataProvider
+    Object[][] provideDataForGetTranscriptAlleleStartPosition() {
 
         return new Object[][] {
                 { 1,  1, 10, Strand.POSITIVE,  1},
@@ -1012,6 +1038,22 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
         };
     }
 
+    @DataProvider
+    Object[][] provideDataForTestAssertValidStrand_ValidStrands() {
+        return new Object[][] {
+                { Strand.POSITIVE },
+                { Strand.NEGATIVE },
+        };
+    }
+
+    @DataProvider
+    Object[][] provideDataForTestAssertValidStrand_InvalidStrands() {
+        return new Object[][] {
+                { null },
+                { Strand.NONE }
+        };
+    }
+
     //==================================================================================================================
     // Tests:
 
@@ -1088,9 +1130,9 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
         Assert.assertEquals(FuncotatorUtils.getAlignedEndPosition(alleleEndPos), expected);
     }
 
-    @Test(dataProvider = "provideDataForGetAlternateCodingSequence")
-    void testGetAlternateCodingSequence(final String refCodingSeq, final int startPos, final Allele refAllele, final Allele altAllele, final String expected) {
-        Assert.assertEquals(FuncotatorUtils.getAlternateCodingSequence(refCodingSeq, startPos, refAllele, altAllele), expected);
+    @Test(dataProvider = "provideDataForGetAlternateSequence")
+    void testGetAlternateSequence(final String refCodingSeq, final int startPos, final Allele refAllele, final Allele altAllele, final String expected) {
+        Assert.assertEquals(FuncotatorUtils.getAlternateSequence(refCodingSeq, startPos, refAllele, altAllele), expected);
     }
 
     @Test(dataProvider = "provideDataForGetEukaryoticAminoAcidByCodon")
@@ -1208,21 +1250,34 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
         Assert.assertEquals( FuncotatorUtils.getProteinChangeEndPosition(proteinChangeStartPosition, alignedAlternateAlleleLength) , expected );
     }
 
-    @Test (dataProvider = "provideDataForGetAlignedAllele")
-    void testGetAlignedAllele(  final String refSequence,
+    @Test (dataProvider = "provideDataForGetAlignedCodingSequenceAllele")
+    void testGetAlignedCodingSequenceAllele(  final String codingSequence,
                                 final Integer alignedAlleleStart,
                                 final Integer alignedAlleleStop,
                                 final Allele refAllele,
                                 final Integer refAlleleStart,
                                 final Strand strand,
                                 final String expected) {
-        final String alignedRefAllele = FuncotatorUtils.getAlignedAllele(refSequence, alignedAlleleStart, alignedAlleleStop, refAllele, refAlleleStart, strand);
+        final String alignedRefAllele = FuncotatorUtils.getAlignedCodingSequenceAllele(codingSequence, alignedAlleleStart, alignedAlleleStop, refAllele, refAlleleStart, strand);
         Assert.assertEquals( alignedRefAllele, expected );
     }
 
-    @Test (dataProvider = "provideDataForGetCodingSequenceAlleleStartPosition")
-    void testGetCodingSequenceAlleleStartPosition(final int variantStartPosition, final int codingStartPosition, final int codingEndPosition, final Strand strand, final int expected) {
-        Assert.assertEquals( FuncotatorUtils.getCodingSequenceAlleleStartPosition(variantStartPosition, codingStartPosition, codingEndPosition, strand), expected );
+    @Test(dataProvider = "provideDataForTestGetAlignedRefAllele")
+    void testGetAlignedRefAllele( final String referenceSnippet,
+                                  final int referencePadding,
+                                  final Allele refAllele,
+                                  final int codingSequenceRefAlleleStart,
+                                  final int alignedRefAlleleStart,
+                                  final String expected) {
+        Assert.assertEquals(
+                FuncotatorUtils.getAlignedRefAllele(referenceSnippet,referencePadding,refAllele,codingSequenceRefAlleleStart,alignedRefAlleleStart),
+                expected
+        );
+    }
+
+    @Test (dataProvider = "provideDataForGetTranscriptAlleleStartPosition")
+    void testGetTranscriptAlleleStartPosition(final int variantStartPosition, final int codingStartPosition, final int codingEndPosition, final Strand strand, final int expected) {
+        Assert.assertEquals( FuncotatorUtils.getTranscriptAlleleStartPosition(variantStartPosition, codingStartPosition, codingEndPosition, strand), expected );
     }
 
     @Test (dataProvider = "provideDataForTestCreateSpliceSiteCodonChange")
@@ -1247,6 +1302,17 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
                                          final List<? extends htsjdk.samtools.util.Locatable> exonPositionList,
                                          final SimpleInterval expected) {
         Assert.assertEquals( FuncotatorUtils.getOverlappingExonPositions(refAllele, altAllele, contig, start, stop, strand, exonPositionList), expected);
+    }
+
+    @Test (dataProvider = "provideDataForTestAssertValidStrand_ValidStrands")
+    void testAssertValidStrand_ValidStrands( final Strand strand ) {
+        FuncotatorUtils.assertValidStrand( strand );
+    }
+
+    @Test (dataProvider = "provideDataForTestAssertValidStrand_InvalidStrands",
+           expectedExceptions = {GATKException.class, IllegalArgumentException.class})
+    void testAssertValidStrand_InvalidStrands( final Strand strand ) {
+        FuncotatorUtils.assertValidStrand( strand );
     }
 
 }

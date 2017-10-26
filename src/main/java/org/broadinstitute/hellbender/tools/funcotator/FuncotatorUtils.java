@@ -55,7 +55,6 @@ import htsjdk.samtools.util.Locatable;
 import htsjdk.samtools.util.SequenceUtil;
 import htsjdk.tribble.annotation.Strand;
 import htsjdk.variant.variantcontext.Allele;
-import htsjdk.variant.variantcontext.VariantContext;
 import org.apache.log4j.Logger;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.exceptions.GATKException;
@@ -534,11 +533,7 @@ public class FuncotatorUtils {
                                                     final Strand strand) {
         Utils.nonNull(variant);
         Utils.nonNull(transcript);
-        Utils.nonNull(strand);
-
-        if ( strand == Strand.NONE ) {
-            throw new GATKException("Cannot handle `NONE` strand!");
-        }
+        assertValidStrand( strand );
 
         int position = 1;
 
@@ -620,23 +615,31 @@ public class FuncotatorUtils {
         Utils.nonNull(seqComp);
         Utils.nonNull(seqComp.getAlignedCodingSequenceAlleleStart());
         Utils.nonNull(seqComp.getAlignedReferenceAlleleStop());
-        Utils.nonNull(seqComp.getAlignedReferenceAllele());
-        Utils.nonNull(seqComp.getAlignedAlternateAllele());
+        Utils.nonNull(seqComp.getAlignedCodingSequenceReferenceAllele());
+        Utils.nonNull(seqComp.getAlignedCodingSequenceAlternateAllele());
         Utils.nonNull(seqComp.getCodingSequenceAlleleStart());
 
+        // Used for insertions:
+        Utils.nonNull(seqComp.getReferenceCodingSequence());
+        assertValidStrand( seqComp.getStrand() );
+
+        // Make some local names so that things are easier to read:
+        final String alignedRefAllele = seqComp.getAlignedCodingSequenceReferenceAllele();
+        final String alignedAltAllele = seqComp.getAlignedCodingSequenceAlternateAllele();
+        
         final StringBuilder ref = new StringBuilder();
         final StringBuilder alt = new StringBuilder();
 
         // Handle the ONP case:
-        if ( isOnp(seqComp.getAlignedReferenceAllele(), seqComp.getAlignedAlternateAllele()) ) {
+        if ( isOnp(alignedRefAllele, alignedAltAllele) ) {
 
             // Capitalize the right parts of each string if they're of equal length:
-            for (int i = 0; i < seqComp.getAlignedReferenceAllele().length(); ++i) {
-                if (seqComp.getAlignedReferenceAllele().charAt(i) != seqComp.getAlignedAlternateAllele().charAt(i)) {
-                    ref.append(Character.toUpperCase(seqComp.getAlignedReferenceAllele().charAt(i)));
-                    alt.append(Character.toUpperCase(seqComp.getAlignedAlternateAllele().charAt(i)));
+            for (int i = 0; i < alignedRefAllele.length(); ++i) {
+                if (alignedRefAllele.charAt(i) != alignedAltAllele.charAt(i)) {
+                    ref.append(Character.toUpperCase(alignedRefAllele.charAt(i)));
+                    alt.append(Character.toUpperCase(alignedAltAllele.charAt(i)));
                 } else {
-                    final char c = Character.toLowerCase(seqComp.getAlignedReferenceAllele().charAt(i));
+                    final char c = Character.toLowerCase(alignedRefAllele.charAt(i));
                     ref.append(c);
                     alt.append(c);
                 }
@@ -653,39 +656,63 @@ public class FuncotatorUtils {
             }
         }
         // Handle the insertion case:
-        else if ( isInsertion(seqComp.getAlignedReferenceAllele(), seqComp.getAlignedAlternateAllele()) ) {
+        else if ( isInsertion(alignedRefAllele, alignedAltAllele) ) {
 
             // Check for frame shift syntax first:
-            if ( isFrameshift(seqComp.getAlignedReferenceAllele(), seqComp.getAlignedAlternateAllele()) ) {
+            if ( isFrameshift(alignedRefAllele, alignedAltAllele) ) {
                 return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + "-" +
                         seqComp.getAlignedReferenceAlleleStop() + ")" +
-                        seqComp.getAlignedReferenceAllele().toLowerCase() + "fs";
+                        alignedRefAllele.toLowerCase() + "fs";
             }
             else {
+
+                // For insertions we need to grab the codon just following the end of the insertion reference and place
+                // it on the end of our reference before we render it.  We must also ignore the first codon because of
+                // the leading extra base in the VCF file.
+                // TODO: This is really bad - we are tying our output to a specific input format.  FIX IT.
+
+                final String nextCodon;
+                if ( seqComp.getStrand() == Strand.POSITIVE ) {
+                    nextCodon = seqComp.getReferenceCodingSequence().getBaseString().substring(seqComp.getAlignedReferenceAlleleStop(), seqComp.getAlignedReferenceAlleleStop() + 3 );
+                }
+                else {
+                    nextCodon = ReadUtils.getBasesReverseComplement(
+                            seqComp.getReferenceCodingSequence().getBaseString().substring(seqComp.getAlignedCodingSequenceAlleleStart() - 3, seqComp.getAlignedCodingSequenceAlleleStart() ).getBytes()
+                    );
+                }
+
+                // Create a new reference allele by removing the first codon
+                // (because of the added leading base for insertions)
+                // and appending the next codon to it:
+                final String newAlignedRefAllele = alignedRefAllele.substring(3) + nextCodon;
+
+                // Create a new alternate allele by removing the first codon
+                // (because of the added leading base for insertions):
+                final String newAlignedAltAllele = alignedAltAllele.substring(3);
+
+                // Create a new start and stop position because of the added leading base:
+                final int newStartPosition = seqComp.getAlignedCodingSequenceAlleleStart() + 3;
+                final int newEndPosition   = seqComp.getAlignedReferenceAlleleStop() + 3;
+
                 // Capitalize for insertion:
 
                 // Insertions alternate alleles have ref first, then the extra bases,
                 // so we capitalize only the extra bases.
 
-                // Ref will always be all lower case:
-                ref.append(seqComp.getAlignedReferenceAllele().toLowerCase());
+                // The next codon is really our new ref allele.
+                // And the ref will always be all lower case:
+                ref.append(nextCodon.toLowerCase());
 
-                // Add lower case ref allele:
-                int i = 0;
-                for ( ; i < seqComp.getAlignedReferenceAllele().length(); ++i ) {
-                    alt.append( Character.toLowerCase(seqComp.getAlignedAlternateAllele().charAt(i)) );
-                }
-
+                // Add alleles to our stringstreams:
                 // Alt allele chars will be upper case:
-                for ( ; i < seqComp.getAlignedAlternateAllele().length(); ++i ) {
-                    alt.append( Character.toUpperCase(seqComp.getAlignedAlternateAllele().charAt(i)) );
-                }
+                alt.append( newAlignedAltAllele.toUpperCase() );
 
-                // NOTE: We know that because of the way insertions are created
-                // (i.e. a base is added to the beginning of the string), we can ignore the first codon (3 bases) of the
-                // reference:
-                return "c.(" + (seqComp.getAlignedCodingSequenceAlleleStart() + 3) + "-" +
-                        (seqComp.getAlignedReferenceAlleleStop() + 3) + ")" +
+                // Ref allele will be lower case:
+                alt.append( newAlignedRefAllele.toLowerCase() );
+
+
+                // Here we add 3 to the start and stop positions because of the
+                return "c.(" + newStartPosition + "-" + newEndPosition + ")" +
                         ref.toString() + ">" + alt.toString();
             }
         }
@@ -696,13 +723,13 @@ public class FuncotatorUtils {
             // (i.e. a base is added to the beginning of the string), we can ignore the first codon (3 bases) of the
             // reference:
             String decorator = "del";
-            if ( isFrameshift(seqComp.getAlignedReferenceAllele(), seqComp.getAlignedAlternateAllele()) ) {
+            if ( isFrameshift(alignedRefAllele, alignedAltAllele) ) {
                 decorator = "fs";
             }
 
             return "c.(" + (seqComp.getAlignedCodingSequenceAlleleStart() + 3) + "-" +
                     seqComp.getAlignedReferenceAlleleStop() + ")" +
-                    seqComp.getAlignedReferenceAllele().substring(3).toLowerCase() + decorator;
+                    alignedRefAllele.substring(3).toLowerCase() + decorator;
         }
     }
 
@@ -741,10 +768,7 @@ public class FuncotatorUtils {
                                                      final int exonEnd,
                                                      final Strand strand,
                                                      final int offsetIndelAdjustment) {
-        Utils.nonNull(strand);
-        if ( strand == Strand.NONE ) {
-            throw new GATKException("Unable to handle NONE strand.");
-        }
+        assertValidStrand( strand );
 
         char sign = '-';
         int offset = exonStart - variantStart;
@@ -861,7 +885,10 @@ public class FuncotatorUtils {
                 return "p." + refAaSeq + protChangeStartPos + "fs";
             }
             else {
-                return "p." + protChangeStartPos + "_" + protChangeEndPos + "ins" + altAaSeq;
+                // NOTE: We know that because of the way insertions are created
+                // (i.e. a base is added to the beginning of the string), we can ignore the first amino acid (3 bases) of the
+                // amino acid sequence:
+                return "p." + protChangeStartPos + "_" + protChangeEndPos + "ins" + altAaSeq.substring(1);
             }
         }
         // Must be a deletion:
@@ -985,9 +1012,11 @@ public class FuncotatorUtils {
      * @return The {@link String} representation of the allele.
      */
     private static String getAlignedAlleleSequence(final String codingSequence,
-                                                final Integer alignedAlleleStart,
-                                                final Integer alignedAlleleStop,
-                                                final Strand strand) {
+                                                   final Integer alignedAlleleStart,
+                                                   final Integer alignedAlleleStop,
+                                                   final Strand strand) {
+        assertValidStrand( strand );
+
         // Get our indices:
         // Subtract 1 because we're 1-based.
         int start = alignedAlleleStart - 1;
@@ -1016,22 +1045,18 @@ public class FuncotatorUtils {
      * @param strand The {@link Strand} on which the alleles are found.
      * @return A {@link String} containing the reference allele coding sequence.
      */
-    public static String getAlignedAllele(final String codingSequence,
-                                          final Integer alignedAlleleStart,
-                                          final Integer alignedAlleleStop,
-                                          final Allele  refAllele,
-                                          final Integer refAlleleStart,
-                                          final Strand strand) {
+    public static String getAlignedCodingSequenceAllele(final String codingSequence,
+                                                        final Integer alignedAlleleStart,
+                                                        final Integer alignedAlleleStop,
+                                                        final Allele  refAllele,
+                                                        final Integer refAlleleStart,
+                                                        final Strand strand) {
         Utils.nonNull(codingSequence);
         Utils.nonNull(alignedAlleleStart);
         Utils.nonNull(alignedAlleleStop);
         Utils.nonNull(refAllele);
         Utils.nonNull(refAlleleStart);
-        Utils.nonNull(strand);
-
-        if ( strand == Strand.NONE ) {
-            throw new GATKException("Cannot handle `NONE` strand!");
-        }
+        assertValidStrand( strand );
 
         String alignedAlleleSeq = getAlignedAlleleSequence(codingSequence, alignedAlleleStart, alignedAlleleStop, strand);
 
@@ -1047,12 +1072,15 @@ public class FuncotatorUtils {
             expectedReferenceSequence = ReadUtils.getBasesReverseComplement( codingSequence.substring(start, end).getBytes() );
         }
 
+        // NOTE: This check appears to be reduntant, but in actuality, it is required.
+        //       Because we reconstruct the coding sequence allele separately from the reference allele, we need to check this
+        //       again to make sure we have the right alleles given our input.
         if ( !expectedReferenceSequence.equals(refAllele.getBaseString()) ) {
             // Oh noes!
             // Ref allele is different from reference sequence!
 
             // Oh well, we should use the reference we were given anyways...
-            final String substitutedAlignedSeq = getAlternateCodingSequence(codingSequence, refAlleleStart, refAllele, refAllele);
+            final String substitutedAlignedSeq = getAlternateSequence(codingSequence, refAlleleStart, refAllele, refAllele);
 
             // We use the positive strand here because we have already reverse complemented the sequence in the call
             // above.
@@ -1066,6 +1094,55 @@ public class FuncotatorUtils {
         }
 
         return alignedAlleleSeq;
+    }
+
+    /**
+     * Get the aligned coding sequence for the given reference allele.
+     * @param referenceSnippet {@link String} containing a short excerpt of the reference sequence around the given reference allele.
+     * @param referencePadding Number of bases in {@code referenceSnippet} before the reference allele starts.  This padding exists at the end as well (plus some other bases to account for the length of the alternate allele if it is longer than the reference).
+     * @param refAllele The reference {@link Allele}.
+     * @param codingSequenceRefAlleleStart The position (1-based, inclusive) in the coding sequence where the {@code refAllele} starts.
+     * @param alignedRefAlleleStart The in-frame position (1-based, inclusive) of the first base of the codon containing the reference allele.
+     * @return A {@link String} of in-frame codons that contain the entire reference allele.
+     */
+    public static String getAlignedRefAllele(final String referenceSnippet,
+                                             final int referencePadding,
+                                             final Allele refAllele,
+                                             final int codingSequenceRefAlleleStart,
+                                             final int alignedRefAlleleStart ) {
+
+        Utils.nonNull(referenceSnippet);
+        Utils.nonNull(refAllele);
+
+        final int extraBasesNeeded = (codingSequenceRefAlleleStart - alignedRefAlleleStart);
+        final int refStartPos = referencePadding - extraBasesNeeded;
+
+        // Round to the nearest multiple of 3 to get the end position.
+        int refEndPos = refStartPos + (int)(Math.ceil((extraBasesNeeded + refAllele.length()) / 3.0) * 3);
+
+        // Create the aligned reference:
+        String alignedReferenceAllele = referenceSnippet.substring(refStartPos, refEndPos);
+
+        // Make sure our reference is what we expect it to be with the ref allele:
+        if ( !alignedReferenceAllele.substring(extraBasesNeeded, extraBasesNeeded + refAllele.length()).equals(refAllele.getBaseString()) ) {
+            // Oh noes!
+            // Ref allele is different from reference sequence!
+
+            // Oh well, we should use the reference we were given anyways...
+            final String substitutedReferenceSnippet = getAlternateSequence(referenceSnippet, referencePadding + 1, refAllele, refAllele);
+            refEndPos = refStartPos + (int)(Math.ceil((extraBasesNeeded + refAllele.length()) / 3.0) * 3);
+
+            final String substitutedAlignedAlleleSeq = substitutedReferenceSnippet.substring(refStartPos, refEndPos);
+
+            // Warn the user!
+            logger.warn("Reference allele is different than the reference coding sequence!  Substituting given allele for sequence code (" + alignedReferenceAllele + "->" + substitutedAlignedAlleleSeq + ")");
+
+            // Set up our return value:
+            alignedReferenceAllele = substitutedAlignedAlleleSeq;
+        }
+
+        return alignedReferenceAllele;
+
     }
 
     /**
@@ -1095,15 +1172,15 @@ public class FuncotatorUtils {
     }
 
     /**
-     * Get the full alternate coding sequence given a reference coding sequence, and two alleles.
+     * Get the full alternate sequence given a reference coding sequence, and two alleles.
      * @param referenceCodingSequence The reference sequence on which to base the resulting alternate coding sequence.
      * @param alleleStartPos Starting position (1-based, inclusive) for the ref and alt alleles in the given {@code referenceCodingSequence}.
      * @param refAllele Reference Allele.  Used for the length of the reference (content ignored).
      * @param altAllele Alternate Allele.  Used for both content and length of the alternate allele.
      * @return The coding sequence that includes the given alternate allele in place of the given reference allele.
      */
-    public static String getAlternateCodingSequence( final String referenceCodingSequence, final int alleleStartPos,
-                                                     final Allele refAllele, final Allele altAllele ) {
+    public static String getAlternateSequence(final String referenceCodingSequence, final int alleleStartPos,
+                                              final Allele refAllele, final Allele altAllele ) {
 
         Utils.nonNull(referenceCodingSequence);
         Utils.nonNull(refAllele);
@@ -1130,14 +1207,11 @@ public class FuncotatorUtils {
      * @param strand {@link Strand} from which strand the associated transcript is read.
      * @return The start position (1-based, inclusive) in the coding sequence where the variant.
      */
-    public static int getCodingSequenceAlleleStartPosition( final int variantGenomicStartPosition,
-                                                            final int codingRegionGenomicStartPosition,
-                                                            final int codingRegionGenomicEndPosition,
-                                                            final Strand strand) {
-        Utils.nonNull(strand);
-        if (strand == Strand.NONE) {
-            throw new GATKException( "Cannot interpret `NONE` strand!" );
-        }
+    public static int getTranscriptAlleleStartPosition(final int variantGenomicStartPosition,
+                                                       final int codingRegionGenomicStartPosition,
+                                                       final int codingRegionGenomicEndPosition,
+                                                       final Strand strand) {
+        assertValidStrand( strand );
 
         if ( strand == Strand.POSITIVE ) {
             return variantGenomicStartPosition - codingRegionGenomicStartPosition + 1;
@@ -1158,16 +1232,15 @@ public class FuncotatorUtils {
      */
     public static String getCodingSequence(final ReferenceContext reference, final List<? extends Locatable> exonList, final Strand strand) {
 
+        // TODO: Fix this - it's broken (and re-enable the tests).
+
         Utils.nonNull(reference);
         Utils.nonNull(exonList);
-        Utils.nonNull(strand);
+        assertValidStrand( strand );
 
-        // Sanity checks:
+        // Sanity check:
         if (exonList.size() == 0) {
             return "";
-        }
-        if ( strand == Strand.NONE ) {
-            throw new GATKException("Invalid genomic strand: " + strand.toString() + " - Cannot generate coding sequence.");
         }
 
         final StringBuilder sb = new StringBuilder();
@@ -1260,12 +1333,8 @@ public class FuncotatorUtils {
         Utils.nonNull( refAllele );
         Utils.nonNull( altAllele );
         Utils.nonNull( contig );
-        Utils.nonNull( strand );
         Utils.nonNull( exonPositionList );
-
-        if ( strand == Strand.NONE ) {
-            throw new GATKException("Cannot handle NONE strand.");
-        }
+        assertValidStrand( strand );
 
         // Get the correct start / end positions:
         int alleleStart = variantStart;
@@ -1305,42 +1374,107 @@ public class FuncotatorUtils {
     }
 
     /**
+     * Asserts that the given strand is non-null and is not equal to {@link Strand#NONE}.
+     * Throws an Exception if the strand is null or equal to {@link Strand#NONE}.
+     * @param strand The {@link Strand} to validate.
+     */
+    public static void assertValidStrand( final Strand strand ) {
+
+        Utils.nonNull( strand );
+
+        if ( strand == Strand.NONE ) {
+            throw new GATKException("Unable to handle NONE strand.");
+        }
+
+    }
+
+    /**
      * A simple data object to hold a comparison between a reference sequence and an alternate allele.
      */
     public static class SequenceComparison {
-        private ReferenceSequence wholeReferenceSequence = null;
 
-        private String  contig                           = null;
-        private Strand  strand                           = null;
-        private Integer alleleStart                      = null;
-        private Integer transcriptAlleleStart            = null;
-        private Integer codingSequenceAlleleStart        = null;
-        private Integer alignedCodingSequenceAlleleStart = null;
+        /**
+         * Bases covering the region around the variant.
+         * This includes bases that would overlap any of the variant or reference bases.
+         * (i.e. if the reference allele is 'A' and the variant is 'GCGCG', this would be
+         * 'ANNNNN' where 'N' is the correct base at that position in the reference sequence).
+         * Contains {@link FuncotatorUtils.SequenceComparison#referenceWindow} bases of padding before and
+         * after the total length.
+         */
+        private String referenceBases                     = null;
+        private Integer referenceWindow                   = null;
 
-        private Integer exonStartPosition                = null;
-        private Integer exonEndPosition                  = null;
+        /**
+         * The reference coding sequence for a the transcript of this sequence comparison.
+         * This does NOT include introns.
+         * Stored in the forward reading direction.  For NEGATIVE strand reads, must
+         * reverse complement any bases retrieved.
+         */
+        private ReferenceSequence referenceCodingSequence = null;
 
-        private Integer proteinChangeStartPosition       = null;
-        private Integer proteinChangeEndPosition         = null;
+        private String  contig                               = null;
+        private Strand  strand                               = null;
+        private Integer alleleStart                          = null;
+        private Integer transcriptAlleleStart                = null;
+        private Integer codingSequenceAlleleStart            = null;
+        private Integer alignedCodingSequenceAlleleStart     = null;
 
-        private String  referenceAllele                  = null;
-        private String  alignedReferenceAllele           = null;
-        private Integer alignedReferenceAlleleStop       = null;
-        private String  referenceAminoAcidSequence       = null;
+        private Integer exonStartPosition                    = null;
+        private Integer exonEndPosition                      = null;
 
-        private String  alternateAllele                  = null;
-        private String  alignedAlternateAllele           = null;
-        private Integer alignedAlternateAlleleStop       = null;
-        private String  alternateAminoAcidSequence       = null;
+        private Integer proteinChangeStartPosition           = null;
+        private Integer proteinChangeEndPosition             = null;
+
+        private String  referenceAllele                      = null;
+        /**
+         * An in-frame sequence of bases that overlaps the given reference allele based on the raw reference genome.
+         * (i.e. This includes INTRONS.)
+         */
+        private String  alignedReferenceAllele               = null;
+        /**
+         * An in-frame sequence of bases that overlaps the given reference allele for the coding region only.
+         * (i.e. This includes ONLY EXONS.)
+         */
+        private String  alignedCodingSequenceReferenceAllele = null;
+        private Integer alignedReferenceAlleleStop           = null;
+        private String  referenceAminoAcidSequence           = null;
+
+        private String  alternateAllele                      = null;
+        private String  alignedAlternateAllele               = null;
+        private String  alignedCodingSequenceAlternateAllele = null;
+        private Integer alignedAlternateAlleleStop           = null;
+        private String  alternateAminoAcidSequence           = null;
 
         // =============================================================================================================
 
-        public ReferenceSequence getWholeReferenceSequence() {
-            return wholeReferenceSequence;
+        public String getReferenceBases() {
+            return referenceBases;
         }
 
-        public void setWholeReferenceSequence(final ReferenceSequence wholeReferenceSequence) {
-            this.wholeReferenceSequence = wholeReferenceSequence;
+        public void setReferenceBases(final String referenceBases) {
+            this.referenceBases = referenceBases;
+        }
+
+        public Integer getReferenceWindow() {
+            return referenceWindow;
+        }
+
+        public void setReferenceWindow(final Integer referenceWindow) {
+            this.referenceWindow = referenceWindow;
+        }
+
+        /**
+         * Return the {@link ReferenceSequence} containing the coding region for the transcript of this {@link SequenceComparison}.
+         * This does NOT include introns.
+         * The reference sequence is stored in the forward reading direction.
+         * For NEGATIVE strand reads, must reverse complement any bases retrieved.
+         */
+        public ReferenceSequence getReferenceCodingSequence() {
+            return referenceCodingSequence;
+        }
+
+        public void setReferenceCodingSequence(final ReferenceSequence referenceCodingSequence) {
+            this.referenceCodingSequence = referenceCodingSequence;
         }
 
         public String getContig() {
@@ -1449,6 +1583,14 @@ public class FuncotatorUtils {
             this.alignedReferenceAllele = alignedReferenceAllele;
         }
 
+        public String getAlignedCodingSequenceReferenceAllele() {
+            return alignedCodingSequenceReferenceAllele;
+        }
+
+        public void setAlignedCodingSequenceReferenceAllele(final String alignedCodingSequenceReferenceAllele) {
+            this.alignedCodingSequenceReferenceAllele = alignedCodingSequenceReferenceAllele;
+        }
+
         public Integer getAlignedReferenceAlleleStop() {
             return alignedReferenceAlleleStop;
         }
@@ -1479,6 +1621,14 @@ public class FuncotatorUtils {
 
         public void setAlignedAlternateAllele(final String alignedAlternateAllele) {
             this.alignedAlternateAllele = alignedAlternateAllele;
+        }
+
+        public String getAlignedCodingSequenceAlternateAllele() {
+            return alignedCodingSequenceAlternateAllele;
+        }
+
+        public void setAlignedCodingSequenceAlternateAllele(final String alignedCodingSequenceAlternateAllele) {
+            this.alignedCodingSequenceAlternateAllele = alignedCodingSequenceAlternateAllele;
         }
 
         public Integer getAlignedAlternateAlleleStop() {
