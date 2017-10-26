@@ -168,8 +168,8 @@ class PloidyModel(Model):
 
         def _get_logp_sjk(_n_sj):
             _logp_sjk = commons.negative_binomial_logp(alpha_adj_sjk * mu_sjk,  # mean
-                                                alpha_j.dimshuffle('x', 0, 'x'),  # over-dispersion
-                                                _n_sj.dimshuffle(0, 1, 'x'))  # contig counts
+                                                       alpha_j.dimshuffle('x', 0, 'x'),  # over-dispersion
+                                                       _n_sj.dimshuffle(0, 1, 'x'))  # contig counts
             return _logp_sjk
 
         DensityDist(name='n_sj_obs',

@@ -12,9 +12,9 @@ from . import commons
 from typing import List, Tuple, Callable
 from abc import abstractmethod
 from ..utils.interval import Interval, GCContentAnnotation
-from .hmm import TheanoForwardBackward
+from .theano_hmm import TheanoForwardBackward
 from .. import config, types
-from ..inference.hybrid_inference_base import HybridInferenceParameters
+from ..inference.inference_task_base import HybridInferenceParameters
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(config.log_level)
@@ -433,9 +433,9 @@ class DenoisingModel(Model):
         return _eval_logp
 
 
-class LogCopyNumberEmissionPosteriorSampler:
-    """ Draws posterior samples from the log emission probability for a given variational approximation to
-    the denoising model posterior """
+class CopyNumberEmissionBasicSampler:
+    """ Draws posterior samples from the log copy number emission probability for a given variational approximation to
+    the denoising model parameters """
     def __init__(self,
                  denoising_model_config: DenoisingModelConfig,
                  calling_config: CopyNumberCallingConfig,
@@ -473,11 +473,11 @@ class LogCopyNumberEmissionPosteriorSampler:
             alpha_st, self.shared_workspace.n_st)
             for c in range(self.calling_config.num_copy_number_states)]).dimshuffle(1, 2, 0)
         log_copy_number_emission_stc_sampler = approx.sample_node(
-            log_copy_number_emission_stc, size=self.training_params.log_copy_number_emission_samples_per_round)
+            log_copy_number_emission_stc, size=self.inference_params.log_emission_samples_per_round)
         return th.function(inputs=[], outputs=log_copy_number_emission_stc_sampler)
 
 
-class HHMMClassAndCopyNumberCaller:
+class HHMMClassAndCopyNumberBasicCaller:
     """ This class updates copy number and class posteriors.
 
         class_prior_k --► (tau_1) --► (tau_2) --► (tau_3) --► ...

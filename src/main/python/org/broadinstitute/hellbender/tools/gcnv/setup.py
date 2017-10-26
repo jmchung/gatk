@@ -1,8 +1,17 @@
 from distutils.core import setup
+import re
+VERSIONFILE="gcnvkernel/_version.py"
+verstrline = open(VERSIONFILE, "rt").read()
+VSRE = r"^__version__ = ['\"]([^'\"]*)['\"]"
+mo = re.search(VSRE, verstrline, re.M)
+if mo:
+    verstr = mo.group(1)
+else:
+    raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
 
 setup(
     name='gcnvkernel',
-    version='0.2dev',
+    version=verstr,
     author='Mehrtash Babadi',
     author_email='mehrtash@broadinstitute.org',
     packages=['gcnvkernel'],

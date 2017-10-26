@@ -47,15 +47,12 @@ class Caller:
 
 class CallerUpdateSummary:
     @abstractmethod
-    def to_string(self):
-        raise NotImplementedError
-
-    @abstractmethod
     def reduce_to_scalar(self) -> float:
         raise NotImplementedError
 
-    __repr__ = to_string
-    __str__ = to_string
+    @abstractmethod
+    def __repr__(self):  # the summary must be representable
+        raise NotImplementedError
 
 
 class InferenceTask:
@@ -143,7 +140,7 @@ class NoisyELBOConvergenceTracker(Callback):
         self._lin_reg = NonStationaryLinearRegression(window=self.window)
         self._n_obs: int = 0
         self._n_obs_snr_under_threshold: int = 0
-        self.eipi: float = None  # effective loss per iteration
+        self.egpi: float = None  # effective gain per iteration
         self.snr: float = None  # signal-to-noise ratio
         self.variance: float = None  # variance of elbo in the window
         self.drift: float = None  # absolute elbo change in the window
@@ -151,11 +148,11 @@ class NoisyELBOConvergenceTracker(Callback):
     def __call__(self, approx, loss, i):
         self._lin_reg.add_observation(loss)
         self._n_obs += 1
-        self.eipi = self._lin_reg.get_slope()
+        self.egpi = self._lin_reg.get_slope()
         self.variance = self._lin_reg.get_variance()
-        if self.eipi is not None and self.variance is not None:
-            self.eipi *= -1
-            self.drift = np.abs(self.eipi) * self.window
+        if self.egpi is not None and self.variance is not None:
+            self.egpi *= -1
+            self.drift = np.abs(self.egpi) * self.window
             self.snr = self.drift / np.sqrt(2 * self.variance)
             if self.snr < self.snr_stop_trigger_threshold:
                 self._n_obs_snr_under_threshold += 1
@@ -225,6 +222,41 @@ class ParamTracker:
 
 
 class HybridInferenceTask(InferenceTask):
+    """
+    A "hybrid" inference is applicable to a PGM structured as:
+
+        +--------------+           +----------------+
+        | discrete RVs + --------► + continuous RVs |
+        +--------------+           +----------------+
+
+    The inference is approximately performed by factorizing the true posterior into an uncorrelated
+    product of discrete RVs (DRVs) and continuous RVs (CRVs):
+
+        p(CRVs, DRVs | observed) ~ q(CRVs) q(DRVs)
+
+    The user must supply the following components:
+
+        (1) a pm.Model that yields the DRV-posterior-expectation of the log joint,
+            E_{DRVs ~ q(DRVs)} [log_P(CRVs, DRVs, observed)]
+
+        (2) a "sampler" that provides samples from the log_emission, defined as:
+            log_emission(DRVs) = E_{CRVs ~ q(CRVs)} [log_P (observed | CRVs, DRV)]
+
+        (3) a "caller" that updates q(DRVs) given log_emission(DRV); it could be as simple as using
+            the Bayes rule, or as complicated as doing iterative hierarchical HMM if correlations about
+            DRVs are important.
+
+    The general implementation motif is:
+
+        (a) to store q(CRVs) as a shared theano tensor such that the the pymc3 model can access it,
+        (b) to store log_emission(DRVs) as a shared theano tensor (or ndarray) such that the caller
+            can access it, and:
+        (c) let the caller directly update the shared q(CRVs).
+
+    This class performs mean-field ADVI to obtain q(CRVs); q(DRV), however, is handled by the external
+    "caller" and is out the scope of this class.
+
+    """
     def __init__(self,
                  hybrid_inference_params: HybridInferenceParameters,
                  continuous_model: Model,
@@ -329,15 +361,15 @@ class HybridInferenceTask(InferenceTask):
                     loss = self.continuous_model_step_func() / self.elbo_normalization_factor
                     self.convergence_tracker(self.continuous_model_advi.approx, loss, i)
                     snr = self.convergence_tracker.snr
-                    eipi = self.convergence_tracker.eipi
+                    egpi = self.convergence_tracker.egpi
                     if snr is not None:
                         self.snr_hist.append(snr)
                     self.elbo_hist.append(-loss)
-                    progress_bar.set_description("({0}) ELBO: {1:2.6}, SNR: {2}, EIPI: {3}".format(
+                    progress_bar.set_description("({0}) ELBO: {1:2.6}, SNR: {2}, EGPI: {3}".format(
                         self.advi_task_name,
                         -loss,
                         "{0:2.2}".format(snr) if snr is not None else "N/A",
-                        "{0:2.2}".format(eipi) if eipi is not None else "N/A"))
+                        "{0:2.2}".format(egpi) if egpi is not None else "N/A"))
                     if self.param_tracker is not None \
                             and i % self.hybrid_inference_params.track_model_params_every == 0:
                         self.param_tracker(self.continuous_model_advi.approx, loss, i)
@@ -408,14 +440,14 @@ class HybridInferenceTask(InferenceTask):
                 for _ in progress_bar:
                     progress_bar.set_description("({0}) ...".format(self.calling_task_name))
                     caller_summary = self.caller.call()
-                    progress_bar.set_description("({0}) {1}".format(self.calling_task_name, caller_summary))
+                    progress_bar.set_description("({0}) {1}".format(self.calling_task_name, repr(caller_summary)))
                     caller_update_size_scalar = caller_summary.reduce_to_scalar()
                     if caller_update_size_scalar < self.hybrid_inference_params.caller_update_convergence_threshold:
                         converged = True
                         raise StopIteration
 
             except StopIteration:
-                progress_bar.set_description("({0}) [final] {1}".format(self.calling_task_name, caller_summary))
+                progress_bar.set_description("({0}) [final] {1}".format(self.calling_task_name, repr(caller_summary)))
                 progress_bar.refresh()
                 progress_bar.close()
                 self._log_stop(self.calling_task_name, i_epoch)
