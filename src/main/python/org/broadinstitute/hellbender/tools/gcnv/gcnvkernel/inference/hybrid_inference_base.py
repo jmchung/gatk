@@ -6,11 +6,12 @@ import tqdm
 from pymc3.variational.callbacks import Callback
 from pymc3 import Model
 from typing import List, Callable, Optional
+from .. import config
 from abc import abstractmethod
 from ..utils.rls import NonStationaryLinearRegression
 
 _logger = logging.getLogger(__name__)
-_logger.setLevel(logging.INFO)
+_logger.setLevel(config.log_level)
 
 
 class Sampler:
@@ -289,7 +290,9 @@ class HybridInferenceTask(InferenceTask):
                 converged_continuous = self._update_continuous_posteriors(i_epoch)
                 converged_sampling = self._update_log_emission_posterior_expectation(i_epoch)
                 converged_discrete = self._update_discrete_posteriors(i_epoch)
-
+                _logger.info("End of epoch {0} -- converged continuous: {1},  converged sampling: {2}, "
+                             "converged discrete: {3}".format(i_epoch, converged_continuous, converged_sampling,
+                                                              converged_discrete))
                 if converged_continuous and converged_sampling and converged_discrete:
                     break
 
@@ -426,3 +429,5 @@ class HybridInferenceTask(InferenceTask):
                 if not converged:
                     _logger.warning('{0} did not converge. Increase maximum calling rounds ({1})'.format(
                         self.calling_task_name, self.hybrid_inference_params.max_calling_iters))
+
+        return converged

@@ -14,7 +14,7 @@ from ..models.denoising_calling_model import DenoisingModel, DenoisingModelConfi
     DenoisingCallingWorkspace, CopyNumberCallingConfig, HHMMClassAndCopyNumberCaller
 
 _logger = logging.getLogger(__name__)
-_logger.setLevel(logging.INFO)
+_logger.setLevel(config.log_level)
 
 _log_copy_number_emission_sampling_task_name = "log copy number emission sampling task"
 _log_ploidy_emission_sampling_task_name = "log ploidy emission sampling task"

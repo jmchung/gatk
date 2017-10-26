@@ -17,7 +17,7 @@ from .. import config, types
 from ..inference.hybrid_inference_base import HybridInferenceParameters
 
 _logger = logging.getLogger(__name__)
-_logger.setLevel(logging.INFO)
+_logger.setLevel(config.log_level)
 
 
 class DenoisingModelConfig:

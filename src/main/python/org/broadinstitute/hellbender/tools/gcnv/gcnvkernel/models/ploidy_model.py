@@ -12,7 +12,7 @@ from ..utils.interval import Interval
 from .. import config, types
 
 _logger = logging.getLogger(__name__)
-_logger.setLevel(logging.INFO)
+_logger.setLevel(config.log_level)
 
 
 class PloidyModelConfig:
@@ -41,10 +41,10 @@ class PloidyModelConfig:
             num_ploidy_states = max(num_ploidy_states, given_contig_prior_ploidy_map[contig].size)
         validated_contig_prior_ploidy_map: Dict[str, np.ndarray] = dict()
         for contig in given_contigs:
-            validated_prior = commons.get_normalized_prob_vector(
-                given_contig_prior_ploidy_map[contig].flatten() + min_prob, config.prob_sum_tol)
-            padded_validated_prior = np.zeros((num_ploidy_states,), dtype=types.floatX)
-            padded_validated_prior[:validated_prior.size] = validated_prior[:]
+            padded_validated_prior = np.zeros((num_ploidy_states,), dtype=types.floatX) + min_prob
+            given_prior = given_contig_prior_ploidy_map[contig].flatten()
+            padded_validated_prior[:given_prior.size] = padded_validated_prior[:given_prior.size] + given_prior
+            padded_validated_prior = commons.get_normalized_prob_vector(padded_validated_prior, config.prob_sum_tol)
             validated_contig_prior_ploidy_map[contig] = padded_validated_prior
         return validated_contig_prior_ploidy_map, num_ploidy_states
 
@@ -217,8 +217,8 @@ class PloidyBasicCaller:
         new_log_q_kappa_sjk = (self.ploidy_workspace.log_p_kappa_jk.dimshuffle('x', 0, 1)
                                + self.ploidy_workspace.log_ploidy_emission_sjk)
         new_log_q_kappa_sjk -= pm.logsumexp(new_log_q_kappa_sjk, axis=2)
-        update_norm_sj = commons.get_hellinger_distance(new_log_q_kappa_sjk,
-                                                        self.ploidy_workspace.log_q_kappa_sjk)
+        update_norm_sj = commons.get_jensen_shannon_divergence(new_log_q_kappa_sjk,
+                                                               self.ploidy_workspace.log_q_kappa_sjk)
         return th.function(inputs=[],
                            outputs=[update_norm_sj],
                            updates=[(self.ploidy_workspace.log_q_kappa_sjk, new_log_q_kappa_sjk)])

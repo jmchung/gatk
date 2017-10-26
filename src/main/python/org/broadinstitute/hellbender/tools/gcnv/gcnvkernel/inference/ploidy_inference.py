@@ -8,7 +8,7 @@ from .. import config, types
 from ..models.ploidy_model import PloidyModelConfig, PloidyModel, PloidyWorkspace, PloidyEmissionBasicSampler, PloidyBasicCaller
 
 _logger = logging.getLogger(__name__)
-_logger.setLevel(logging.INFO)
+_logger.setLevel(config.log_level)
 
 
 class PloidyCaller(Caller):

@@ -1,11 +1,11 @@
 import numpy as np
 import logging
 import theano.tensor as tt
-
 import pymc3.distributions.dist_math as pm_dist_math
+from .. import config
 
 _logger = logging.getLogger(__name__)
-_logger.setLevel(logging.INFO)
+_logger.setLevel(config.log_level)
 
 
 def get_normalized_prob_vector(prob_vector: np.ndarray, prob_sum_tol: float) -> np.ndarray:
