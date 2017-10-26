@@ -1,9 +1,11 @@
 package org.broadinstitute.hellbender.tools.walkers.readorientation;
 
+import htsjdk.samtools.metrics.MetricBase;
+import htsjdk.samtools.metrics.MetricsFile;
+import htsjdk.samtools.util.Histogram;
 import htsjdk.samtools.util.SequenceUtil;
 import org.broadinstitute.barclay.argparser.Argument;
 import org.broadinstitute.barclay.argparser.CommandLineProgramProperties;
-import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
 import org.broadinstitute.hellbender.cmdline.programgroups.VariantProgramGroup;
 import org.broadinstitute.hellbender.engine.*;
 import org.broadinstitute.hellbender.engine.filters.ReadFilter;
@@ -15,7 +17,6 @@ import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.pileup.ReadPileup;
 import org.broadinstitute.hellbender.utils.read.ReadUtils;
 import org.broadinstitute.hellbender.tools.walkers.readorientation.AltSiteRecord.AltSiteRecordTableWriter;
-import org.broadinstitute.hellbender.tools.walkers.readorientation.RefSiteHistogram.RefSiteHistogramWriter;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,39 +28,54 @@ import java.util.stream.Collectors;
  */
 
 @CommandLineProgramProperties(
-        summary = "Traverse and collect data from a bam for Mutect2 Read Orientation Filter",
+        summary = "Collect data from a tumor bam for Mutect2 Read Orientation Filter",
         oneLineSummary = "Data collection for Mutect2 Read Orientation Filter",
         programGroup = VariantProgramGroup.class
 )
 
 public class CollectDataForReadOrientationFilter extends LocusWalker {
-    public static final String ALT_DATA_TABLE_SHORT_NAME = "alt_table";
-    public static final String ALT_DATA_TABLE_LONG_NAME = "alt_data_table";
+    public static final String ALT_DATA_TABLE_SHORT_NAME = "alt-table";
+    public static final String ALT_DATA_TABLE_LONG_NAME = "alt-data-table";
 
-    public static final String REF_HISTOGRAM_TABLE_SHORT_NAME = "ref_table";
-    public static final String REF_HISTOGRAM_TABLE_LONG_NAME = "ref_histogram_table";
+    public static final String REF_SITE_METRICS_SHORT_NAME = "ref-table";
+    public static final String REF_SITE_METRICS_LONG_NAME = "ref-histogram-table";
+
+    public static final String MIN_MEDIAN_MQ_SHORT_NAME = "mq";
+    public static final String MIN_MEDIAN_MQ_LONG_NAME = "min-mq";
+
+    public static final String MIN_BASE_QUALITY_SHORT_NAME = "bq";
+    public static final String MIN_BASE_QUALITY_LONG_NAME = "min-bq";
 
 
-    @Argument(fullName = "min-mq", shortName = "mq", doc = "exclude reads below this quality from pileup", optional = true)
-    static int MINIMUM_MEDIAN_MQ = 20;
+    @Argument(fullName = MIN_MEDIAN_MQ_LONG_NAME,
+            shortName = MIN_MEDIAN_MQ_SHORT_NAME,
+            doc = "exclude reads below this quality from pileup", optional = true)
+    private static int MINIMUM_MEDIAN_MQ = 20;
 
-    @Argument(fullName = "min-bq", shortName = "bq", doc = "exclude bases below this quality from pileup", optional = true)
-    static int MINIMUM_BASE_QUALITY = 10;
+    @Argument(fullName = MIN_BASE_QUALITY_LONG_NAME,
+            shortName = MIN_BASE_QUALITY_SHORT_NAME,
+            doc = "exclude bases below this quality from pileup", optional = true)
+    private static int MINIMUM_BASE_QUALITY = 10;
 
     @Argument(fullName = ALT_DATA_TABLE_LONG_NAME,
             shortName = ALT_DATA_TABLE_SHORT_NAME,
             doc = "a tab-separated output table of pileup data over alt sites")
-    static File altDataTable = null;
+    private static File altDataTable = null;
 
-    @Argument(fullName = REF_HISTOGRAM_TABLE_LONG_NAME,
-            shortName = REF_HISTOGRAM_TABLE_SHORT_NAME,
-            doc = "a tab-separated output histogram of depths over ref sites")
-    static File refHistogramTable = null;
+    @Argument(fullName = REF_SITE_METRICS_LONG_NAME,
+            shortName = REF_SITE_METRICS_SHORT_NAME,
+            doc = "a metrics file with overall summary metrics and reference context-specific depth histograms")
+    private static File referenceSiteMetrics = null;
+
+    private static final List<String> ALL_3_MERS = SequenceUtil.generateAllKmers(3).stream()
+            .map(String::new).collect(Collectors.toList());
 
     // for computational efficiency, for each reference context, we build a depth histogram over ref sites
-    private static RefSiteHistogram[] refSiteHistograms = new RefSiteHistogram[64];
+    private static Histogram<Integer>[] refSiteHistograms = new Histogram[ALL_3_MERS.size()];
 
-    AltSiteRecordTableWriter altTableWriter;
+    private AltSiteRecordTableWriter altTableWriter;
+
+    private final MetricsFile<?, Integer> refMetricsFile = new MetricsFile();
 
     @Override
     public boolean requiresReference(){
@@ -73,9 +89,11 @@ public class CollectDataForReadOrientationFilter extends LocusWalker {
 
     @Override
     public void onTraversalStart() {
-        final List<String> all3Mers = SequenceUtil.generateAllKmers(3).stream().map(String::new).collect(Collectors.toList());
-        for (final String refContext : all3Mers){
-            refSiteHistograms[contextToIndex(refContext)] = new RefSiteHistogram(refContext);
+
+        for (final String refContext : ALL_3_MERS){
+            // create a histogram - use the ref context as the label so that, when we read the metrics file and
+            // all the histograms in it, we can sort them
+            refSiteHistograms[contextToIndex(refContext)] = new Histogram<>("depth", refContext);
         }
 
         // intentionally not use try-with-resources so that the writer stays open outside of the try block
@@ -106,7 +124,7 @@ public class CollectDataForReadOrientationFilter extends LocusWalker {
             return;
         }
 
-        final ReadPileup pileup = alignmentContext.filter(pe -> pe.getQual() > MINIMUM_BASE_QUALITY).getBasePileup();
+        final ReadPileup pileup = alignmentContext.getBasePileup().makeFilteredPileup(pe -> pe.getQual() > MINIMUM_BASE_QUALITY);
 
         // This case should not happen, as AlignmentContext should come filtered, it does happen once in a while
         if (pileup.size() == 0){
@@ -183,7 +201,11 @@ public class CollectDataForReadOrientationFilter extends LocusWalker {
 
     @Override
     public Object onTraversalSuccess() {
-        RefSiteHistogram.writeRefSiteHistograms(Arrays.asList(refSiteHistograms), refHistogramTable);
+        for (String context : ALL_3_MERS){
+            refMetricsFile.addHistogram(refSiteHistograms[contextToIndex(context)]);
+        }
+
+        refMetricsFile.write(referenceSiteMetrics);
         return "SUCCESS";
     }
 

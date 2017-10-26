@@ -2,6 +2,10 @@ package org.broadinstitute.hellbender.tools.walkers.readorientation;
 
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMReadGroupRecord;
+import htsjdk.samtools.metrics.MetricsFile;
+import htsjdk.samtools.util.CloserUtil;
+import htsjdk.samtools.util.Histogram;
+import htsjdk.samtools.util.IOUtil;
 import org.broadinstitute.hellbender.CommandLineProgramTest;
 import org.broadinstitute.hellbender.utils.MathUtils;
 import org.broadinstitute.hellbender.utils.genotyper.*;
@@ -15,26 +19,27 @@ import org.testng.internal.junit.ArrayAsserts;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Reader;
 import java.util.*;
 
 /**
  * Created by tsato on 8/1/17.
  */
 public class CollectDataForReadOrientationFilterIntegrationTest extends CommandLineProgramTest {
-
+    private final static double EPSILON = 1e-6;
     /**
      * Test the tool on a real bam to make sure that it does not crash
      */
     @Test
     public void testOnRealBam() {
-        final File refTable = createTempFile("ref", ".table");
+        final File refMetrics = createTempFile("ref", ".table");
         final File altTable = createTempFile("alt", ".table");
 
         final String[] args = {
                 "-R", v37_chr17_1Mb_Reference,
                 "-I", NA12878_chr17_1k_BAM,
-                "-alt_table", altTable.getAbsolutePath(),
-                "-ref_table", refTable.getAbsolutePath()
+                "-" + CollectDataForReadOrientationFilter.ALT_DATA_TABLE_SHORT_NAME, altTable.getAbsolutePath(),
+                "-" + CollectDataForReadOrientationFilter.REF_SITE_METRICS_SHORT_NAME, refMetrics.getAbsolutePath()
         };
 
         runCommandLine(args);
@@ -42,7 +47,7 @@ public class CollectDataForReadOrientationFilterIntegrationTest extends CommandL
 
     @Test
     public void testOnSyntheticBam() throws IOException{
-        final File refTable = createTempFile("ref", ".table");
+        final File refMetrics = createTempFile("ref", ".metrics");
         final File altTable = createTempFile("alt", ".table");
 
         final int numAltReads = 30;
@@ -53,13 +58,18 @@ public class CollectDataForReadOrientationFilterIntegrationTest extends CommandL
         final String[] args = {
                 "-R", hg19_chr1_1M_Reference,
                 "-I", samFile.getAbsolutePath(),
-                "-alt_table", altTable.getAbsolutePath(),
-                "-ref_table", refTable.getAbsolutePath()
+                "-" + CollectDataForReadOrientationFilter.ALT_DATA_TABLE_SHORT_NAME, altTable.getAbsolutePath(),
+                "-" + CollectDataForReadOrientationFilter.REF_SITE_METRICS_SHORT_NAME, refMetrics.getAbsolutePath()
         };
 
         runCommandLine(args);
 
-        List<RefSiteHistogram> histograms = RefSiteHistogram.readRefSiteHistograms(refTable);
+        final MetricsFile<?, Integer> referenceSiteMetrics = new MetricsFile();
+        final Reader in = IOUtil.openFileForBufferedReading(refMetrics);
+        referenceSiteMetrics.read(in);
+        CloserUtil.close(in);
+
+        List<Histogram<Integer>> histograms = referenceSiteMetrics.getAllHistograms();
         List<AltSiteRecord> altDesignMatrix = AltSiteRecord.readAltSiteRecords(altTable);
 
         /** Expected result
@@ -108,14 +118,11 @@ public class CollectDataForReadOrientationFilterIntegrationTest extends CommandL
 
         // check ref histograms
         for (String exptectedRefContext : Arrays.asList("TCA", "ACT", "CTA", "AAG", "GCA", "CAC")){
-            RefSiteHistogram histogram = histograms.stream()
-                    .filter(hist -> hist.getReferenceContext().equals(exptectedRefContext))
+            Histogram<Integer> histogram = histograms.stream()
+                    .filter(hist -> hist.getValueLabel().equals(exptectedRefContext))
                     .findFirst().get();
-            // recall the refsite histogram places depth 1 at index 0
-            // index: 0, 1, ..., depth-1, ...
-            // depth: 1, 2, ..., depth,   ...
-            Assert.assertEquals(histogram.getCounts()[depth-1], 1);
-            Assert.assertEquals(MathUtils.sum(histogram.getCounts()), 1);
+            Assert.assertEquals(histogram.get(depth).getValue(), 1.0 );
+            Assert.assertEquals(histogram.getSumOfValues(), 1.0);
         }
     }
 
