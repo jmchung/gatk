@@ -6,12 +6,10 @@ import tqdm
 from pymc3.variational.callbacks import Callback
 from pymc3 import Model
 from typing import List, Callable, Optional
-from .. import config
 from abc import abstractmethod
 from ..utils.rls import NonStationaryLinearRegression
 
 _logger = logging.getLogger(__name__)
-_logger.setLevel(config.log_level)
 
 
 class Sampler:

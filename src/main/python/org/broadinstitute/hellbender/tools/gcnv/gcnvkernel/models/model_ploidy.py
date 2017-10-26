@@ -12,7 +12,6 @@ from ..utils.interval import Interval
 from .. import config, types
 
 _logger = logging.getLogger(__name__)
-_logger.setLevel(config.log_level)
 
 
 class PloidyModelConfig:
@@ -36,7 +35,7 @@ class PloidyModelConfig:
     def _get_validated_contig_prior_ploidy_map(given_contig_prior_ploidy_map: Dict[str, np.ndarray],
                                                min_prob: float = 1e-12):
         given_contigs = set(given_contig_prior_ploidy_map.keys())
-        num_ploidy_states = 0
+        num_ploidy_states: int = 0
         for contig in given_contigs:
             num_ploidy_states = max(num_ploidy_states, given_contig_prior_ploidy_map[contig].size)
         validated_contig_prior_ploidy_map: Dict[str, np.ndarray] = dict()

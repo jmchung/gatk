@@ -10,7 +10,6 @@ from ..models.model_ploidy import PloidyModelConfig, PloidyModel,\
     PloidyWorkspace, PloidyEmissionBasicSampler, PloidyBasicCaller
 
 _logger = logging.getLogger(__name__)
-_logger.setLevel(config.log_level)
 
 
 class PloidyCaller(Caller):
@@ -89,5 +88,5 @@ class PloidyInferenceTask(HybridInferenceTask):
         elbo_normalization_factor = ploidy_workspace.num_samples * ploidy_workspace.num_contigs
         super().__init__(hybrid_inference_params, ploidy_model, ploidy_emission_sampler, ploidy_caller,
                          elbo_normalization_factor=elbo_normalization_factor,
-                         advi_task_name="contig-level denoising",
-                         calling_task_name="calling ploidy")
+                         advi_task_name="denoising",
+                         calling_task_name="ploidy")

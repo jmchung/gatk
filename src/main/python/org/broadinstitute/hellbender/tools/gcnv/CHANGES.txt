@@ -11,4 +11,6 @@ v0.1 (2017-10-19)
 v0.2dev (?)
 -----------
 
-- ?
+- hybrid inference task framework
+- ploidy determination model and inference task
+

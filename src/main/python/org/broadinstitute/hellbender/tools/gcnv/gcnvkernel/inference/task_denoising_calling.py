@@ -10,7 +10,6 @@ from ..models.model_denoising_calling import DenoisingModel, DenoisingModelConfi
     DenoisingCallingWorkspace, CopyNumberCallingConfig, HHMMClassAndCopyNumberBasicCaller
 
 _logger = logging.getLogger(__name__)
-_logger.setLevel(config.log_level)
 
 
 class HHMMClassAndCopyNumberCaller(Caller):
@@ -113,4 +112,4 @@ class CohortDenoisingAndCallingTask(HybridInferenceTask):
         super().__init__(hybrid_inference_params, denoising_model, copy_number_emission_sampler, copy_number_caller,
                          elbo_normalization_factor=elbo_normalization_factor,
                          advi_task_name="denoising",
-                         calling_task_name="calling CNVs")
+                         calling_task_name="calling")

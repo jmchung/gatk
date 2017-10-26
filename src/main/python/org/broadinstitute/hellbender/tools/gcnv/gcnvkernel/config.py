@@ -10,5 +10,3 @@ log_eps = 1e-12
 # be normalized and a warning will be emitted
 prob_sum_tol = 1e-10
 
-# global log level
-log_level = WARNING

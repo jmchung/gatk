@@ -2,13 +2,24 @@
 High priority
 =============
 
-- rewrite cohort learning and calling task using the general hybrid inference framework
+- a sample-contig-ploidy dictionary
 
-- [DONE] ploidy model
+- fix reference CN per contig per sample in the denoising model
 
-- fix read depth and reference CN per contig per sample in the denoising model
+- remove read depth from the model parameters
 
-- filter targets
+- [DONE] filter targets
+
+- [DONE] replace psi with alpha
+    * retracted! for some reason, led to slower convergence (conditioning?)
+
+
+
+
+
+- add additional priors to the ploidy model
+
+- add constant ploidy-related terms to the per-contig denoising model
 
 - pre-processor (python side)
     1. take a cohort (or single-sample) and a list of target intervals
@@ -22,7 +33,9 @@ High priority
         * mean_count(sample, contig)
         * std_count(sample, contig)
 
+
 - multi-threading for forward-backward
+
 
 - write model params and sample posteriors to disk
 
@@ -40,6 +53,15 @@ High priority
     - ?
 
 - generate learning plots
+
+
+
+
+
+
+
+
+
 
 
 - port notebook to pycharm
@@ -92,6 +114,10 @@ High priority
     * non-diploid CN in reference (perhaps we can handle this properly instead of blacklisting?)
     * very low mappability
     * regions near centromeres
+
+- [DONE] rewrite cohort learning and calling task using the general hybrid inference framework
+
+- [DONE] ploidy model
 
 - [NOT GOOD] drop psi adjustment term in NB
     * the term is not necessary; will be captured by mean bias

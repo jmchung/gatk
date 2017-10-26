@@ -17,7 +17,6 @@ from .. import config, types
 from ..inference.inference_task_base import HybridInferenceParameters
 
 _logger = logging.getLogger(__name__)
-_logger.setLevel(config.log_level)
 
 
 class DenoisingModelConfig:
@@ -28,10 +27,10 @@ class DenoisingModelConfig:
     def __init__(self,
                  max_bias_factors: int = 5,
                  mapping_error_rate: float = 1e-2,
-                 mean_psi: float = 0.1,
-                 tau_depth: float = 1e+1,
-                 sigma_log_bias: float = 5e-1,
-                 init_alpha_rel_psi: float = 0.1,
+                 psi_mean: float = 10.0,
+                 tau_depth: float = 10.0,
+                 log_mean_bias_std: float = 0.5,
+                 init_ard_rel_unexplained_variance: float = 0.1,
                  num_gc_bins: int = 20,
                  gc_curve_sd: float = 1.0,
                  q_c_expectation_mode: str = 'map',
@@ -40,10 +39,10 @@ class DenoisingModelConfig:
         """ Constructor
         :param max_bias_factors: maximum number of bias factors
         :param mapping_error_rate: typical mapping error rate
-        :param mean_psi: mean expected unexplained variance
+        :param psi_mean: mean unexplained variance
         :param tau_depth: precision for pinning the read depth to the raw coverage median
-        :param sigma_log_bias: standard deviation of the log mean bias
-        :param init_alpha_rel_psi: initial ARD precision relative to mean_psi
+        :param log_mean_bias_std: standard deviation of the log mean bias
+        :param init_ard_rel_unexplained_variance: initial ARD precision relative to unexplained variance
         :param num_gc_bins: number of GC bins (if enable_explicit_gc_bias_modeling is True)
         :param gc_curve_sd: standard deviation of each knob in the GC curve
         :param q_c_expectation_mode: approximation scheme to use for calculating posterior expectations
@@ -54,10 +53,10 @@ class DenoisingModelConfig:
 
         self.max_bias_factors = max_bias_factors
         self.mapping_error_rate = mapping_error_rate
-        self.mean_psi = mean_psi
+        self.psi_mean = psi_mean
         self.tau_depth = tau_depth
-        self.sigma_log_bias = sigma_log_bias
-        self.init_alpha_rel_psi = init_alpha_rel_psi
+        self.log_mean_bias_std = log_mean_bias_std
+        self.init_ard_rel_unexplained_variance = init_ard_rel_unexplained_variance
         self.num_gc_bins = num_gc_bins
         self.gc_curve_sd = gc_curve_sd
         self.q_c_expectation_mode = q_c_expectation_mode
@@ -130,7 +129,7 @@ class PosteriorInitializer:
     def initialize_posterior(denoising_config: DenoisingModelConfig,
                              calling_config: CopyNumberCallingConfig,
                              shared_workspace: 'DenoisingCallingWorkspace') -> None:
-        pass
+        raise NotImplementedError
 
 
 class InitializeToPrior(PosteriorInitializer):
@@ -163,7 +162,7 @@ class DenoisingCallingWorkspace:
         assert n_st.shape[1] == len(targets_interval_list), "the length of the targets interval list does not match" \
                                                             " the shape of the read counts matrix"
         self.targets_interval_list: List[Interval] = targets_interval_list
-        self.n_st: types.TensorSharedVariable = th.shared(n_st.astype(types.floatX), name="n_st",
+        self.n_st: types.TensorSharedVariable = th.shared(n_st.astype(types.big_uint), name="n_st",
                                                           borrow=config.borrow_numpy)
         self.num_targets: int = len(targets_interval_list)
         self.num_samples: int = n_st.shape[0]
@@ -173,6 +172,10 @@ class DenoisingCallingWorkspace:
             np.asarray([targets_interval_list[ti + 1].distance(targets_interval_list[ti])
                         for ti in range(self.num_targets - 1)], dtype=types.floatX),
             borrow=config.borrow_numpy)
+
+        # a vector of (integer) copy numbers
+        copy_number_values_c = np.arange(0, calling_config.num_copy_number_states, dtype=types.big_uint)
+        self.copy_number_values_c = th.shared(copy_number_values_c, name='copy_number_values_c')
 
         # copy number log posterior
         #   initialized by PosteriorInitializer.initialize(),
@@ -264,7 +267,8 @@ class DenoisingCallingWorkspace:
         indices = [get_gc_bin_idx(interval.get_annotation(GCContentAnnotation.get_key()))
                    for interval in targets_interval_list]
         indptr = np.arange(0, num_targets + 1)
-        scipy_gc_matrix = sp.csr_matrix((data, indices, indptr), shape=(num_targets, num_gc_bins), dtype=np.int8)
+        scipy_gc_matrix = sp.csr_matrix((data, indices, indptr), shape=(num_targets, num_gc_bins),
+                                        dtype=types.small_uint)
         theano_gc_matrix: tst.SparseConstant = tst.as_sparse(scipy_gc_matrix)
         return theano_gc_matrix
 
@@ -300,7 +304,7 @@ class DefaultInitialModelParametersSupplier(InitialModelParametersSupplier):
         super().__init__(denoising_model_config, calling_config, shared_workspace)
 
     def get_init_psi_t(self) -> np.ndarray:
-        return self.denoising_model_config.mean_psi * np.ones((self.shared_workspace.num_targets,), dtype=types.floatX)
+        return self.denoising_model_config.psi_mean * np.ones((self.shared_workspace.num_targets,), dtype=types.floatX)
 
     def get_init_log_mean_bias_t(self) -> np.ndarray:
         depth_normalized_n_st: np.ndarray = self.shared_workspace.n_st.get_value(borrow=True) / (
@@ -309,7 +313,7 @@ class DefaultInitialModelParametersSupplier(InitialModelParametersSupplier):
         return np.log(bias_t + config.log_eps)
 
     def get_init_alpha_u(self) -> np.ndarray:
-        fact = self.denoising_model_config.mean_psi * self.denoising_model_config.init_alpha_rel_psi
+        fact = self.denoising_model_config.psi_mean * self.denoising_model_config.init_ard_rel_unexplained_variance
         return fact * np.ones((self.denoising_model_config.max_bias_factors,), dtype=types.floatX)
 
 
@@ -323,12 +327,12 @@ class DenoisingModel(Model):
         super().__init__()
 
         # target-specific unexplained variance
-        psi_t = Exponential(name='psi_t', lam=1.0 / denoising_model_config.mean_psi,
+        psi_t = Exponential(name='psi_t', lam=1.0 / denoising_model_config.psi_mean,
                             shape=shared_workspace.num_targets,
                             testval=test_value_supplier.get_init_psi_t())
 
         # target-specific mean log bias
-        log_mean_bias_t = Normal(name='log_mean_bias_t', mu=0.0, sd=denoising_model_config.sigma_log_bias,
+        log_mean_bias_t = Normal(name='log_mean_bias_t', mu=0.0, sd=denoising_model_config.log_mean_bias_std,
                                  shape=shared_workspace.num_targets,
                                  testval=test_value_supplier.get_init_log_mean_bias_t())
 
@@ -425,9 +429,9 @@ class DenoisingModel(Model):
             eps_st = (mapping_error_rate * depth_s).dimshuffle(0, 'x')
             mu_adj_fact_st = tt.exp(0.5 * psi_t).dimshuffle('x', 0)
             alpha_st = tt.inv((tt.exp(psi_t) - 1.0)).dimshuffle('x', 0)
-            c_argmax_st = tt.argmax(log_q_c_stc, axis=2)
-            log_copy_number_emission_st = commons.negative_binomial_logp(
-                c_argmax_st * mu_adj_fact_st * depth_bias_st + eps_st, alpha_st, n_st)
+            c_map_st = tt.argmax(log_q_c_stc, axis=2)
+            mu_st = c_map_st * mu_adj_fact_st * depth_bias_st + eps_st
+            log_copy_number_emission_st = commons.negative_binomial_logp(mu_st, alpha_st, n_st)
             return tt.sum(log_copy_number_emission_st)
 
         return _eval_logp
@@ -459,6 +463,8 @@ class CopyNumberEmissionBasicSampler:
     def draw(self):
         return self._simultaneous_log_copy_number_emission_sampler()
 
+    # todo the code duplication here can be reduced by making log_copy_number_emission_stc a deterministic
+    # todo in the denoising model declaration
     def _get_compiled_simultaneous_log_copy_number_emission_sampler(self, approx: pm.approximations.MeanField):
         """ For a given variational approximation, returns a compiled theano function that draws posterior samples
         from the log copy number emission """
@@ -468,10 +474,13 @@ class CopyNumberEmissionBasicSampler:
         eps_st = self.model_config.mapping_error_rate * self.denoising_model['depth_s'].dimshuffle(0, 'x')
         mu_adj_fact_st = tt.exp(0.5 * self.denoising_model['psi_t']).dimshuffle('x', 0)
         alpha_st = tt.inv((tt.exp(self.denoising_model['psi_t']) - 1.0)).dimshuffle('x', 0)
-        log_copy_number_emission_stc = tt.stack([commons.negative_binomial_logp(
-            c * mu_adj_fact_st * depth_bias_st + eps_st,
-            alpha_st, self.shared_workspace.n_st)
-            for c in range(self.calling_config.num_copy_number_states)]).dimshuffle(1, 2, 0)
+        copy_number_values_c = self.shared_workspace.copy_number_values_c
+        log_copy_number_emission_stc = commons.negative_binomial_logp(
+            copy_number_values_c.dimshuffle('x', 'x', 0)
+            * mu_adj_fact_st.dimshuffle(0, 1, 'x')
+            * depth_bias_st.dimshuffle(0, 1, 'x') + eps_st.dimshuffle(0, 1, 'x'),
+            alpha_st.dimshuffle(0, 1, 'x'),
+            self.shared_workspace.n_st.dimshuffle(0, 1, 'x'))
         log_copy_number_emission_stc_sampler = approx.sample_node(
             log_copy_number_emission_stc, size=self.inference_params.log_emission_samples_per_round)
         return th.function(inputs=[], outputs=log_copy_number_emission_stc_sampler)
@@ -639,7 +648,7 @@ class HHMMClassAndCopyNumberBasicCaller:
             not_stay_ta.dimshuffle(0, 'x', 1, 'x') * pi_kc.dimshuffle('x', 0, 'x', 1)
             + stay_ta.dimshuffle(0, 'x', 1, 'x') * delta_ab.dimshuffle('x', 'x', 0, 1))
 
-        # posterior copy number probability of two subsequent targets
+        # xi_tab ~ posterior copy number probability of two subsequent targets
         # Note:
         #   correlations are ignored, i.e. we assume:
         #       xi(c_t, c_{t+1}) \equiv q(c_t, c_{t+1}) \approx q(c_t) q(c_{t+1})
@@ -657,4 +666,3 @@ class HHMMClassAndCopyNumberBasicCaller:
 
         return th.function(inputs=[], outputs=[], updates=[
             (self.shared_workspace.log_class_emission_tk, log_class_emission_tk)])
-

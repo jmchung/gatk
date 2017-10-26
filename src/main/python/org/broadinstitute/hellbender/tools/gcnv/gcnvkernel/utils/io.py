@@ -2,13 +2,14 @@ import numpy as np
 import pandas as pd
 import logging
 from typing import List, Optional, Tuple
+from .. import types
 
 from .interval import Interval, IntervalAnnotation, interval_annotations_dict, interval_annotations_dtypes
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.INFO)
 
 # standard read counts and target interval list files data types
-std_dtypes_dict = {'contig': np.str, 'start': np.int, 'stop': np.int, 'name': np.str}
+std_dtypes_dict = {'contig': np.str, 'start': types.big_uint, 'stop': types.big_uint, 'name': np.str}
 
 
 def _get_tsv_header(tsv_filename: str, comment: str = '#') -> str:
@@ -53,7 +54,9 @@ def _convert_targets_pd_to_interval_list(targets_pd: pd.DataFrame) -> List[Inter
     return interval_list
 
 
-def load_read_counts_tsv_file(read_counts_tsv_file: str, read_counts_data_type=np.int, max_rows: Optional[int] = None)\
+def load_read_counts_tsv_file(read_counts_tsv_file: str,
+                              read_counts_data_type=types.big_uint,
+                              max_rows: Optional[int] = None)\
         -> Tuple[np.ndarray, List[str], List[Interval]]:
     header = _get_tsv_header(read_counts_tsv_file)
     sample_names = header.split()[4:]
