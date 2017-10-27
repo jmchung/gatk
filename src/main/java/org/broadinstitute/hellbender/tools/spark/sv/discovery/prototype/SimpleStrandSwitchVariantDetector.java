@@ -75,7 +75,7 @@ final class SimpleStrandSwitchVariantDetector implements VariantDetectorFromLoca
      */
     private static Tuple2<ChimericAlignment, byte[]> convertAlignmentIntervalsToChimericAlignment
     (final AlignedContig contigWith2AIMappedToSameChrAndStrandSwitch, final Broadcast<SAMSequenceDictionary> referenceDictionary) {
-        Utils.validateArg(SvDiscoverFromLocalAssemblyContigAlignmentsSpark.isLikelyInvBreakpointOrInsInv(contigWith2AIMappedToSameChrAndStrandSwitch),
+        Utils.validateArg(AssemblyContigAlignmentSignatureClassifier.indicatesIntraChrStrandSwitchBkpts(contigWith2AIMappedToSameChrAndStrandSwitch),
                 "assumption that input aligned assembly contig has 2 alignments mapped to the same chr with strand switch is invalid.\n" +
                         contigWith2AIMappedToSameChrAndStrandSwitch.toString());
 

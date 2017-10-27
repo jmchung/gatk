@@ -7,8 +7,6 @@ import com.esotericsoftware.kryo.io.Output;
 import com.google.common.annotations.VisibleForTesting;
 import htsjdk.samtools.SAMSequenceDictionary;
 import org.broadinstitute.hellbender.utils.IntervalUtils;
-import org.broadinstitute.hellbender.utils.SimpleInterval;
-import scala.Tuple2;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -302,10 +300,12 @@ public class ChimericAlignment {
     /**
      * Determine if the chimeric alignment indicates a simple translocation.
      * Simple translocations are defined here and at this time as:
+     * <ul>
      *  <li>inter-chromosomal translocations, i.e. novel adjacency between different reference chromosomes, or</li>
      *  <li>intra-chromosomal translocation that DOES NOT involve a strand switch, i.e.
-     *      novel adjacency between reference locations on the same chromosome involving NO strand switch but reference interval order switch</li>
-     * <p>
+     *      novel adjacency between reference locations on the same chromosome involving NO strand switch but reference interval order switch
+     *  </li>
+     * </ul>
      * A caveat is that this does not cover the case when the novel adjacency suggested by the CA is between
      * two reference locations on the same chromosome, but involves a strand switch,
      * which could be a translocation or inversion breakpoint.
