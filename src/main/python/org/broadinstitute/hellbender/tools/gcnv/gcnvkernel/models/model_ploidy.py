@@ -33,7 +33,7 @@ class PloidyModelConfig:
 
     @staticmethod
     def _get_validated_contig_prior_ploidy_map(given_contig_prior_ploidy_map: Dict[str, np.ndarray],
-                                               min_prob: float = 1e-12):
+                                               min_prob: float = 0):
         given_contigs = set(given_contig_prior_ploidy_map.keys())
         num_ploidy_states: int = 0
         for contig in given_contigs:
@@ -216,11 +216,12 @@ class PloidyBasicCaller:
         new_log_q_kappa_sjk = (self.ploidy_workspace.log_p_kappa_jk.dimshuffle('x', 0, 1)
                                + self.ploidy_workspace.log_ploidy_emission_sjk)
         new_log_q_kappa_sjk -= pm.logsumexp(new_log_q_kappa_sjk, axis=2)
-        update_norm_sj = commons.get_jensen_shannon_divergence(new_log_q_kappa_sjk,
-                                                               self.ploidy_workspace.log_q_kappa_sjk)
+        update_norm_sj = commons.get_hellinger_distance(new_log_q_kappa_sjk,
+                                                        self.ploidy_workspace.log_q_kappa_sjk)
         return th.function(inputs=[],
                            outputs=[update_norm_sj],
                            updates=[(self.ploidy_workspace.log_q_kappa_sjk, new_log_q_kappa_sjk)])
 
     def call(self) -> np.ndarray:
         return self._update_log_q_kappa_sjk_theano_func()
+

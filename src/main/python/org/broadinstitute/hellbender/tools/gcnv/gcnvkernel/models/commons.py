@@ -87,4 +87,4 @@ def get_jensen_shannon_divergence(log_p_1, log_p_2):
 def get_hellinger_distance(log_p_1, log_p_2):
     p_1 = tt.exp(log_p_1)
     p_2 = tt.exp(log_p_2)
-    return tt.sqrt(tt.sum(tt.sqr(tt.sqrt(p_1) - tt.sqrt(p_2)), axis=-1)) / tt.sqrt(2)
+    return tt.sqrt(tt.sum(tt.square(tt.sqrt(p_1) - tt.sqrt(p_2)), axis=-1)) / tt.sqrt(2)

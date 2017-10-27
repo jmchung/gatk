@@ -255,11 +255,14 @@ class HybridInferenceTask(InferenceTask):
     "caller" and is out the scope of this class.
 
     """
+
+    task_modes = ['advi', 'hybrid']
+
     def __init__(self,
                  hybrid_inference_params: HybridInferenceParameters,
                  continuous_model: Model,
-                 sampler: Sampler,
-                 caller: Caller,
+                 sampler: Optional[Sampler],
+                 caller: Optional[Caller],
                  **kwargs):
         self.hybrid_inference_params = hybrid_inference_params
         self.continuous_model = continuous_model
@@ -313,7 +316,28 @@ class HybridInferenceTask(InferenceTask):
         self.elbo_hist: List[float] = []
         self.snr_hist: List[float] = []
 
+        if sampler is None or caller is None:
+            _logger.warning("No discrete emission sampler and/or caller given -- running in plain continuous RV mode")
+            self._engage = self._engage_advi
+        else:
+            self._engage = self._engage_hybrid
+
     def engage(self):
+        self._engage()
+
+    def _engage_advi(self):
+        try:
+            for i_epoch in range(self.hybrid_inference_params.max_training_epochs):
+                _logger.info("Starting epoch {0}...".format(i_epoch))
+                converged_continuous = self._update_continuous_posteriors(i_epoch)
+                _logger.info("End of epoch {0}; converged: {1}".format(i_epoch, converged_continuous))
+                if converged_continuous:
+                    break
+
+        except KeyboardInterrupt:
+            pass
+
+    def _engage_hybrid(self):
         try:
             for i_epoch in range(self.hybrid_inference_params.max_training_epochs):
                 _logger.info("Starting epoch {0}...".format(i_epoch))
@@ -373,10 +397,11 @@ class HybridInferenceTask(InferenceTask):
                         self.param_tracker(self.continuous_model_advi.approx, loss, i)
 
             except StopIteration as ex:
-                progress_bar.close()
-                _logger.info(ex)
-                converged = True
-                self._log_stop(self.advi_task_name, i_epoch)
+                if i_epoch > 0:
+                    progress_bar.close()
+                    _logger.info(ex)
+                    converged = True
+                    self._log_stop(self.advi_task_name, i_epoch)
 
             except KeyboardInterrupt:
                 progress_bar.close()
