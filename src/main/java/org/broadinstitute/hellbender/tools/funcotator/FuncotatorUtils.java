@@ -1115,7 +1115,11 @@ public class FuncotatorUtils {
         Utils.nonNull(refAllele);
 
         final int extraBasesNeeded = (codingSequenceRefAlleleStart - alignedRefAlleleStart);
-        final int refStartPos = referencePadding - extraBasesNeeded;
+        int refStartPos = referencePadding - extraBasesNeeded;
+
+        if ( refStartPos < 0 ) {
+            refStartPos = 0;
+        }
 
         // Round to the nearest multiple of 3 to get the end position.
         int refEndPos = refStartPos + (int)(Math.ceil((extraBasesNeeded + refAllele.length()) / 3.0) * 3);

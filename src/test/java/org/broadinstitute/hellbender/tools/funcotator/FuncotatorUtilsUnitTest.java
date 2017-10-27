@@ -864,17 +864,42 @@ public class FuncotatorUtilsUnitTest extends BaseTest {
         final String referenceSnippet = "AAATTTGGGCCCATGATATAGGCGCCGTAGCAGTAGATAGCCCCCCAACCGGGGCCCGGGTTTAAA";
 
         return new Object[][] {
-                {referenceSnippet, 0, Allele.create("A", true), 3, 1, "AAA"},
-                {referenceSnippet, 0, Allele.create("AA", true), 2, 1, "AAA"},
+                // Allele same as reference sequence:
                 {referenceSnippet, 0, Allele.create("AAA", true), 1, 1, "AAA"},
+                {referenceSnippet, 1, Allele.create("AA", true), 2, 1, "AAA"},
+                {referenceSnippet, 2, Allele.create("A", true), 3, 1, "AAA"},
 
-                {referenceSnippet, 0, Allele.create("G", true), 9, 7, "GGG"},
-                {referenceSnippet, 0, Allele.create("GG", true), 8, 7, "GGG"},
-                {referenceSnippet, 0, Allele.create("GGG", true), 7, 7, "GGG"},
+                {referenceSnippet, 6, Allele.create("GGG", true), 1, 1, "GGG"},
+                {referenceSnippet, 7, Allele.create("GG", true), 2, 1, "GGG"},
+                {referenceSnippet, 8, Allele.create("G", true), 3, 1, "GGG"},
 
-                {referenceSnippet, 0, Allele.create("GC", true), 9, 7, "GGGCCC"},
+                {referenceSnippet, 6, Allele.create("GGG", true), 60, 60, "GGG"},
+                {referenceSnippet, 7, Allele.create("GG", true), 61, 60, "GGG"},
+                {referenceSnippet, 8, Allele.create("G", true), 62, 60, "GGG"},
 
-                {referenceSnippet, 8, Allele.create("T", true), 6, 4, "CAT"},
+                {referenceSnippet, 17, Allele.create("ATAG", true), 18, 17, "TATAGG"},
+
+                {referenceSnippet, 4, Allele.create(referenceSnippet.substring(4), true), 18, 17, referenceSnippet.substring(3)},
+
+                // Allele diffferent from reference sequence:
+                {referenceSnippet, 0, Allele.create("TAA", true), 1, 1, "TAA"},
+                {referenceSnippet, 1, Allele.create("AG", true), 2, 1, "AAG"},
+                {referenceSnippet, 2, Allele.create("T", true), 3, 1, "AAT"},
+
+                {referenceSnippet, 6, Allele.create("GCC", true), 1, 1, "GCC"},
+                {referenceSnippet, 7, Allele.create("AG", true), 2, 1, "GAG"},
+                {referenceSnippet, 8, Allele.create("A", true), 3, 1, "GGA"},
+
+                {referenceSnippet, 6, Allele.create("GCC", true), 60, 60, "GCC"},
+                {referenceSnippet, 7, Allele.create("AG", true), 61, 60, "GAG"},
+                {referenceSnippet, 8, Allele.create("A", true), 62, 60, "GGA"},
+
+                {referenceSnippet, 17, Allele.create("ATAT", true), 18, 17, "TATATG"},
+
+                {referenceSnippet, 4, Allele.create(
+                        new String(new char[referenceSnippet.length() - 4]).replace("\0", "A"), true),
+                        18, 17,
+                        "T" + new String(new char[referenceSnippet.length() - 4]).replace("\0", "A")},
         };
     }
 
