@@ -3,11 +3,11 @@ import pymc3 as pm
 import logging
 import time
 import tqdm
-from pymc3.variational.callbacks import Callback
 from pymc3 import Model
 from typing import List, Callable, Optional
 from abc import abstractmethod
-from ..utils.rls import NonStationaryLinearRegression
+from .covergence_tracker import NoisyELBOConvergenceTracker
+from .param_tracker import ParamTrackerConfig, ParamTracker
 
 _logger = logging.getLogger(__name__)
 
@@ -60,175 +60,17 @@ class InferenceTask:
         raise NotImplementedError("Core breach imminent!")
 
 
-class HybridInferenceParameters:
-    """ Hybrid ADVI (for continuous RVs) + external calling (for discrete RVs) inference parameters """
-    def __init__(self,
-                 learning_rate: float = 0.2,
-                 obj_n_mc: int = 1,
-                 total_grad_norm_constraint: Optional[float] = None,
-                 log_emission_samples_per_round: int = 50,
-                 log_emission_sampling_median_rel_error: float = 5e-3,
-                 log_emission_sampling_rounds: int = 10,
-                 max_advi_iter_first_epoch: int = 500,
-                 max_advi_iter_subsequent_epochs: int = 300,
-                 max_training_epochs: int = 50,
-                 track_model_params: bool = False,
-                 track_model_params_every: int = 10,
-                 param_tracker_config: Optional['ParamTrackerConfig'] = None,
-                 convergence_snr_averaging_window: int = 100,
-                 convergence_snr_trigger_threshold: float = 0.1,
-                 convergence_snr_countdown_window: int = 10,
-                 max_calling_iters: int = 10,
-                 caller_update_convergence_threshold: float = 1e-6,
-                 caller_admixing_rate: float = 0.75,
-                 caller_summary_statistics_reducer: Callable[[np.ndarray], float] = np.mean):
-        self.learning_rate = learning_rate
-        self.obj_n_mc = obj_n_mc
-        self.total_grad_norm_constraint = total_grad_norm_constraint
-        self.log_emission_samples_per_round = log_emission_samples_per_round
-        self.log_emission_sampling_median_rel_error = log_emission_sampling_median_rel_error
-        self.log_emission_sampling_rounds = log_emission_sampling_rounds
-        self.max_advi_iter_first_epoch = max_advi_iter_first_epoch
-        self.max_advi_iter_subsequent_epochs = max_advi_iter_subsequent_epochs
-        self.max_training_epochs = max_training_epochs
-        self.track_model_params = track_model_params
-        self.track_model_params_every = track_model_params_every
-        self.param_tracker_config = param_tracker_config
-        self.convergence_snr_averaging_window = convergence_snr_averaging_window
-        self.convergence_snr_trigger_threshold = convergence_snr_trigger_threshold
-        self.convergence_snr_countdown_window = convergence_snr_countdown_window
-        self.max_calling_iters = max_calling_iters
-        self.caller_update_convergence_threshold = caller_update_convergence_threshold
-        self.caller_admixing_rate = caller_admixing_rate
-        self.caller_summary_statistics_reducer = caller_summary_statistics_reducer
-
-        self._assert_params()
-
-    # todo (complete this)
-    def _assert_params(self):
-        assert self.learning_rate >= 0
-        assert self.obj_n_mc >= 0
-        assert self.log_emission_samples_per_round >= 1
-        assert self.log_emission_sampling_rounds >= 1
-        assert 0.0 < self.log_emission_sampling_median_rel_error < 1.0
-
-        if self.track_model_params:
-            assert self.param_tracker_config is not None
-
-
-class NoisyELBOConvergenceTracker(Callback):
-    """ Convergence stopping criterion based on the linear trend of the noisy ELBO observations """
-    MIN_WINDOW_SIZE = 10
-
-    def __init__(self,
-                 window: int = 100,
-                 snr_stop_trigger_threshold: float = 0.5,
-                 stop_countdown_window: int = 10):
-        """ Constructor.
-        :param window: window size for performing linear regression
-        :param snr_stop_trigger_threshold: signal-to-noise ratio threshold for triggering countdown to stop
-        :param stop_countdown_window: once the trigger is pulled, the snr must remain under
-        the given threshold for at least stop_countdown_window subsequent ELBO observations to raise StopIteration;
-        the countdown will be reset if at any point the snr goes about snr_stop_trigger_threshold
-        """
-        self.window = window
-        self.snr_stop_trigger_threshold = snr_stop_trigger_threshold
-        self.stop_countdown_window = stop_countdown_window
-        self._assert_params()
-        self._lin_reg = NonStationaryLinearRegression(window=self.window)
-        self._n_obs: int = 0
-        self._n_obs_snr_under_threshold: int = 0
-        self.egpi: float = None  # effective gain per iteration
-        self.snr: float = None  # signal-to-noise ratio
-        self.variance: float = None  # variance of elbo in the window
-        self.drift: float = None  # absolute elbo change in the window
-
-    def __call__(self, approx, loss, i):
-        self._lin_reg.add_observation(loss)
-        self._n_obs += 1
-        self.egpi = self._lin_reg.get_slope()
-        self.variance = self._lin_reg.get_variance()
-        if self.egpi is not None and self.variance is not None:
-            self.egpi *= -1
-            self.drift = np.abs(self.egpi) * self.window
-            self.snr = self.drift / np.sqrt(2 * self.variance)
-            if self.snr < self.snr_stop_trigger_threshold:
-                self._n_obs_snr_under_threshold += 1
-            else:  # reset countdown
-                self._n_obs_snr_under_threshold = 0
-            if self._n_obs_snr_under_threshold == self.stop_countdown_window:
-                raise StopIteration("Convergence criterion satisfied: SNR remained below {0} for "
-                                    "{1} iterations.".format(self.snr_stop_trigger_threshold, self.stop_countdown_window))
-
-    def _assert_params(self):
-        assert self.window > self.MIN_WINDOW_SIZE, \
-            "ELBO linear regression window size is too small (minimum is {0})".format(self.MIN_WINDOW_SIZE)
-        assert self.snr_stop_trigger_threshold > 0, "bad SNR stop trigger threshold (must be positive)"
-        assert self.stop_countdown_window >= 1, "bad SNR-under-threshold countdown window (must be >= 1)"
-
-
-class ParamTrackerConfig:
-    def __init__(self):
-        self.param_names = []
-        self.inv_trans_list = []
-        self.inv_trans_param_names = []
-
-    def add(self,
-            param_name: str,
-            inv_trans: Callable[[np.ndarray], np.ndarray],
-            inv_trans_param_name: str):
-        self.param_names.append(param_name)
-        self.inv_trans_list.append(inv_trans)
-        self.inv_trans_param_names.append(inv_trans_param_name)
-
-
-class ParamTracker:
-    def __init__(self, param_tracker_config: ParamTrackerConfig):
-        self.param_tracker_config = param_tracker_config
-        self.tracked_param_values_dict = {}
-        for key in self.param_tracker_config.inv_trans_param_names:
-            self.tracked_param_values_dict[key] = []
-
-    def _extract_param_mean(self, approx: pm.approximations.MeanField):
-        all_means = approx.mean.eval()
-        out = dict()
-        for param_name, inv_trans, inv_trans_param_name in zip(
-                self.param_tracker_config.param_names,
-                self.param_tracker_config.inv_trans_list,
-                self.param_tracker_config.inv_trans_param_names):
-            _, slc, _, dtype = approx._global_view[param_name]
-            bare_param_mean = all_means[..., slc].astype(dtype)
-            if inv_trans is None:
-                out[inv_trans_param_name] = bare_param_mean
-            else:
-                out[inv_trans_param_name] = inv_trans(bare_param_mean)
-        return out
-
-    def record(self, approx, _loss, _i):
-        out = self._extract_param_mean(approx)
-        for key in self.param_tracker_config.inv_trans_param_names:
-            self.tracked_param_values_dict[key].append(out[key])
-
-    __call__ = record
-
-    def clear(self):
-        for key in self.param_tracker_config.inv_trans_param_names:
-            self.tracked_param_values_dict[key] = []
-
-    def __getitem__(self, key):
-        return self.tracked_param_values_dict[key]
-
-
 class HybridInferenceTask(InferenceTask):
     """
-    A "hybrid" inference is applicable to a PGM structured as:
+    The "hybrid" inference framework is applicable to a PGM structured as follows:
 
         +--------------+           +----------------+
         | discrete RVs + --------► + continuous RVs |
         +--------------+           +----------------+
 
-    The inference is approximately performed by factorizing the true posterior into an uncorrelated
-    product of discrete RVs (DRVs) and continuous RVs (CRVs):
+    Note that discrete RVs do not have any continuous parents. The inference is approximately
+    performed by factorizing the true posterior into an uncorrelated product of discrete RVs (DRVs)
+    and continuous RVs (CRVs):
 
         p(CRVs, DRVs | observed) ~ q(CRVs) q(DRVs)
 
@@ -237,7 +79,7 @@ class HybridInferenceTask(InferenceTask):
         (1) a pm.Model that yields the DRV-posterior-expectation of the log joint,
             E_{DRVs ~ q(DRVs)} [log_P(CRVs, DRVs, observed)]
 
-        (2) a "sampler" that provides samples from the log_emission, defined as:
+        (2) a "sampler" that provides samples from the log emission, defined as:
             log_emission(DRVs) = E_{CRVs ~ q(CRVs)} [log_P (observed | CRVs, DRV)]
 
         (3) a "caller" that updates q(DRVs) given log_emission(DRV); it could be as simple as using
@@ -251,15 +93,15 @@ class HybridInferenceTask(InferenceTask):
             can access it, and:
         (c) let the caller directly update the shared q(CRVs).
 
-    This class performs mean-field ADVI to obtain q(CRVs); q(DRV), however, is handled by the external
-    "caller" and is out the scope of this class.
-
+    This class performs mean-field ADVI to obtain q(CRVs); q(DRV) is handled by the external
+    "caller" and is out the scope of this class. This class, however, requires a CallerUpdateSummary
+    from the Caller in order to check for convergence.
     """
 
     task_modes = ['advi', 'hybrid']
 
     def __init__(self,
-                 hybrid_inference_params: HybridInferenceParameters,
+                 hybrid_inference_params: 'HybridInferenceParameters',
                  continuous_model: Model,
                  sampler: Optional[Sampler],
                  caller: Optional[Caller],
@@ -486,3 +328,59 @@ class HybridInferenceTask(InferenceTask):
                         self.calling_task_name, self.hybrid_inference_params.max_calling_iters))
 
         return converged
+
+
+class HybridInferenceParameters:
+    """ Hybrid ADVI (for continuous RVs) + external calling (for discrete RVs) inference parameters """
+    def __init__(self,
+                 learning_rate: float = 0.2,
+                 obj_n_mc: int = 1,
+                 total_grad_norm_constraint: Optional[float] = None,
+                 log_emission_samples_per_round: int = 50,
+                 log_emission_sampling_median_rel_error: float = 5e-3,
+                 log_emission_sampling_rounds: int = 10,
+                 max_advi_iter_first_epoch: int = 500,
+                 max_advi_iter_subsequent_epochs: int = 300,
+                 max_training_epochs: int = 50,
+                 track_model_params: bool = False,
+                 track_model_params_every: int = 10,
+                 param_tracker_config: Optional['ParamTrackerConfig'] = None,
+                 convergence_snr_averaging_window: int = 100,
+                 convergence_snr_trigger_threshold: float = 0.1,
+                 convergence_snr_countdown_window: int = 10,
+                 max_calling_iters: int = 10,
+                 caller_update_convergence_threshold: float = 1e-6,
+                 caller_admixing_rate: float = 0.75,
+                 caller_summary_statistics_reducer: Callable[[np.ndarray], float] = np.mean):
+        self.learning_rate = learning_rate
+        self.obj_n_mc = obj_n_mc
+        self.total_grad_norm_constraint = total_grad_norm_constraint
+        self.log_emission_samples_per_round = log_emission_samples_per_round
+        self.log_emission_sampling_median_rel_error = log_emission_sampling_median_rel_error
+        self.log_emission_sampling_rounds = log_emission_sampling_rounds
+        self.max_advi_iter_first_epoch = max_advi_iter_first_epoch
+        self.max_advi_iter_subsequent_epochs = max_advi_iter_subsequent_epochs
+        self.max_training_epochs = max_training_epochs
+        self.track_model_params = track_model_params
+        self.track_model_params_every = track_model_params_every
+        self.param_tracker_config = param_tracker_config
+        self.convergence_snr_averaging_window = convergence_snr_averaging_window
+        self.convergence_snr_trigger_threshold = convergence_snr_trigger_threshold
+        self.convergence_snr_countdown_window = convergence_snr_countdown_window
+        self.max_calling_iters = max_calling_iters
+        self.caller_update_convergence_threshold = caller_update_convergence_threshold
+        self.caller_admixing_rate = caller_admixing_rate
+        self.caller_summary_statistics_reducer = caller_summary_statistics_reducer
+
+        self._assert_params()
+
+    # todo (complete this)
+    def _assert_params(self):
+        assert self.learning_rate >= 0
+        assert self.obj_n_mc >= 0
+        assert self.log_emission_samples_per_round >= 1
+        assert self.log_emission_sampling_rounds >= 1
+        assert 0.0 < self.log_emission_sampling_median_rel_error < 1.0
+
+        if self.track_model_params:
+            assert self.param_tracker_config is not None

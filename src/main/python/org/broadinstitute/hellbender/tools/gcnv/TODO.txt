@@ -4,22 +4,32 @@ High priority
 
 - a sample-contig-ploidy dictionary
 
-- fix reference CN per contig per sample in the denoising model
-
 - remove read depth from the model parameters
+    * set read depth to n_s / (total number of targets) deterministically
+    * variations can be captured by the bias terms
 
-- [DONE] filter targets
+- fix reference copy number per contig per sample in the denoising model
 
-- [DONE] replace psi with alpha
-    * retracted! for some reason, led to slower convergence (conditioning?)
+- multiply baseline CNV probability by target length
 
+- multi-threading for forward-backward
 
+- write model params and sample posteriors to disk
 
+- read model params from disk
 
+- a case-sample denoising model
+    * refactor the current DenoisingModel?
 
-- add additional priors to the ploidy model
+- a case-sample inference task
 
-- add constant ploidy-related terms to the per-contig denoising model
+- generate sample summary statistics output and plot
+    - hmm data likelihood
+      Q: how does this scale with read depth? we need to scale that out
+    - bias factor likelihood
+    - ?
+
+- generate learning plots
 
 - pre-processor (python side)
     1. take a cohort (or single-sample) and a list of target intervals
@@ -34,39 +44,13 @@ High priority
         * std_count(sample, contig)
 
 
-- multi-threading for forward-backward
-
-
-- write model params and sample posteriors to disk
-
-- read model params from disk
-
-- a case-sample denoising model
-    * refactor the current DenoisingModel?
-
-- a case-sample InferenceTask
-
-- generate sample summary statistics output and plot
-    - hmm data likelihood
-      Q: how does this scale with read depth? we need to scale that out
-    - bias factor likelihood
-    - ?
-
-- generate learning plots
-
-
-
-
-
-
-
 
 
 
 
 - port notebook to pycharm
     * [DONE] model and inference
-    * pre-processor
+    * [LATER] pre-processor
 
 - generate realistic simulated data
     * read depth, mean bias, covariates, etc. from a realistic analysis
@@ -103,8 +87,6 @@ High priority
 
 - replace theano.function inputs w/ theano.function.In(..., borrow=True)
 
-- replace tt.stack and python lists in calculating log_emission_stc with properly dimshuffled tensors
-
 - compute on GPU
 
 - accumulate log emission during ADVI iterations instead of posterior sampling
@@ -114,6 +96,13 @@ High priority
     * non-diploid CN in reference (perhaps we can handle this properly instead of blacklisting?)
     * very low mappability
     * regions near centromeres
+
+- [DONE] replace tt.stack and python lists in calculating log_emission_stc with properly dimshuffled tensors
+
+- [DONE] filter targets
+
+- [DONE] replace psi with alpha
+    * retracted! for some reason, led to slower convergence (conditioning?)
 
 - [DONE] rewrite cohort learning and calling task using the general hybrid inference framework
 
