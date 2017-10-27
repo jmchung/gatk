@@ -36,11 +36,13 @@ import java.util.List;
         programGroup = StructuralVariationSparkProgramGroup.class)
 @BetaFeature
 public final class FindBadGenomicKmersSpark extends GATKSparkTool {
-    public static final int REF_RECORD_LEN = 10000;
-    // assuming we have ~1Gb/core, we can process ~1M kmers per partition
-    public static final int REF_RECORDS_PER_PARTITION = 1024*1024 / REF_RECORD_LEN;
     private static final long serialVersionUID = 1L;
-    @VisibleForTesting static final int MAX_KMER_FREQ = 3;
+
+    public static final int REF_RECORD_LEN = 10000;
+
+    public static final int REF_RECORDS_PER_PARTITION = 1024*1024 / REF_RECORD_LEN;
+
+    public static final int MAX_KMER_FREQ = 3;
 
     @Argument(doc = "file for ubiquitous kmer output", shortName = StandardArgumentDefinitions.OUTPUT_SHORT_NAME,
             fullName = StandardArgumentDefinitions.OUTPUT_LONG_NAME)
@@ -98,10 +100,11 @@ public final class FindBadGenomicKmersSpark extends GATKSparkTool {
      * Kmerize, mapping to a pair <kmer,1>, reduce by summing values by key, filter out <kmer,N> where
      * N <= MAX_KMER_FREQ, and collect the high frequency kmers back in the driver.
      */
-    public static List<SVKmer> collectUbiquitousKmersInReference(final int kSize,
-                                                                 final int maxDUSTScore,
-                                                                 final int maxKmerFreq,
-                                                                 final JavaRDD<byte[]> refRDD) {
+    @VisibleForTesting
+    static List<SVKmer> collectUbiquitousKmersInReference(final int kSize,
+                                                          final int maxDUSTScore,
+                                                          final int maxKmerFreq,
+                                                          final JavaRDD<byte[]> refRDD) {
         Utils.nonNull(refRDD, "reference bases RDD is null");
         Utils.validateArg(kSize > 0, "provided kmer size is non positive");
         Utils.validateArg(maxDUSTScore > 0, "provided DUST filter score is non positive");
@@ -126,8 +129,7 @@ public final class FindBadGenomicKmersSpark extends GATKSparkTool {
                 .mapToPair(entry -> new Tuple2<>(entry.getKey(), entry.getValue()))
                 .partitionBy(new HashPartitioner(nPartitions))
                 .mapPartitions(pairItr -> {
-                    final HopscotchMap<SVKmer, Integer, KmerAndCount> kmerCounts =
-                            new HopscotchMap<>(hashSize);
+                    final HopscotchMap<SVKmer, Integer, KmerAndCount> kmerCounts = new HopscotchMap<>(hashSize);
                     while ( pairItr.hasNext() ) {
                         final Tuple2<SVKmer, Integer> pair = pairItr.next();
                         final SVKmer kmer = pair._1();

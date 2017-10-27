@@ -18,13 +18,13 @@ import org.broadinstitute.hellbender.engine.datasources.ReferenceMultiSource;
 import org.broadinstitute.hellbender.engine.filters.ReadFilter;
 import org.broadinstitute.hellbender.engine.filters.ReadFilterLibrary;
 import org.broadinstitute.hellbender.engine.spark.GATKSparkTool;
-import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDiscoveryArgumentCollection;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.AlignedContig;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.AlignmentInterval;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVFileUtils;
 import org.broadinstitute.hellbender.utils.Utils;
+import org.broadinstitute.hellbender.utils.io.IOUtils;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
 import scala.Tuple2;
 
@@ -105,7 +105,7 @@ public final class SvDiscoverFromLocalAssemblyContigAlignmentsSpark extends GATK
                 divertReadsByPossiblyRawTypes(contigsWithAlignmentsReconstructed, localLogger);
 
         try {
-            SVFileUtils.createDirectory(outputDir);
+            IOUtils.createDirectory(outputDir);
         } catch (final IOException x) {
             throw new UserException.CouldNotCreateOutputFile("Could not create file at path:" + outputDir + " due to " + x.getMessage(), x);
         }

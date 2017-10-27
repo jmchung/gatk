@@ -5,6 +5,7 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.google.common.annotations.VisibleForTesting;
+import org.broadinstitute.hellbender.utils.Utils;
 
 import java.util.Map;
 
@@ -20,6 +21,7 @@ public final class KmerAndCount extends SVKmerLong implements Map.Entry<SVKmer, 
 
     public KmerAndCount( final SVKmerLong kmer, final int count ) {
         super(kmer);
+        Utils.validateArg(count >= 0, "initializing count is negative: " + count);
         this.count = count;
     }
 

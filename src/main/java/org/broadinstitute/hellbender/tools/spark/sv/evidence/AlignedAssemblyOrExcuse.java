@@ -6,6 +6,7 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.samtools.SAMSequenceRecord;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVFileUtils;
@@ -308,17 +309,17 @@ public final class AlignedAssemblyOrExcuse {
     /**
      * write a SAM file containing records for each aligned contig
      */
-    static void writeAssemblySAMFile( final List<AlignedAssemblyOrExcuse> alignedAssemblyOrExcuseList,
-                                      final SAMFileHeader header,
-                                      final SAMFileHeader.SortOrder assemblyAlnSortOrder,
-                                      final String outputAssembliesFile ) {
-        final SAMFileHeader cleanHeader = new SAMFileHeader(header.getSequenceDictionary());
+    static void writeAssemblySAMFile(final String outputAssembliesFile,
+                                     final List<AlignedAssemblyOrExcuse> alignedAssemblyOrExcuseList,
+                                     final SAMSequenceDictionary refSeqDictionary,
+                                     final SAMFileHeader.SortOrder assemblyAlnSortOrder) {
+        final SAMFileHeader cleanHeader = new SAMFileHeader(refSeqDictionary);
         cleanHeader.setSortOrder(assemblyAlnSortOrder);
-        final List<String> refNames = SequenceDictionaryUtils.getContigNamesList(header.getSequenceDictionary());
+        final List<String> refNames = SequenceDictionaryUtils.getContigNamesList(refSeqDictionary);
         final Stream<SAMRecord> samRecordStream =
                 alignedAssemblyOrExcuseList.stream().filter(AlignedAssemblyOrExcuse::isNotFailure)
-                        .flatMap(aa -> aa.toSAMStreamForAlignmentsOfThisAssembly(header, refNames));
-        SVFileUtils.writeSAMFile(outputAssembliesFile, samRecordStream.iterator(), header,
+                        .flatMap(aa -> aa.toSAMStreamForAlignmentsOfThisAssembly(cleanHeader, refNames));
+        SVFileUtils.writeSAMFile(outputAssembliesFile, samRecordStream.iterator(), cleanHeader,
                 assemblyAlnSortOrder == SAMFileHeader.SortOrder.queryname);
     }
 }

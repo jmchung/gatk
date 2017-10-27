@@ -141,7 +141,8 @@ public final class FindBreakpointEvidenceSpark extends GATKSparkTool {
         }
 
         // write alignments of the assembled contigs
-        AlignedAssemblyOrExcuse.writeAssemblySAMFile(alignedAssemblyOrExcuseList, header, params.assembliesSortOrder, outputAssemblyAlignments);
+        AlignedAssemblyOrExcuse.writeAssemblySAMFile(outputAssemblyAlignments, alignedAssemblyOrExcuseList, header.getSequenceDictionary(),
+                                                     params.assembliesSortOrder);
         log("Wrote SAM file of aligned contigs.", toolLogger);
 
         return new AssembledEvidenceResults(evidenceScanResults.readMetadata, alignedAssemblyOrExcuseList, evidenceScanResults.evidenceTargetLinks);

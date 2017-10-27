@@ -5,7 +5,6 @@ import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.spark.utils.HopscotchSet;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.gcs.BucketUtils;
-import org.broadinstitute.hellbender.utils.io.IOUtils;
 
 import java.io.*;
 import java.util.*;
@@ -13,25 +12,6 @@ import java.util.*;
 public final class SVFileUtils {
 
     private static final String REFERENCE_GAP_INTERVAL_FILE_COMMENT_LINE_PROMPT = "#";
-
-    /**
-     * Creates a directory, in local FS, HDFS, or Google buckets to write individual files in.
-     */
-    public static void createDirectory(final String pathString) throws IOException {
-        Utils.nonNull(pathString);
-
-        if (BucketUtils.isHadoopUrl(pathString)) {
-            final boolean isSuccessful = org.apache.hadoop.fs.FileSystem.get(new org.apache.hadoop.conf.Configuration())
-                            .mkdirs(new org.apache.hadoop.fs.Path(pathString));
-            if (!isSuccessful)
-                throw new IOException("Dir creation failed: " + pathString);
-        } else {
-            final java.nio.file.Path dir = java.nio.file.Files.createDirectory(IOUtils.getPath(pathString)); // createDirectory checks and throws if a file with same name exists
-            final boolean isSuccessful = java.nio.file.Files.isDirectory(dir) && java.nio.file.Files.isWritable(dir);
-            if (!isSuccessful)
-                throw new IOException("File created is either not a directory or not writable: " + pathString);
-        }
-    }
 
     public static void writeSAMFile(final String outputName, final Iterator<SAMRecord> alignments, final SAMFileHeader header,
                                     final boolean preOrdered) {
@@ -52,9 +32,9 @@ public final class SVFileUtils {
             throw new IllegalArgumentException("Provided path doesn't have a proper extension: " + outputName);
         }
         final SAMFileWriterFactory factory = new SAMFileWriterFactory()
-                .setCreateIndex(preOrdered && header.getSortOrder()== SAMFileHeader.SortOrder.coordinate);
+                .setCreateIndex(preOrdered && header.getSortOrder() == SAMFileHeader.SortOrder.coordinate);
 
-        final String fileExtension = outputName.substring(idx+1, outputName.length());
+        final String fileExtension = outputName.substring(idx + 1, outputName.length());
         if (fileExtension.endsWith(SamReader.Type.BAM_TYPE.fileExtension())) {
             return factory.makeBAMWriter(header, preOrdered, BucketUtils.createFile(outputName));
         } else if (fileExtension.endsWith(SamReader.Type.SAM_TYPE.fileExtension())) {
@@ -98,7 +78,7 @@ public final class SVFileUtils {
             }
         }
         catch ( final IOException ioe ) {
-            throw new GATKException("Unable to read kmers from "+kmersFilePath, ioe);
+            throw new GATKException("Unable to read kmers from " + kmersFilePath, ioe);
         }
 
         return kmers;
@@ -115,7 +95,7 @@ public final class SVFileUtils {
             }
         }
         catch ( final IOException ioe ) {
-            throw new GATKException("Unable to write kmers to "+kmersFilePath, ioe);
+            throw new GATKException("Unable to write kmers to " + kmersFilePath, ioe);
         }
     }
 
@@ -139,23 +119,23 @@ public final class SVFileUtils {
                 }
                 final String[] tokens = line.split("\t");
                 if ( tokens.length != 3 ) {
-                    throw new GATKException("Interval file "+intervalsFilePath+" line "+
-                            lineNo+" did not contain 3 columns: "+line);
+                    throw new GATKException("Interval file " + intervalsFilePath + " line " +
+                            lineNo + " did not contain 3 columns: " + line);
                 }
                 try {
                     final Integer contigId = contigNameMap.get(tokens[0]);
-                    if ( contigId == null ) throw new GATKException("contig name "+tokens[0]+" not in dictionary");
+                    if ( contigId == null ) throw new GATKException("contig name " + tokens[0] + " not in dictionary");
                     final int start = Integer.valueOf(tokens[1]);
                     final int end = Integer.valueOf(tokens[2]);
                     intervals.add(new SVInterval(contigId, start, end));
                 }
                 catch ( final Exception e ) {
-                    throw new GATKException("Unable to parse interval file "+intervalsFilePath+" line "+lineNo+": "+line, e);
+                    throw new GATKException("Unable to parse interval file " + intervalsFilePath + " line " + lineNo + ": " + line, e);
                 }
             }
         }
         catch ( final IOException ioe ) {
-            throw new GATKException("Unable to read intervals from "+intervalsFilePath, ioe);
+            throw new GATKException("Unable to read intervals from " + intervalsFilePath, ioe);
         }
         return intervals;
     }

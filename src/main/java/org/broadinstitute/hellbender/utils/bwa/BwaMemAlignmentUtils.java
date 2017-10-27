@@ -4,6 +4,7 @@ import htsjdk.samtools.*;
 import htsjdk.samtools.util.SequenceUtil;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVUtils;
 import org.broadinstitute.hellbender.utils.BaseUtils;
+import org.broadinstitute.hellbender.utils.Utils;
 
 import java.util.*;
 import java.util.stream.Stream;
@@ -135,6 +136,12 @@ public class BwaMemAlignmentUtils {
     public static Stream<SAMRecord> toSAMStreamForRead(final String readName, final byte[] contigSequence,
                                                        final List<BwaMemAlignment> alignments,
                                                        final SAMFileHeader header, final List<String> refNames) {
+        Utils.nonNull(readName, "provided read name is null for the alignments");
+        Utils.nonNull(contigSequence, "provided read sequence is null");
+        Utils.nonNull(alignments, "alignments to be converted is null");
+        Utils.nonNull(header, "provided header is null");
+        Utils.nonNull(refNames, "provided list of reference contig names is null");
+
         if ( alignments.isEmpty() ) return Stream.empty();
 
         final Map<BwaMemAlignment,String> saTagMap = createSATags(alignments,refNames);
