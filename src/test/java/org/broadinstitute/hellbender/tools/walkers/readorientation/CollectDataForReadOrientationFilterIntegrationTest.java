@@ -138,7 +138,7 @@ public class CollectDataForReadOrientationFilterIntegrationTest extends CommandL
 
         // create a sample list
         final int chromosomeIndex = 0;
-        final String sampleName = "meganshand";
+        final String sampleName = "samthreetree";
         final SampleList sampleList = new IndexedSampleList(sampleName);
 
         // specify chracteristics of reads
@@ -162,18 +162,14 @@ public class CollectDataForReadOrientationFilterIntegrationTest extends CommandL
             read.setReadGroup(readGroupName);
             read.setMappingQuality(mapq);
             read.setIsFirstOfPair();
-            if (i % 2 == 0) {
-                read.setIsReverseStrand(true);
-            } else {
-                read.setIsReverseStrand(false);
-            }
+            read.setIsReverseStrand(i % 2 == 0);
             reads.add(read);
         }
 
         final File samFile = File.createTempFile("synthetic",".sam");
         final SAMFileGATKReadWriter writer = new SAMFileGATKReadWriter(
                 ReadUtils.createCommonSAMWriter(samFile, null, samHeader, true, false, false));
-        reads.forEach(r -> writer.addRead(r));
+        reads.forEach(writer::addRead);
         writer.close(); // closing the writer writes to the file
 
         return samFile;

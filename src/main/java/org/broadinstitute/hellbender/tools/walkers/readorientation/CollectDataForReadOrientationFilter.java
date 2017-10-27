@@ -1,6 +1,5 @@
 package org.broadinstitute.hellbender.tools.walkers.readorientation;
 
-import htsjdk.samtools.metrics.MetricBase;
 import htsjdk.samtools.metrics.MetricsFile;
 import htsjdk.samtools.util.Histogram;
 import htsjdk.samtools.util.SequenceUtil;
@@ -8,8 +7,12 @@ import org.broadinstitute.barclay.argparser.Argument;
 import org.broadinstitute.barclay.argparser.CommandLineProgramProperties;
 import org.broadinstitute.hellbender.cmdline.programgroups.VariantProgramGroup;
 import org.broadinstitute.hellbender.engine.*;
+import org.broadinstitute.hellbender.engine.filters.MappingQualityReadFilter;
 import org.broadinstitute.hellbender.engine.filters.ReadFilter;
+import org.broadinstitute.hellbender.engine.filters.ReadFilterLibrary;
+import org.broadinstitute.hellbender.engine.filters.WellformedReadFilter;
 import org.broadinstitute.hellbender.exceptions.UserException;
+import org.broadinstitute.hellbender.tools.walkers.mutect.Mutect2Engine;
 import org.broadinstitute.hellbender.utils.BaseUtils;
 import org.broadinstitute.hellbender.utils.MathUtils;
 import org.broadinstitute.hellbender.utils.Nucleotide;
@@ -49,13 +52,18 @@ public class CollectDataForReadOrientationFilter extends LocusWalker {
 
     @Argument(fullName = MIN_MEDIAN_MQ_LONG_NAME,
             shortName = MIN_MEDIAN_MQ_SHORT_NAME,
-            doc = "exclude reads below this quality from pileup", optional = true)
+            doc = "skip sites with median mapping quality below this value", optional = true)
     private static int MINIMUM_MEDIAN_MQ = 20;
 
     @Argument(fullName = MIN_BASE_QUALITY_LONG_NAME,
             shortName = MIN_BASE_QUALITY_SHORT_NAME,
             doc = "exclude bases below this quality from pileup", optional = true)
     private static int MINIMUM_BASE_QUALITY = 10;
+
+    @Argument(fullName = "",
+            shortName = "",
+            doc = "filter reads with mapping qualiyt below this value", optional = true)
+    private static int MAPPING_QUALITY_THRESHOLD = 20;
 
     @Argument(fullName = ALT_DATA_TABLE_LONG_NAME,
             shortName = ALT_DATA_TABLE_SHORT_NAME,
@@ -77,6 +85,8 @@ public class CollectDataForReadOrientationFilter extends LocusWalker {
 
     private final MetricsFile<?, Integer> refMetricsFile = new MetricsFile();
 
+    private final List<Nucleotide> regularBases = Arrays.asList(Nucleotide.A, Nucleotide.C, Nucleotide.G, Nucleotide.T);
+
     @Override
     public boolean requiresReference(){
         return true;
@@ -84,7 +94,7 @@ public class CollectDataForReadOrientationFilter extends LocusWalker {
 
     @Override
     public List<ReadFilter> getDefaultReadFilters() {
-        return ReadUtils.makeStandardReadFilters();
+        return Mutect2Engine.makeStandardMutect2ReadFilters();
     }
 
     @Override
@@ -113,7 +123,7 @@ public class CollectDataForReadOrientationFilter extends LocusWalker {
         // TODO: this is still relevant (10/2). I shouldn't mess with the internal state of the ref context object
         referenceContext.setWindow(1, 1);
         final String refContext = new String(referenceContext.getBases());
-        assert refContext.length() == 3 : "kmer must have length 3";
+        Utils.validate(refContext.length() == 3, "kmer must have length 3"); // or should we return?
         if (refContext.contains("N")) {
             return;
         }
@@ -126,7 +136,7 @@ public class CollectDataForReadOrientationFilter extends LocusWalker {
 
         final ReadPileup pileup = alignmentContext.getBasePileup().makeFilteredPileup(pe -> pe.getQual() > MINIMUM_BASE_QUALITY);
 
-        // This case should not happen, as AlignmentContext should come filtered, it does happen once in a while
+        // This case should not happen, as AlignmentContext should come filtered, but it does happen once in a while
         if (pileup.size() == 0){
             return;
         }
@@ -166,11 +176,11 @@ public class CollectDataForReadOrientationFilter extends LocusWalker {
 
         final Nucleotide refBase = Nucleotide.valueOf(refContext.getBytes()[1]);
 
-        // Make a copy of base counts and update the counts of ref to -1. Now the argmax of the array gives us
+        // Make a copy of base counts and update the counts of ref to -1. Now the maxElementIndex of the array gives us
         // the alt base.
         final int[] baseCountsCopy = Arrays.copyOf(baseCounts, baseCounts.length);
         baseCountsCopy[refBase.ordinal()] = -1;
-        final int altBaseIndex = MathUtils.argmax(baseCountsCopy);
+        final int altBaseIndex = MathUtils.maxElementIndex(baseCountsCopy);
         final boolean referenceSite = baseCounts[altBaseIndex] == 0;
 
         /*** End heuristics ***/
@@ -184,11 +194,8 @@ public class CollectDataForReadOrientationFilter extends LocusWalker {
         // if we got here, we have an alt site
         final Nucleotide altBase = Nucleotide.valueOf(BaseUtils.baseIndexToSimpleBase(altBaseIndex));
 
-        final int[] altF1R2Counts = new int[4];
-        for (Nucleotide base : Arrays.asList(Nucleotide.A, Nucleotide.C, Nucleotide.G, Nucleotide.T)){
-            altF1R2Counts[base.ordinal()] = pileup.getNumberOfElements(pe ->
-                    Nucleotide.valueOf(pe.getBase()) == base && ! ReadUtils.isF2R1(pe.getRead()));
-        }
+        final int[] altF1R2Counts = regularBases.stream().mapToInt(base -> pileup.getNumberOfElements(
+                pe -> Nucleotide.valueOf(pe.getBase()) == base && ReadUtils.isF1R2(pe.getRead()))).toArray();
 
         try {
             altTableWriter.writeRecord(new AltSiteRecord(refContext, baseCounts, altF1R2Counts, depth, altBase));
