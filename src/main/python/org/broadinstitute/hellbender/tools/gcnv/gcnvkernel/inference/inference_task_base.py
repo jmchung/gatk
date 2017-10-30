@@ -59,6 +59,10 @@ class InferenceTask:
     def engage(self):
         raise NotImplementedError("Core breach imminent!")
 
+    @abstractmethod
+    def disengage(self):
+        raise NotImplementedError
+
 
 class HybridInferenceTask(InferenceTask):
     """
@@ -166,6 +170,10 @@ class HybridInferenceTask(InferenceTask):
 
     def engage(self):
         self._engage()
+
+    @abstractmethod
+    def disengage(self):
+        raise NotImplementedError
 
     def _engage_advi(self):
         try:

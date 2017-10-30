@@ -8,6 +8,7 @@ from .inference_task_base import Sampler, Caller, CallerUpdateSummary,\
 from .. import config, types
 from ..models.model_ploidy import PloidyModelConfig, PloidyModel,\
     PloidyWorkspace, PloidyEmissionBasicSampler, PloidyBasicCaller
+from ..structs.metadata import SampleCoverageMetadataCollection
 
 _logger = logging.getLogger(__name__)
 
@@ -90,3 +91,10 @@ class PloidyInferenceTask(HybridInferenceTask):
                          elbo_normalization_factor=elbo_normalization_factor,
                          advi_task_name="denoising",
                          calling_task_name="ploidy")
+
+        self.ploidy_workspace = ploidy_workspace
+
+    def disengage(self):
+        self.ploidy_workspace.post_process()
+
+

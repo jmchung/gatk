@@ -6,6 +6,7 @@ import pymc3 as pm
 import theano as th
 import theano.tensor as tt
 from pymc3 import Model, Normal, HalfFlat, Deterministic, DensityDist, Bound
+from typing import Optional
 
 from ..structs.interval import Interval
 from ..structs.metadata import TargetsIntervalListMetadata, SampleCoverageMetadataCollection
@@ -55,6 +56,7 @@ class PloidyWorkspace:
                  targets_metadata: TargetsIntervalListMetadata,
                  sample_metadata_collection: SampleCoverageMetadataCollection):
         self.targets_metadata = targets_metadata
+        self.sample_metadata_collection = sample_metadata_collection
         self.ploidy_config = ploidy_config
         self.num_contigs = targets_metadata.num_contigs
         self.num_samples: int = sample_metadata_collection.num_samples
@@ -82,18 +84,18 @@ class PloidyWorkspace:
                                              borrow=config.borrow_numpy)
 
         # ploidy priors
-        p_kappa_jk = np.zeros((self.num_contigs, self.ploidy_config.num_ploidy_states), dtype=types.floatX)
+        p_ploidy_jk = np.zeros((self.num_contigs, self.ploidy_config.num_ploidy_states), dtype=types.floatX)
         for j, contig in enumerate(targets_metadata.contig_list):
-            p_kappa_jk[j, :] = ploidy_config.contig_prior_ploidy_map[contig][:]
-        log_p_kappa_jk = np.log(p_kappa_jk)
-        self.log_p_kappa_jk: types.TensorSharedVariable = th.shared(log_p_kappa_jk, name='log_p_kappa_jk',
+            p_ploidy_jk[j, :] = ploidy_config.contig_prior_ploidy_map[contig][:]
+        log_p_ploidy_jk = np.log(p_ploidy_jk)
+        self.log_p_ploidy_jk: types.TensorSharedVariable = th.shared(log_p_ploidy_jk, name='log_p_ploidy_jk',
                                                                     borrow=config.borrow_numpy)
 
         # ploidy log posteriors (placeholder)
         #
-        log_q_kappa_sjk = np.tile(log_p_kappa_jk, (self.num_samples, 1, 1))
-        self.log_q_kappa_sjk: types.TensorSharedVariable = th.shared(
-            log_q_kappa_sjk, name='log_q_kappa_sjk', borrow=config.borrow_numpy)
+        log_q_ploidy_sjk = np.tile(log_p_ploidy_jk, (self.num_samples, 1, 1))
+        self.log_q_ploidy_sjk: types.TensorSharedVariable = th.shared(
+            log_q_ploidy_sjk, name='log_q_ploidy_sjk', borrow=config.borrow_numpy)
 
         # ploidy log emission (placeholder)
         log_ploidy_emission_sjk = np.zeros(
@@ -101,14 +103,34 @@ class PloidyWorkspace:
         self.log_ploidy_emission_sjk: types.TensorSharedVariable = th.shared(
             log_ploidy_emission_sjk, name="log_ploidy_emission_sjk", borrow=config.borrow_numpy)
 
-        # exclusion mask
+        # exclusion mask; mask(j, k) = 1 - delta(j, k)
         contig_exclusion_mask_jj = (np.ones((self.num_contigs, self.num_contigs), dtype=np.int)
                                     - np.eye(self.num_contigs, dtype=np.int))
         self.contig_exclusion_mask_jj = th.shared(contig_exclusion_mask_jj, name='contig_exclusion_mask_jj')
 
+        # post-processed results; will be set by process_ploidy_posteriors once
+        self.most_likely_ploidy_sj: Optional[np.ndarray] = None
+        self.ploidy_genotyping_quality_sj: Optional[np.ndarray] = None
+
     @staticmethod
     def _get_contig_set_from_interval_list(targets_interval_list: List[Interval]) -> Set[str]:
         return {target.contig for target in targets_interval_list}
+
+    # todo warn if ploidy genotyping quality is low
+    # todo warn if ploidy genotyping is incompatible with a given list of sex genotypes
+    def post_process(self, update_sample_metadata=True):
+        self.most_likely_ploidy_sj = np.zeros((self.num_samples, self.num_contigs), dtype=types.small_uint)
+        self.ploidy_genotyping_quality_sj = np.zeros((self.num_samples, self.num_contigs), dtype=types.floatX)
+        log_q_ploidy_sjk = self.log_q_ploidy_sjk.get_value(borrow=True)
+        for si in range(self.num_samples):
+            for j in range(self.num_contigs):
+                (self.most_likely_ploidy_sj[si, j],
+                 self.ploidy_genotyping_quality_sj[si, j]) = commons.perform_genotyping(log_q_ploidy_sjk[si, j, :])
+
+        if update_sample_metadata:
+            for si in range(self.num_samples):
+                self.sample_metadata_collection.get_sample_coverage_metadata_by_index(si).set_ploidy(
+                    self.most_likely_ploidy_sj[si, :])
 
 
 class PloidyModel(Model):
@@ -124,8 +146,8 @@ class PloidyModel(Model):
         contig_exclusion_mask_jj = ploidy_workspace.contig_exclusion_mask_jj
         n_s = ploidy_workspace.n_s
         n_sj = ploidy_workspace.n_sj
-        kappa_k = ploidy_workspace.int_ploidy_values_k
-        q_kappa_sjk = tt.exp(ploidy_workspace.log_q_kappa_sjk)
+        ploidy_k = ploidy_workspace.int_ploidy_values_k
+        q_ploidy_sjk = tt.exp(ploidy_workspace.log_q_ploidy_sjk)
         eps = ploidy_config.mapping_error_rate
 
         # mean per-contig bias
@@ -134,23 +156,23 @@ class PloidyModel(Model):
                                           sd=ploidy_config.mean_bias_sd,
                                           shape=ploidy_workspace.num_contigs)
 
-        # todo put an informative prior?
+        # todo informative prior?
         # per-contig NB over-dispersion parameter
         alpha_j = HalfFlat('alpha_j', shape=ploidy_workspace.num_contigs)
 
         # mean ploidy per contig per sample
-        mean_kappa_sj = tt.sum(tt.exp(ploidy_workspace.log_q_kappa_sjk)
+        mean_ploidy_sj = tt.sum(tt.exp(ploidy_workspace.log_q_ploidy_sjk)
                                * ploidy_workspace.int_ploidy_values_k.dimshuffle('x', 'x', 0), axis=2)
 
         # mean-field amplification coefficient per contig
-        gamma_sj = mean_kappa_sj * t_j.dimshuffle('x', 0) * mean_bias_j.dimshuffle('x', 0)
+        gamma_sj = mean_ploidy_sj * t_j.dimshuffle('x', 0) * mean_bias_j.dimshuffle('x', 0)
 
         # gamma_rest_sj \equiv sum_{j' \neq j} gamma_sj
         gamma_rest_sj = tt.dot(gamma_sj, contig_exclusion_mask_jj)
 
         # NB per-contig counts
         mu_num_sjk = (t_j.dimshuffle('x', 0, 'x') * mean_bias_j.dimshuffle('x', 0, 'x')
-                      * kappa_k.dimshuffle('x', 'x', 0))
+                      * ploidy_k.dimshuffle('x', 'x', 0))
         mu_den_sjk = gamma_rest_sj.dimshuffle(0, 1, 'x') + mu_num_sjk
         eps_j = eps * t_j / tt.sum(t_j)  # proportion of fragments erroneously mapped to contig j
         mu_sjk = ((1.0 - eps) * (mu_num_sjk / mu_den_sjk)
@@ -164,7 +186,7 @@ class PloidyModel(Model):
             return _logp_sjk
 
         DensityDist(name='n_sj_obs',
-                    logp=lambda _n_sj: tt.sum(q_kappa_sjk * _get_logp_sjk(_n_sj)),
+                    logp=lambda _n_sj: tt.sum(q_ploidy_sjk * _get_logp_sjk(_n_sj)),
                     observed=n_sj)
 
         # for log ploidy emission sampling
@@ -201,19 +223,19 @@ class PloidyBasicCaller:
     def __init__(self,
                  ploidy_workspace: PloidyWorkspace):
         self.ploidy_workspace = ploidy_workspace
-        self._update_log_q_kappa_sjk_theano_func = self._get_update_log_q_kappa_sjk_theano_func()
+        self._update_log_q_ploidy_sjk_theano_func = self._get_update_log_q_ploidy_sjk_theano_func()
 
     @th.configparser.change_flags(compute_test_value="ignore")
-    def _get_update_log_q_kappa_sjk_theano_func(self):
-        new_log_q_kappa_sjk = (self.ploidy_workspace.log_p_kappa_jk.dimshuffle('x', 0, 1)
+    def _get_update_log_q_ploidy_sjk_theano_func(self):
+        new_log_q_ploidy_sjk = (self.ploidy_workspace.log_p_ploidy_jk.dimshuffle('x', 0, 1)
                                + self.ploidy_workspace.log_ploidy_emission_sjk)
-        new_log_q_kappa_sjk -= pm.logsumexp(new_log_q_kappa_sjk, axis=2)
-        update_norm_sj = commons.get_hellinger_distance(new_log_q_kappa_sjk,
-                                                        self.ploidy_workspace.log_q_kappa_sjk)
+        new_log_q_ploidy_sjk -= pm.logsumexp(new_log_q_ploidy_sjk, axis=2)
+        update_norm_sj = commons.get_hellinger_distance(new_log_q_ploidy_sjk,
+                                                        self.ploidy_workspace.log_q_ploidy_sjk)
         return th.function(inputs=[],
                            outputs=[update_norm_sj],
-                           updates=[(self.ploidy_workspace.log_q_kappa_sjk, new_log_q_kappa_sjk)])
+                           updates=[(self.ploidy_workspace.log_q_ploidy_sjk, new_log_q_ploidy_sjk)])
 
     def call(self) -> np.ndarray:
-        return self._update_log_q_kappa_sjk_theano_func()
+        return self._update_log_q_ploidy_sjk_theano_func()
 

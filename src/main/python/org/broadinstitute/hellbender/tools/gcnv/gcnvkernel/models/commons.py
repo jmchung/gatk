@@ -2,11 +2,12 @@ import numpy as np
 import logging
 import theano.tensor as tt
 import pymc3.distributions.dist_math as pm_dist_math
-from .. import config
+from typing import Tuple
 
 _logger = logging.getLogger(__name__)
 
-_log_2_pi = np.log(2 * np.pi)
+_log_2_pi = 1.837877066409345  # np.log(2 * np.pi)
+_10_inv_log_10 = 4.342944819032518  # 10 / np.log(10)
 
 
 def get_normalized_prob_vector(prob_vector: np.ndarray, prob_sum_tol: float) -> np.ndarray:
@@ -108,3 +109,22 @@ def get_hellinger_distance(log_p_1, log_p_2):
     p_1 = tt.exp(log_p_1)
     p_2 = tt.exp(log_p_2)
     return tt.sqrt(tt.sum(tt.square(tt.sqrt(p_1) - tt.sqrt(p_2)), axis=-1)) / tt.sqrt(2)
+
+
+def perform_genotyping(log_p: np.ndarray) -> Tuple[int, float]:
+    """
+    Takes an array of log probs and perform genotyping
+
+    Note:
+        log_p must be properly normalized, i.e. np.sum(np.exp(log_p)) == 1
+        (this is _not_ checked for performance)
+
+    :param log_p: an array of log probs
+    :return: a tuple (most likely genotype, phred-scaled genotyping quality; see below)
+    """
+    assert log_p.ndim == 1, "the log_p array must be a vector"
+    assert log_p.size >= 2, "at least two states are required"
+    sorted_log_p = sorted(enumerate(log_p), key=lambda x: -x[1])
+    max_likely_genotype_idx = sorted_log_p[0][0]
+    phred_genotype_quality = _10_inv_log_10 * (sorted_log_p[0][1] - sorted_log_p[1][1])
+    return max_likely_genotype_idx, phred_genotype_quality

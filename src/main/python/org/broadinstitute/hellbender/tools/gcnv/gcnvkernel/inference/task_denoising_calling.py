@@ -113,3 +113,7 @@ class CohortDenoisingAndCallingTask(HybridInferenceTask):
                          elbo_normalization_factor=elbo_normalization_factor,
                          advi_task_name="denoising",
                          calling_task_name="calling")
+
+    # todo
+    def disengage(self):
+        pass

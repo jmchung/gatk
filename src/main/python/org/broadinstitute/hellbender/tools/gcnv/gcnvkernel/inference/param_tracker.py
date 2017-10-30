@@ -25,6 +25,7 @@ class ParamTracker:
         for key in self.param_tracker_config.inv_trans_param_names:
             self.tracked_param_values_dict[key] = []
 
+    # todo there must a way of doing this without accessing approx._global_view
     def _extract_param_mean(self, approx: pm.approximations.MeanField):
         all_means = approx.mean.eval()
         out = dict()

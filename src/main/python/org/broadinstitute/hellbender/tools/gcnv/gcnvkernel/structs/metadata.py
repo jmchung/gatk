@@ -32,6 +32,12 @@ class TargetsIntervalListMetadata:
 
 
 class SampleCoverageMetadata:
+    """ Represents essential metadata collected from a sample's coverage profile
+
+    Note:
+        The initializer only generates immediately available metadata (coverage per contig, etc.)
+        The ploidy
+    """
     def __init__(self,
                  sample_name: str,
                  n_t: np.ndarray,
@@ -55,16 +61,20 @@ class SampleCoverageMetadata:
         self.n_total = np.sum(self.n_j)
 
         # ploidy per contig
-        self.kappa_j: Optional[np.ndarray] = None
+        self.ploidy_j: Optional[np.ndarray] = None
 
-    def set_ploidy(self, kappa_j: np.ndarray):
+    def set_ploidy(self, ploidy_j: np.ndarray):
         """
-        :param kappa_j: a vector of ploidy per contig
+        :param ploidy_j: a vector of ploidy per contig
         :return:
         """
-        assert self._targets_metadata.num_contigs == kappa_j.size
-        self.kappa_j = np.zeros((self._targets_metadata.num_contigs,), dtype=types.small_uint)
-        self.kappa_j[:] = kappa_j[:]
+        assert self._targets_metadata.num_contigs == ploidy_j.size
+        self.ploidy_j = np.zeros((self._targets_metadata.num_contigs,), dtype=types.small_uint)
+        self.ploidy_j[:] = ploidy_j[:]
+
+    @property
+    def has_ploidy_metadata(self):
+        return self.ploidy_j is not None
 
 
 class SampleCoverageMetadataCollection:
