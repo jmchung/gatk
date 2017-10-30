@@ -4,6 +4,9 @@ from ._version import __version__
 from . import preprocess
 from .utils import io
 
+# metadata
+from .structs.metadata import TargetsIntervalListMetadata, SampleCoverageMetadataCollection
+
 # model configs and workspaces
 from .models.model_ploidy import PloidyModelConfig, PloidyWorkspace
 from .models.model_denoising_calling import CopyNumberCallingConfig, DenoisingModelConfig, DenoisingCallingWorkspace

@@ -98,7 +98,7 @@ class CohortDenoisingAndCallingTask(HybridInferenceTask):
                  initial_param_supplier: InitialModelParametersSupplier):
         _logger.info("Instantiating the denoising model...")
         denoising_model = DenoisingModel(
-            denoising_config, calling_config, shared_workspace, initial_param_supplier)
+            denoising_config, shared_workspace, initial_param_supplier)
 
         _logger.info("Instantiating the sampler...")
         copy_number_emission_sampler = CopyNumberEmissionSampler(

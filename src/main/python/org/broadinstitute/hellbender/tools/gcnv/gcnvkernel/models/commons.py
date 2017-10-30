@@ -6,6 +6,8 @@ from .. import config
 
 _logger = logging.getLogger(__name__)
 
+_log_2_pi = np.log(2 * np.pi)
+
 
 def get_normalized_prob_vector(prob_vector: np.ndarray, prob_sum_tol: float) -> np.ndarray:
     """
@@ -53,7 +55,25 @@ def negative_binomial_logp(mu, alpha, value):
                               mu > 0, value >= 0, alpha > 0)
 
 
-# todo does this have a name?
+def negative_binomial_normal_approx_logp(mu, alpha, value):
+    """
+    Normal approximation to Negative binomial log probability
+
+    :param mu: mean
+    :param alpha: inverse over-dispersion
+    :param value: observed
+    :return: theano tensor
+    """
+    tau = alpha / (mu * (alpha + mu))  # precision
+    return pm_dist_math.bound(0.5 * (tt.log(tau) - _log_2_pi - tau * tt.square(value - mu)),
+                              mu > 0, value >= 0, alpha > 0)
+
+
+# todo a lazy switch between normal approximation and exact
+def negative_binomial_smart_approx_logp(mu, alpha, value, where):
+    raise NotImplementedError
+
+
 def centered_heavy_tail_logp(mu, value):
     """
     This distribution is obtained by taking X ~ Exp and performing a Bose transformation

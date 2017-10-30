@@ -1,17 +1,17 @@
-import numpy as np
-import theano as th
-import theano.tensor as tt
-import theano.sparse as tst
-import scipy.sparse as sp
-import pymc3 as pm
 import logging
-
-from pymc3 import Model, Normal, Exponential, HalfFlat, Deterministic, Lognormal, DensityDist
-from . import commons
-
-from typing import List, Tuple, Callable
 from abc import abstractmethod
-from ..utils.interval import Interval, GCContentAnnotation
+from typing import List, Tuple
+
+import numpy as np
+import pymc3 as pm
+import scipy.sparse as sp
+import theano as th
+import theano.sparse as tst
+import theano.tensor as tt
+from pymc3 import Model, Normal, Exponential, HalfFlat, Deterministic, Lognormal, DensityDist
+
+from ..structs.interval import Interval, GCContentAnnotation
+from . import commons
 from .theano_hmm import TheanoForwardBackward
 from .. import config, types
 from ..inference.inference_task_base import HybridInferenceParameters
@@ -321,10 +321,10 @@ class DenoisingModel(Model):
     """ The gCNV coverage denoising model """
     def __init__(self,
                  denoising_model_config: DenoisingModelConfig,
-                 calling_config: CopyNumberCallingConfig,
                  shared_workspace: DenoisingCallingWorkspace,
                  test_value_supplier: InitialModelParametersSupplier):
         super().__init__()
+        eps = denoising_model_config.mapping_error_rate
 
         # target-specific unexplained variance
         psi_t = Exponential(name='psi_t', lam=1.0 / denoising_model_config.psi_mean,
@@ -341,6 +341,7 @@ class DenoisingModel(Model):
                             tau=denoising_model_config.tau_depth,
                             shape=shared_workspace.num_samples,
                             testval=shared_workspace.depth_prior_s)
+
         # bias modeling
         log_bias_st = tt.tile(log_mean_bias_t, (shared_workspace.num_samples, 1))
 
@@ -353,88 +354,73 @@ class DenoisingModel(Model):
             W_tu = Normal(name='W_tu', mu=0.0, tau=alpha_u.dimshuffle('x', 0),
                           shape=(shared_workspace.num_targets, denoising_model_config.max_bias_factors))
 
-            # sample-specific bias factor latent variables
+            # sample-specific bias factor loadings
             z_su = Normal(name='z_su', mu=0.0, sd=1.0,
                           shape=(shared_workspace.num_samples, denoising_model_config.max_bias_factors))
 
-            # total bias = mean bias + sample-specific bias factors
+            # add contribution to total log bias
             log_bias_st += tt.dot(W_tu, z_su.T).T
 
-        # gc bias
+        # GC bias
         if denoising_model_config.enable_explicit_gc_bias_modeling:
+            # sample-specific GC bias factor loadings
             z_sg = Normal(name='z_sg', mu=0.0, sd=denoising_model_config.gc_curve_sd,
                           shape=(shared_workspace.num_samples, denoising_model_config.num_gc_bins))
 
+            # add contribution to total log bias
             log_bias_st += tst.dot(shared_workspace.W_gc_tg, z_sg.T).T
 
-        bias_st = Deterministic(name='bias_st', var=tt.exp(log_bias_st))
+        # normalize the total bias such at the mean bias (over all targets) is unity
+        unnormalized_bias_st = tt.exp(log_bias_st)
+        mean_bias_per_target_s = tt.sum(unnormalized_bias_st, axis=1) / shared_workspace.num_targets
+        bias_st = Deterministic(
+            name='bias_st',
+            var=unnormalized_bias_st / mean_bias_per_target_s.dimshuffle(0, 'x'))
+
+        # convert "unexplained variance" to negative binomial over-dispersion
+        alpha_st = Deterministic(
+            name='alpha_st',
+            var=tt.inv((tt.exp(psi_t) - 1.0)).dimshuffle('x', 0))
+
+        # useful deterministic variables for sampling
+        mu_stc = Deterministic(
+            name='mu_stc',
+            var=((1.0 - eps) * depth_s.dimshuffle(0, 'x', 'x') * bias_st.dimshuffle(0, 1, 'x')
+                 * shared_workspace.copy_number_values_c.dimshuffle('x', 'x', 0)
+                 + eps * depth_s.dimshuffle(0, 'x', 'x')))
+        Deterministic(
+            name='log_copy_number_emission_stc',
+            var=commons.negative_binomial_logp(
+                mu_stc, alpha_st.dimshuffle(0, 1, 'x'), shared_workspace.n_st.dimshuffle(0, 1, 'x')))
 
         # n_st (observed)
         if denoising_model_config.q_c_expectation_mode == 'map':
+            def _copy_number_emission_logp(n_st):
+                c_map_st = tt.argmax(shared_workspace.log_q_c_stc, axis=2)
+                mu_st = ((1.0 - eps) * depth_s.dimshuffle(0, 'x') * bias_st * c_map_st
+                         + eps * depth_s.dimshuffle(0, 'x'))
+                log_copy_number_emission_st = commons.negative_binomial_logp(mu_st, alpha_st, n_st)
+                return tt.sum(log_copy_number_emission_st)
+
             DensityDist(name='n_st_obs',
-                        logp=self._logp_negative_binomial_q_c_expectation_map(
-                            bias_st, depth_s, psi_t,shared_workspace.log_q_c_stc,
-                            denoising_model_config.mapping_error_rate),
+                        logp=lambda n_st: _copy_number_emission_logp(n_st),
                         observed=shared_workspace.n_st)
+
         elif denoising_model_config.q_c_expectation_mode == 'exact':
+            def _copy_number_emission_logp(_n_st):
+                _log_copy_number_emission_stc = commons.negative_binomial_logp(
+                    mu_stc,
+                    alpha_st.dimshuffle(0, 1, 'x'),
+                    _n_st.dimshuffle(0, 1, 'x'))
+                log_q_c_stc = shared_workspace.log_q_c_stc
+                q_c_stc = tt.exp(log_q_c_stc)
+                return tt.sum(q_c_stc * (_log_copy_number_emission_stc - log_q_c_stc))
+
             DensityDist(name='n_st_obs',
-                        logp=self._logp_negative_binomial_q_c_expectation_exact(
-                            bias_st, depth_s, psi_t, shared_workspace.log_q_c_stc,
-                            denoising_model_config.mapping_error_rate,
-                            calling_config.num_copy_number_states),
+                        logp=lambda n_st: _copy_number_emission_logp(n_st),
                         observed=shared_workspace.n_st)
         else:
             raise Exception("Unknown q_c expectation mode")
-
-    @staticmethod
-    def _logp_negative_binomial_q_c_expectation_exact(bias_st: types.TheanoMatrix,
-                                                      depth_s: types.TheanoVector,
-                                                      psi_t: types.TheanoVector,
-                                                      log_q_c_stc: types.TheanoTensor3,
-                                                      mapping_error_rate: types.floatX,
-                                                      num_copy_number_states: int)\
-            -> Callable[[types.TheanoMatrix], types.TheanoScalar]:
-        """ Calculates the variational lower bound to the emission probability for given parameters of the
-        coverage denoising model.
-        :return: A function from n_st (2d theano tensor) to a scalar theano tensor; evaluates to the log
-        probability density.
-        """
-        def _eval_logp(n_st):
-            depth_bias_st = (1.0 - mapping_error_rate) * depth_s.dimshuffle(0, 'x') * bias_st
-            eps_st = (mapping_error_rate * depth_s).dimshuffle(0, 'x')
-            mu_adj_fact_st = tt.exp(0.5 * psi_t).dimshuffle('x', 0)
-            alpha_st = tt.inv((tt.exp(psi_t) - 1.0)).dimshuffle('x', 0)
-            log_copy_number_emission_stc = tt.stack([commons.negative_binomial_logp(
-                c * mu_adj_fact_st * depth_bias_st + eps_st, alpha_st, n_st)
-                for c in range(num_copy_number_states)]).dimshuffle(1, 2, 0)
-            q_c_stc = tt.exp(log_q_c_stc)
-            return tt.sum(q_c_stc * (log_copy_number_emission_stc - log_q_c_stc))
-
-        return _eval_logp
-
-    @staticmethod
-    def _logp_negative_binomial_q_c_expectation_map(bias_st: types.TheanoMatrix,
-                                                    depth_s: types.TheanoVector,
-                                                    psi_t: types.TheanoVector,
-                                                    log_q_c_stc: types.TheanoTensor3,
-                                                    mapping_error_rate: types.floatX)\
-            -> Callable[[types.TheanoMatrix], types.TheanoScalar]:
-        """ Calculates the variational lower bound to the emission probability for given parameters of the
-        coverage denoising model. Instead of exact q_c posterior expectation, it uses MAP(c).
-        :return: A function from n_st (2d theano tensor) to a scalar theano tensor; evaluates to the log
-        probability density.
-        """
-        def _eval_logp(n_st):
-            depth_bias_st = (1.0 - mapping_error_rate) * depth_s.dimshuffle(0, 'x') * bias_st
-            eps_st = (mapping_error_rate * depth_s).dimshuffle(0, 'x')
-            mu_adj_fact_st = tt.exp(0.5 * psi_t).dimshuffle('x', 0)
-            alpha_st = tt.inv((tt.exp(psi_t) - 1.0)).dimshuffle('x', 0)
-            c_map_st = tt.argmax(log_q_c_stc, axis=2)
-            mu_st = c_map_st * mu_adj_fact_st * depth_bias_st + eps_st
-            log_copy_number_emission_st = commons.negative_binomial_logp(mu_st, alpha_st, n_st)
-            return tt.sum(log_copy_number_emission_st)
-
-        return _eval_logp
 
 
 class CopyNumberEmissionBasicSampler:
@@ -468,21 +454,9 @@ class CopyNumberEmissionBasicSampler:
     def _get_compiled_simultaneous_log_copy_number_emission_sampler(self, approx: pm.approximations.MeanField):
         """ For a given variational approximation, returns a compiled theano function that draws posterior samples
         from the log copy number emission """
-        depth_bias_st = ((1.0 - self.model_config.mapping_error_rate)
-                         * self.denoising_model['depth_s'].dimshuffle(0, 'x')
-                         * self.denoising_model['bias_st'])
-        eps_st = self.model_config.mapping_error_rate * self.denoising_model['depth_s'].dimshuffle(0, 'x')
-        mu_adj_fact_st = tt.exp(0.5 * self.denoising_model['psi_t']).dimshuffle('x', 0)
-        alpha_st = tt.inv((tt.exp(self.denoising_model['psi_t']) - 1.0)).dimshuffle('x', 0)
-        copy_number_values_c = self.shared_workspace.copy_number_values_c
-        log_copy_number_emission_stc = commons.negative_binomial_logp(
-            copy_number_values_c.dimshuffle('x', 'x', 0)
-            * mu_adj_fact_st.dimshuffle(0, 1, 'x')
-            * depth_bias_st.dimshuffle(0, 1, 'x') + eps_st.dimshuffle(0, 1, 'x'),
-            alpha_st.dimshuffle(0, 1, 'x'),
-            self.shared_workspace.n_st.dimshuffle(0, 1, 'x'))
         log_copy_number_emission_stc_sampler = approx.sample_node(
-            log_copy_number_emission_stc, size=self.inference_params.log_emission_samples_per_round)
+            self.denoising_model['log_copy_number_emission_stc'],
+            size=self.inference_params.log_emission_samples_per_round)
         return th.function(inputs=[], outputs=log_copy_number_emission_stc_sampler)
 
 

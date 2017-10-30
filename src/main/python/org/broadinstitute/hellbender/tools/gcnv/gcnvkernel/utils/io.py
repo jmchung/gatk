@@ -1,12 +1,13 @@
-import numpy as np
-import pandas as pd
 import logging
 from typing import List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
+
+from ..structs.interval import Interval, IntervalAnnotation, interval_annotations_dict, interval_annotations_dtypes
 from .. import types
 
-from .interval import Interval, IntervalAnnotation, interval_annotations_dict, interval_annotations_dtypes
 _logger = logging.getLogger(__name__)
-_logger.setLevel(logging.INFO)
 
 # standard read counts and target interval list files data types
 std_dtypes_dict = {'contig': np.str, 'start': types.big_uint, 'stop': types.big_uint, 'name': np.str}

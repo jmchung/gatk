@@ -31,6 +31,8 @@ High priority
 
 - generate learning plots
 
+- store argmax(q_cst)
+
 - pre-processor (python side)
     1. take a cohort (or single-sample) and a list of target intervals
         * for WGS, intervals must be equally spaced
@@ -67,6 +69,9 @@ High priority
     * low-coverage targets are not called as deletion
     * GC bias is modelled properly
     * bi- and multi-allelic regions are called properly
+    * important:
+        * sensitivity vs. p_alt, coherence_cnv, p_flat, coherence_class
+
 
 - prior optimization
     * think about the interaction between coherence length and prior

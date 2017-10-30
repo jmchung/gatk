@@ -1,7 +1,9 @@
-import numpy as np
-from ..utils.interval import Interval
-from typing import List, Set, Tuple, Optional
 import logging
+from typing import List, Set
+
+import numpy as np
+
+from ..structs.interval import Interval
 
 __all__ = ['TargetMask']
 
