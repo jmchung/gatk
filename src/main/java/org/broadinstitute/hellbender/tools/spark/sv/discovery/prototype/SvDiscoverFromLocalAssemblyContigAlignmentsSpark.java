@@ -125,20 +125,19 @@ public final class SvDiscoverFromLocalAssemblyContigAlignmentsSpark extends GATK
                               final Broadcast<SAMSequenceDictionary> broadcastSequenceDictionary, final String sampleId) {
 
         new InsDelVariantDetector()
-                .inferSvAndWriteVCF(contigsByPossibleRawTypes.get(RawTypes.InsDel), outputDir+"/"+RawTypes.InsDel.name()+".vcf",
-                        referenceMultiSourceBroadcast, broadcastSequenceDictionary, localLogger, sampleId);
+                .inferSvAndWriteVCF(outputDir+"/"+RawTypes.InsDel.name()+".vcf", sampleId, contigsByPossibleRawTypes.get(RawTypes.InsDel),
+                        referenceMultiSourceBroadcast, broadcastSequenceDictionary, localLogger);
 
         new SimpleStrandSwitchVariantDetector()
-                .inferSvAndWriteVCF(contigsByPossibleRawTypes.get(RawTypes.Inv), outputDir+"/"+RawTypes.Inv.name()+".vcf",
-                        referenceMultiSourceBroadcast, broadcastSequenceDictionary, localLogger, sampleId);
+                .inferSvAndWriteVCF(outputDir+"/"+RawTypes.Inv.name()+".vcf", sampleId, contigsByPossibleRawTypes.get(RawTypes.Inv),
+                        referenceMultiSourceBroadcast, broadcastSequenceDictionary, localLogger);
 
         // here contigs supporting cpx having only 2 alignments could be handled easily together with ref block order switch ones
         final JavaRDD<AlignedContig> diffChrTrans =
                 contigsByPossibleRawTypes.get(RawTypes.Cpx).filter(tig -> tig.alignmentIntervals.size() == 2);
         new SuspectedTransLocDetector()
-                .inferSvAndWriteVCF(contigsByPossibleRawTypes.get(RawTypes.DispersedDupOrMEI).union(diffChrTrans),
-                        outputDir+"/"+ RawTypes.DispersedDupOrMEI.name()+".vcf",
-                        referenceMultiSourceBroadcast, broadcastSequenceDictionary, localLogger, sampleId);
+                .inferSvAndWriteVCF(outputDir+"/"+ RawTypes.DispersedDupOrMEI.name()+".vcf", sampleId, contigsByPossibleRawTypes.get(RawTypes.DispersedDupOrMEI).union(diffChrTrans),
+                        referenceMultiSourceBroadcast, broadcastSequenceDictionary, localLogger);
     }
 
     private enum RawTypes {
