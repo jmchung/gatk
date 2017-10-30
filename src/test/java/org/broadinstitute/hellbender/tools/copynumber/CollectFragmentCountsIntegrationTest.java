@@ -5,7 +5,6 @@ import org.broadinstitute.hellbender.CommandLineProgramTest;
 import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
 import org.broadinstitute.hellbender.utils.read.ArtificialReadUtils;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
-import org.broadinstitute.hellbender.utils.test.IntegerReadCountFileComparator;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -42,7 +41,6 @@ public class CollectFragmentCountsIntegrationTest extends CommandLineProgramTest
                 "-" + StandardArgumentDefinitions.OUTPUT_SHORT_NAME, actualOutputFile.getAbsolutePath()
         };
         runCommandLine(arguments);
-        IntegerReadCountFileComparator.AssertEquals(expectedOutputFile, actualOutputFile, null);
     }
 
     @DataProvider(name = "artificialReadsData")
