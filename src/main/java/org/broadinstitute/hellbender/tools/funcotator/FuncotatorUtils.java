@@ -658,11 +658,25 @@ public class FuncotatorUtils {
         // Handle the insertion case:
         else if ( isInsertion(alignedRefAllele, alignedAltAllele) ) {
 
+            final String nextCodon;
+            if ( seqComp.getStrand() == Strand.POSITIVE ) {
+                nextCodon = seqComp.getReferenceCodingSequence().getBaseString().substring(seqComp.getAlignedReferenceAlleleStop(), seqComp.getAlignedReferenceAlleleStop() + 3 );
+            }
+            else {
+                nextCodon = ReadUtils.getBasesReverseComplement(
+                        seqComp.getReferenceCodingSequence().getBaseString().substring(seqComp.getAlignedCodingSequenceAlleleStart() - 3, seqComp.getAlignedCodingSequenceAlleleStart() ).getBytes()
+                );
+            }
+
             // Check for frame shift syntax first:
             if ( isFrameshift(alignedRefAllele, alignedAltAllele) ) {
-                return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + "-" +
-                        seqComp.getAlignedReferenceAlleleStop() + ")" +
-                        alignedRefAllele.toLowerCase() + "fs";
+//                return "c.(" + seqComp.getAlignedCodingSequenceAlleleStart() + "-" +
+//                        seqComp.getAlignedReferenceAlleleStop() + ")" +
+//                        alignedRefAllele.toLowerCase() + "fs";
+
+                return "c.(" + (seqComp.getAlignedCodingSequenceAlleleStart() + 3) + "-" +
+                        (seqComp.getAlignedReferenceAlleleStop() + 3) + ")" +
+                        nextCodon.toLowerCase() + "fs";
             }
             else {
 
@@ -670,16 +684,6 @@ public class FuncotatorUtils {
                 // it on the end of our reference before we render it.  We must also ignore the first codon because of
                 // the leading extra base in the VCF file.
                 // TODO: This is really bad - we are tying our output to a specific input format.  FIX IT.
-
-                final String nextCodon;
-                if ( seqComp.getStrand() == Strand.POSITIVE ) {
-                    nextCodon = seqComp.getReferenceCodingSequence().getBaseString().substring(seqComp.getAlignedReferenceAlleleStop(), seqComp.getAlignedReferenceAlleleStop() + 3 );
-                }
-                else {
-                    nextCodon = ReadUtils.getBasesReverseComplement(
-                            seqComp.getReferenceCodingSequence().getBaseString().substring(seqComp.getAlignedCodingSequenceAlleleStart() - 3, seqComp.getAlignedCodingSequenceAlleleStart() ).getBytes()
-                    );
-                }
 
                 // Create a new reference allele by removing the first codon
                 // (because of the added leading base for insertions)
@@ -1177,16 +1181,16 @@ public class FuncotatorUtils {
 
     /**
      * Get the full alternate sequence given a reference coding sequence, and two alleles.
-     * @param referenceCodingSequence The reference sequence on which to base the resulting alternate coding sequence.
-     * @param alleleStartPos Starting position (1-based, inclusive) for the ref and alt alleles in the given {@code referenceCodingSequence}.
+     * @param referenceSequence The reference sequence on which to base the resulting alternate sequence.
+     * @param alleleStartPos Starting position (1-based, inclusive) for the ref and alt alleles in the given {@code referenceSequence}.
      * @param refAllele Reference Allele.  Used for the length of the reference (content ignored).
      * @param altAllele Alternate Allele.  Used for both content and length of the alternate allele.
      * @return The coding sequence that includes the given alternate allele in place of the given reference allele.
      */
-    public static String getAlternateSequence(final String referenceCodingSequence, final int alleleStartPos,
+    public static String getAlternateSequence(final String referenceSequence, final int alleleStartPos,
                                               final Allele refAllele, final Allele altAllele ) {
 
-        Utils.nonNull(referenceCodingSequence);
+        Utils.nonNull(referenceSequence);
         Utils.nonNull(refAllele);
         Utils.nonNull(altAllele);
 
@@ -1194,9 +1198,9 @@ public class FuncotatorUtils {
         // the start and end of the coding region:
         final int alleleIndex = Math.abs(alleleStartPos - 1);
 
-        return referenceCodingSequence.substring(0, alleleIndex) +
+        return referenceSequence.substring(0, alleleIndex) +
                 altAllele.getBaseString() +
-                referenceCodingSequence.substring(alleleIndex + refAllele.length());
+                referenceSequence.substring(alleleIndex + refAllele.length());
     }
 
     /**
@@ -1406,6 +1410,11 @@ public class FuncotatorUtils {
          * after the total length.
          */
         private String referenceBases                     = null;
+
+        /**
+         * The number of bases in {@link FuncotatorUtils.SequenceComparison#referenceBases} before the
+         * start of the reference Allele / variant.
+         */
         private Integer referenceWindow                   = null;
 
         /**
@@ -1416,19 +1425,77 @@ public class FuncotatorUtils {
          */
         private ReferenceSequence referenceCodingSequence = null;
 
+        /**
+         * The contig on which this sequence comparison occurs.
+         */
         private String  contig                               = null;
+
+        /**
+         * The strand on which this sequence comparison occurs.
+         */
         private Strand  strand                               = null;
+
+        /**
+         * The position (1-based, inclusive in genome coordinates - relative to the start of
+         * {@link FuncotatorUtils.SequenceComparison#contig}) of the start of the reference allele / variant.
+         */
         private Integer alleleStart                          = null;
+
+        /**
+         * The position (1-based, inclusive) in transcript coordinates relative to the start of
+         * the transcript of start of the reference allele / variant.
+         */
         private Integer transcriptAlleleStart                = null;
+
+        /**
+         * The position (1-based, inclusive) in coding sequence coordinates relative to the start of
+         * the coding region of the transcript of the start of the reference allele / variant.
+         * This location is obtained by concatenating the exons together and counting from the start of
+         * that sequence to where the reference allele / variant begins.
+         */
         private Integer codingSequenceAlleleStart            = null;
+
+        /**
+         * The in-frame position (1-based, inclusive) in coding sequence coordinates relative to the start of
+         * the coding region of the transcript of the start of the first codon containing the reference allele / variant.
+         * This location is obtained by concatenating the exons together and counting from the start of
+         * that sequence to where the reference allele / variant begins, then moving backwards to an in-frame
+         * position, if necessary.
+         */
         private Integer alignedCodingSequenceAlleleStart     = null;
 
+        /**
+         * The position (1-based, inclusive in genome coordinates - relative to the start of
+         * {@link FuncotatorUtils.SequenceComparison#contig}) of the start of the exon that contains the
+         * variant in this {@link FuncotatorUtils.SequenceComparison}.
+         */
         private Integer exonStartPosition                    = null;
+
+        /**
+         * The position (1-based, inclusive in genome coordinates - relative to the start of
+         * {@link FuncotatorUtils.SequenceComparison#contig}) of the end of the exon that contains the
+         * variant in this {@link FuncotatorUtils.SequenceComparison}.
+         */
         private Integer exonEndPosition                      = null;
 
+        /**
+         * The start position (1-based, inclusive) of the Protein Change for the alleles in this {@link SequenceComparison}.
+         * This is computed using {@link SequenceComparison#alignedCodingSequenceAlleleStart}.
+         * See {@link FuncotatorUtils#getProteinChangePosition} for more details.
+         */
         private Integer proteinChangeStartPosition           = null;
+
+        /**
+         * The end position (1-based, inclusive) of the Protein Change for the alleles in this {@link SequenceComparison}.
+         * This is computed by using {@link SequenceComparison#alignedCodingSequenceAlleleStart} and the length of
+         * {@link SequenceComparison#alignedCodingSequenceAlternateAllele}.
+         * See {@link FuncotatorUtils#getProteinChangeEndPosition} for more details.
+         */
         private Integer proteinChangeEndPosition             = null;
 
+        /**
+         * A string representation of the reference allele.
+         */
         private String  referenceAllele                      = null;
         /**
          * An in-frame sequence of bases that overlaps the given reference allele based on the raw reference genome.
@@ -1440,13 +1507,49 @@ public class FuncotatorUtils {
          * (i.e. This includes ONLY EXONS.)
          */
         private String  alignedCodingSequenceReferenceAllele = null;
+
+        /**
+         * The in-frame position (1-based, inclusive) of the last base of the last codon that contains the reference
+         * allele relative to the start of the coding sequence.
+         * All codons containing the reference allele can be extracted from the coding sequence using
+         * {@link SequenceComparison#alignedCodingSequenceAlleleStart} and {@link SequenceComparison#alignedReferenceAlleleStop}.
+         */
         private Integer alignedReferenceAlleleStop           = null;
+
+        /**
+         * The amino acid sequence as coded by the in-frame reference coding sequence ({@link SequenceComparison#alignedCodingSequenceReferenceAllele}.
+         */
         private String  referenceAminoAcidSequence           = null;
 
+        /**
+         * A string representation of the alternate allele.
+         */
         private String  alternateAllele                      = null;
+
+        /**
+         * An in-frame sequence of bases that includes the entire alternate allele based on the reference genome.
+         * May span multiple codons.
+         * May include intron bases.
+         */
         private String  alignedAlternateAllele               = null;
+
+        /**
+         * An in-frame sequence of bases that includes the entire alternate allele based on the coding sequence reference.
+         * May span multiple codons.
+         */
         private String  alignedCodingSequenceAlternateAllele = null;
+
+        /**
+         * The in-frame position (1-based, inclusive) of the last base of the last codon that contains the alternate
+         * allele relative to the start of the coding sequence.
+         * All codons containing the alternate allele can be extracted from the coding sequence using
+         * {@link SequenceComparison#alignedCodingSequenceAlleleStart} and {@link SequenceComparison#alignedAlternateAlleleStop}.
+         */
         private Integer alignedAlternateAlleleStop           = null;
+
+        /**
+         * The amino acid sequence as coded by the in-frame alternate coding sequence ({@link SequenceComparison#alignedCodingSequenceAlternateAllele}.
+         */
         private String  alternateAminoAcidSequence           = null;
 
         // =============================================================================================================
