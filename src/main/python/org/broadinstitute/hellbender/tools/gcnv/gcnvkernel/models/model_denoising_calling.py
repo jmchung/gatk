@@ -11,6 +11,7 @@ import theano.tensor as tt
 from pymc3 import Model, Normal, Exponential, HalfFlat, Deterministic, Lognormal, DensityDist
 
 from ..structs.interval import Interval, GCContentAnnotation
+from ..structs.metadata import SampleCoverageMetadataCollection, TargetsIntervalListMetadata
 from . import commons
 from .theano_hmm import TheanoForwardBackward
 from .. import config, types
@@ -104,15 +105,10 @@ class CopyNumberCallingConfig:
         for k in range(num_copy_number_classes):
             _pi_kc[k, :] = commons.get_normalized_prob_vector(_pi_kc[k, :], config.prob_sum_tol)
 
-        # calculate copy number prior mean
-        _pi_c = np.dot(_pi_kc.T, _class_probs_k).reshape((num_copy_number_states,))
-
         # set member variables
         self.num_copy_number_states = num_copy_number_states
         self.num_copy_number_classes = num_copy_number_classes
         self.pi_kc: types.TensorSharedVariable = th.shared(_pi_kc, name="pi_kc", borrow=config.borrow_numpy)
-        self.pi_c: types.TensorSharedVariable = th.shared(_pi_c, name="pi_c", borrow=config.borrow_numpy)
-        self.prior_mean_c: float = np.dot(_pi_c, np.arange(0, num_copy_number_states, dtype=types.floatX))
         self.class_probs_k: types.TensorSharedVariable = th.shared(_class_probs_k, name="class_probs_k",
                                                                    borrow=config.borrow_numpy)
         self.class_coherence_k: types.TensorSharedVariable = th.shared(_class_coherence_k, name="class_coherence_k",
@@ -138,15 +134,29 @@ class InitializeToPrior(PosteriorInitializer):
     def initialize_posterior(denoising_config: DenoisingModelConfig,
                              calling_config: CopyNumberCallingConfig,
                              shared_workspace: 'DenoisingCallingWorkspace'):
+        # todo use diptest statistic for better initialization?
         # class log posterior probs
         log_q_tau_tk = np.tile(np.log(calling_config.class_probs_k.get_value(borrow=True)),
                                (shared_workspace.num_targets, 1))
         shared_workspace.log_q_tau_tk = th.shared(log_q_tau_tk, name="log_q_tau_tk", borrow=config.borrow_numpy)
 
+        # todo shall we use ploidy posteriors instead of ploidy MAP?
         # copy number log posterior probs
-        log_q_c_stc = np.tile(np.log(calling_config.pi_c.get_value(borrow=True)),
-                              (shared_workspace.num_samples, shared_workspace.num_targets, 1))
+        log_q_c_stc = np.zeros((shared_workspace.num_samples, shared_workspace.num_targets,
+                                calling_config.num_copy_number_states), dtype=types.floatX)
+        c_map_st = np.zeros((shared_workspace.num_samples, shared_workspace.num_targets), dtype=np.int)
+        for si in range(shared_workspace.num_samples):
+            sample_metadata = shared_workspace.sample_metadata_collection.get_sample_coverage_metadata_by_index(si)
+            log_q_c_stc[si, :, :] = -np.inf
+            for j, contig in enumerate(shared_workspace.targets_metadata.contig_list):
+                contig_target_indices = shared_workspace.targets_metadata.contig_target_indices[contig]
+                contig_ploidy = sample_metadata.ploidy_j[j]
+                log_q_c_stc[si, contig_target_indices, contig_ploidy] = 0
+                c_map_st[si, contig_target_indices] = contig_ploidy
+        c_mean_s = np.mean(c_map_st.astype(dtype=types.floatX), axis=1)
         shared_workspace.log_q_c_stc = th.shared(log_q_c_stc, name="log_q_c_stc", borrow=config.borrow_numpy)
+        shared_workspace.c_map_st = th.shared(c_map_st, name="c_map_st", borrow=config.borrow_numpy)
+        shared_workspace.c_mean_s = th.shared(c_mean_s, name="c_mean_s", borrow=config.borrow_numpy)
 
 
 class DenoisingCallingWorkspace:
@@ -155,32 +165,49 @@ class DenoisingCallingWorkspace:
     def __init__(self,
                  denoising_config: DenoisingModelConfig,
                  calling_config: CopyNumberCallingConfig,
-                 targets_interval_list: List[Interval],
+                 targets_metadata: TargetsIntervalListMetadata,
+                 sample_metadata_collection: SampleCoverageMetadataCollection,
                  n_st: np.ndarray,
                  initializer: PosteriorInitializer = InitializeToPrior):
         assert n_st.ndim == 2, "read counts matrix must be a dim=2 ndarray with shape (num_samples, num_targets)"
-        assert n_st.shape[1] == len(targets_interval_list), "the length of the targets interval list does not match" \
-                                                            " the shape of the read counts matrix"
-        self.targets_interval_list: List[Interval] = targets_interval_list
+        assert n_st.shape[1] == len(targets_metadata.targets_interval_list),\
+            "the length of the targets interval list is incompatible with the shape of the read counts matrix"
+        assert n_st.shape[0] == sample_metadata_collection.num_samples,\
+            "the size of the sample metadata collection is incompatible with the shape of the read counts matrix"
+        assert sample_metadata_collection.all_have_ploidy_and_read_depth_metadata,\
+            "all samples must have ploidy and read depth metadata"
+
+        self.targets_metadata = targets_metadata
+        self.sample_metadata_collection = sample_metadata_collection
+        self.targets_interval_list: List[Interval] = targets_metadata.targets_interval_list
         self.n_st: types.TensorSharedVariable = th.shared(n_st.astype(types.big_uint), name="n_st",
                                                           borrow=config.borrow_numpy)
-        self.num_targets: int = len(targets_interval_list)
+        self.num_targets: int = len(self.targets_interval_list)
         self.num_samples: int = n_st.shape[0]
 
         # distances between subsequent targets
         self.dist_t: types.TensorSharedVariable = th.shared(
-            np.asarray([targets_interval_list[ti + 1].distance(targets_interval_list[ti])
+            np.asarray([self.targets_interval_list[ti + 1].distance(self.targets_interval_list[ti])
                         for ti in range(self.num_targets - 1)], dtype=types.floatX),
             borrow=config.borrow_numpy)
+
+        # read depth
+        read_depth_s = np.zeros((self.num_samples,), dtype=types.floatX)
+        for si in range(self.num_samples):
+            read_depth_s[si] = sample_metadata_collection.get_sample_coverage_metadata_by_index(si).read_depth
+        self.read_depth_s: types.TensorSharedVariable = th.shared(read_depth_s, name="read_depth_s",
+                                                                  borrow=config.borrow_numpy)
 
         # a vector of (integer) copy numbers
         copy_number_values_c = np.arange(0, calling_config.num_copy_number_states, dtype=types.big_uint)
         self.copy_number_values_c = th.shared(copy_number_values_c, name='copy_number_values_c')
 
-        # copy number log posterior
+        # copy number log posterior and derived quantities
         #   initialized by PosteriorInitializer.initialize(),
         #   subsequently updated by HHMMClassAndCopyNumberCaller.update_copy_number_log_posterior()
         self.log_q_c_stc: types.TensorSharedVariable = None
+        self.c_map_st: types.TensorSharedVariable = None
+        self.c_mean_s: types.TensorSharedVariable = None
 
         # copy number emission log posterior
         #   updated by LogEmissionPosteriorSampler.update_log_copy_number_emission_posterior()
@@ -231,9 +258,6 @@ class DenoisingCallingWorkspace:
         if denoising_config.enable_explicit_gc_bias_modeling:
             self.W_gc_tg = self._create_sparse_gc_bin_tensor_tg(
                 self.targets_interval_list, denoising_config.num_gc_bins)
-
-        # read depth prior
-        self.depth_prior_s = (np.median(n_st, axis=1) / calling_config.prior_mean_c).astype(types.floatX)
 
         # initialize posterior
         initializer.initialize_posterior(denoising_config, calling_config, self)
@@ -306,11 +330,13 @@ class DefaultInitialModelParametersSupplier(InitialModelParametersSupplier):
     def get_init_psi_t(self) -> np.ndarray:
         return self.denoising_model_config.psi_mean * np.ones((self.shared_workspace.num_targets,), dtype=types.floatX)
 
+    # todo
     def get_init_log_mean_bias_t(self) -> np.ndarray:
-        depth_normalized_n_st: np.ndarray = self.shared_workspace.n_st.get_value(borrow=True) / (
-            self.calling_config.prior_mean_c * self.shared_workspace.depth_prior_s[:, np.newaxis])
-        bias_t = np.mean(depth_normalized_n_st, axis=0)
-        return np.log(bias_t + config.log_eps)
+        return np.zeros((self.shared_workspace.num_targets,), dtype=types.floatX)
+        # depth_normalized_n_st: np.ndarray = self.shared_workspace.n_st.get_value(borrow=True) / (
+        #     self.calling_config.prior_mean_c * self.shared_workspace.depth_prior_s[:, np.newaxis])
+        # bias_t = np.mean(depth_normalized_n_st, axis=0)
+        # return np.log(bias_t + config.log_eps)
 
     def get_init_alpha_u(self) -> np.ndarray:
         fact = self.denoising_model_config.psi_mean * self.denoising_model_config.init_ard_rel_unexplained_variance
@@ -336,11 +362,12 @@ class DenoisingModel(Model):
                                  shape=shared_workspace.num_targets,
                                  testval=test_value_supplier.get_init_log_mean_bias_t())
 
-        # sample-specific depth
-        depth_s = Lognormal(name='depth_s', mu=np.log(shared_workspace.depth_prior_s),
-                            tau=denoising_model_config.tau_depth,
-                            shape=shared_workspace.num_samples,
-                            testval=shared_workspace.depth_prior_s)
+        # todo in principle, we can allow a per-contig read depth adjustment variable to taking care of
+        # todo small variations about the mean read depth (rather than fixing read depth from the outset)
+        # depth_s = Lognormal(name='depth_s', mu=np.log(shared_workspace.read_depth_s),
+        #                     tau=denoising_model_config.tau_depth,
+        #                     shape=shared_workspace.num_samples,
+        #                     testval=shared_workspace.read_depth_s)
 
         # bias modeling
         log_bias_st = tt.tile(log_mean_bias_t, (shared_workspace.num_samples, 1))
@@ -383,11 +410,13 @@ class DenoisingModel(Model):
             var=tt.inv((tt.exp(psi_t) - 1.0)).dimshuffle('x', 0))
 
         # useful deterministic variables for sampling
+        mean_mapping_error_correction_s = eps * shared_workspace.read_depth_s * shared_workspace.c_mean_s
+
         mu_stc = Deterministic(
             name='mu_stc',
-            var=((1.0 - eps) * depth_s.dimshuffle(0, 'x', 'x') * bias_st.dimshuffle(0, 1, 'x')
+            var=((1.0 - eps) * shared_workspace.read_depth_s.dimshuffle(0, 'x', 'x') * bias_st.dimshuffle(0, 1, 'x')
                  * shared_workspace.copy_number_values_c.dimshuffle('x', 'x', 0)
-                 + eps * depth_s.dimshuffle(0, 'x', 'x')))
+                 + mean_mapping_error_correction_s.dimshuffle(0, 'x', 'x')))
         Deterministic(
             name='log_copy_number_emission_stc',
             var=commons.negative_binomial_logp(
@@ -396,9 +425,8 @@ class DenoisingModel(Model):
         # n_st (observed)
         if denoising_model_config.q_c_expectation_mode == 'map':
             def _copy_number_emission_logp(n_st):
-                c_map_st = tt.argmax(shared_workspace.log_q_c_stc, axis=2)
-                mu_st = ((1.0 - eps) * depth_s.dimshuffle(0, 'x') * bias_st * c_map_st
-                         + eps * depth_s.dimshuffle(0, 'x'))
+                mu_st = ((1.0 - eps) * shared_workspace.read_depth_s.dimshuffle(0, 'x') * bias_st
+                         * shared_workspace.c_map_st + mean_mapping_error_correction_s.dimshuffle(0, 'x'))
                 log_copy_number_emission_st = commons.negative_binomial_logp(mu_st, alpha_st, n_st)
                 return tt.sum(log_copy_number_emission_st)
 
@@ -509,6 +537,9 @@ class HHMMClassAndCopyNumberBasicCaller:
         # compiled function for update of class log emission
         self._update_log_class_emission_tk_theano_func = self._get_update_log_class_emission_tk_theano_func()
 
+        # compiled function for update of auxiliary variables
+        self._update_aux_theano_func = self._get_update_aux_theano_func()
+
     def call(self,
              copy_number_update_summary_statistic_reducer,
              class_update_summary_statistic_reducer) -> Tuple[np.ndarray, np.ndarray, float, float]:
@@ -526,6 +557,9 @@ class HHMMClassAndCopyNumberBasicCaller:
         # class posterior update
         self._update_log_class_emission_tk()
         class_update, class_log_likelihood = self._update_class_log_posterior(class_update_summary_statistic_reducer)
+
+        # update auxiliary variables
+        self._update_aux()
 
         return copy_number_update_s, copy_number_log_likelihoods_s, class_update, class_log_likelihood
 
@@ -566,6 +600,9 @@ class HHMMClassAndCopyNumberBasicCaller:
             self.shared_workspace.log_trans_tkk,
             self.shared_workspace.log_class_emission_tk.get_value(borrow=True))
         return class_update_summary_statistic_reducer(output[0]), float(output[1])
+
+    def _update_aux(self):
+        self._update_aux_theano_func()
 
     @th.configparser.change_flags(compute_test_value="ignore")
     def _get_update_copy_number_hmm_specs_theano_func(self):
@@ -640,3 +677,15 @@ class HHMMClassAndCopyNumberBasicCaller:
 
         return th.function(inputs=[], outputs=[], updates=[
             (self.shared_workspace.log_class_emission_tk, log_class_emission_tk)])
+
+    @th.configparser.change_flags(compute_test_value="ignore")
+    def _get_update_aux_theano_func(self):
+        c_map_st = tt.argmax(self.shared_workspace.log_q_c_stc, axis=2)
+        c_mean_s = tt.sum(tt.mean(tt.exp(self.shared_workspace.log_q_c_stc), axis=1)
+                          * self.shared_workspace.copy_number_values_c.dimshuffle('x', 0),
+                          axis=1)
+
+        return th.function(inputs=[], outputs=[], updates=[
+            (self.shared_workspace.c_map_st, c_map_st),
+            (self.shared_workspace.c_mean_s, c_mean_s)
+        ])

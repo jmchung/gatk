@@ -129,7 +129,7 @@ class PloidyWorkspace:
 
         if update_sample_metadata:
             for si in range(self.num_samples):
-                self.sample_metadata_collection.get_sample_coverage_metadata_by_index(si).set_ploidy(
+                self.sample_metadata_collection.get_sample_coverage_metadata_by_index(si).set_ploidy_and_read_depth(
                     self.most_likely_ploidy_sj[si, :])
 
 

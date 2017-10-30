@@ -60,10 +60,13 @@ class SampleCoverageMetadata:
         # total count
         self.n_total = np.sum(self.n_j)
 
-        # ploidy per contig
+        # ploidy per contig (will be set by SampleCoverageMetadata.set_ploidy)
         self.ploidy_j: Optional[np.ndarray] = None
 
-    def set_ploidy(self, ploidy_j: np.ndarray):
+        # mean read depth per target per copy number (will be set by SampleCoverageMetadata.set_ploidy)
+        self.read_depth: Optional[float] = None
+
+    def set_ploidy_and_read_depth(self, ploidy_j: np.ndarray):
         """
         :param ploidy_j: a vector of ploidy per contig
         :return:
@@ -71,10 +74,15 @@ class SampleCoverageMetadata:
         assert self._targets_metadata.num_contigs == ploidy_j.size
         self.ploidy_j = np.zeros((self._targets_metadata.num_contigs,), dtype=types.small_uint)
         self.ploidy_j[:] = ploidy_j[:]
+        self.read_depth = float(self.n_total) / np.sum(self.ploidy_j * self._targets_metadata.t_j)
 
     @property
     def has_ploidy_metadata(self):
         return self.ploidy_j is not None
+
+    @property
+    def has_read_depth_metadata(self):
+        return self.read_depth is not None
 
 
 class SampleCoverageMetadataCollection:
@@ -91,6 +99,11 @@ class SampleCoverageMetadataCollection:
 
         self._sample_name_to_sample_index = {sample_name: si for si, sample_name in enumerate(sample_names)}
         self._sample_names_set = set(sample_names)
+
+    @property
+    def all_have_ploidy_and_read_depth_metadata(self):
+        return all([sample_metadata.has_ploidy_metadata and sample_metadata.has_read_depth_metadata
+                    for sample_metadata in self.sample_metadata_list])
 
     def get_sample_coverage_metadata_by_name(self, sample_name: str):
         assert sample_name in self._sample_names_set,\

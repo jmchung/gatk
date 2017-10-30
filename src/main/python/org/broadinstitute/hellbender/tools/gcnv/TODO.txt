@@ -2,11 +2,7 @@
 High priority
 =============
 
-- a sample-contig-ploidy dictionary
-
-- remove read depth from the model parameters
-    * set read depth to n_s / (total number of targets) deterministically
-    * variations can be captured by the bias terms
+- clean up calling config
 
 - fix reference copy number per contig per sample in the denoising model
 
@@ -33,18 +29,17 @@ High priority
 
 - store argmax(q_cst)
 
-- pre-processor (python side)
+
+
+- [DONE] remove read depth from the model parameters
+    * set read depth to n_s / (total number of targets) deterministically
+    * variations can be captured by the bias terms
+
+- [DONE] pre-processor (python side)
     1. take a cohort (or single-sample) and a list of target intervals
-        * for WGS, intervals must be equally spaced
-        * for WES, intervals must be either equally spaced within each exon or must be baits; the idea is that
-          we want more or less similar counts per interval
+    2. calculate counts summary statistics of counts per contig
 
-    2. calculate counts summary statistics of counts per contig, including sex chromosomes
-        * total_count(sample, contig)
-        * median_count(sample, contig)
-        * mean_count(sample, contig)
-        * std_count(sample, contig)
-
+- [DONE] a sample-contig-ploidy dictionary
 
 
 
