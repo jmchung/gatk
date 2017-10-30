@@ -1,7 +1,6 @@
 package org.broadinstitute.hellbender.tools.copynumber;
 
 import org.apache.commons.math3.linear.RealMatrix;
-import org.apache.logging.log4j.Logger;
 import org.broadinstitute.barclay.argparser.Argument;
 import org.broadinstitute.barclay.argparser.CommandLineProgramProperties;
 import org.broadinstitute.barclay.help.DocumentedFeature;
@@ -12,6 +11,7 @@ import org.broadinstitute.hellbender.cmdline.CommandLineProgram;
 import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
 import org.broadinstitute.hellbender.cmdline.programgroups.CopyNumberProgramGroup;
 import org.broadinstitute.hellbender.exceptions.UserException;
+import org.broadinstitute.hellbender.tools.copynumber.annotation.GCBiasCorrector;
 import org.broadinstitute.hellbender.tools.copynumber.coverage.denoising.svd.HDF5SVDReadCountPanelOfNormals;
 import org.broadinstitute.hellbender.tools.copynumber.coverage.denoising.svd.SVDDenoisedCopyRatioResult;
 import org.broadinstitute.hellbender.tools.copynumber.coverage.denoising.svd.SVDDenoisingUtils;
@@ -19,29 +19,18 @@ import org.broadinstitute.hellbender.tools.copynumber.coverage.denoising.svd.SVD
 import org.broadinstitute.hellbender.tools.copynumber.formats.CopyNumberStandardArgument;
 import org.broadinstitute.hellbender.tools.copynumber.formats.metadata.SimpleSampleMetadata;
 import org.broadinstitute.hellbender.tools.copynumber.temporary.SimpleReadCountCollection;
-import org.broadinstitute.hellbender.tools.exome.Target;
-import org.broadinstitute.hellbender.tools.exome.TargetAnnotation;
-import org.broadinstitute.hellbender.tools.exome.TargetArgumentCollection;
-import org.broadinstitute.hellbender.tools.exome.TargetCollection;
-import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.io.IOUtils;
 
 import java.io.File;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Denoises read counts given the panel of normals (PoN) created by {@link CreateReadCountPanelOfNormals} to produce
  * a copy-ratio profile.
  *
  * <h3>Examples</h3>
- * <p>
- *     The following command is for either whole exome sequencing (WES) or whole genome sequencing (WGS) data.
- * </p>
  *
  * <pre>
- *     TODO
  * gatk-launch --javaOptions "-Xmx4g" DenoiseReadCounts \
  *   --input tumor.coverage.tsv \
  *   --panelOfNormals panel_of_normals.pon \
@@ -76,7 +65,7 @@ public final class DenoiseReadCounts extends CommandLineProgram {
     private File inputPanelOfNormalsFile = null;
 
     @Argument(
-            doc = "Input annotated-interval file containing annotations for GC content in genomic intervals (output of AnnotateTargets).  " +
+            doc = "Input annotated-interval file containing annotations for GC content in genomic intervals (output of AnnotateIntervals).  " +
                     "Intervals must be identical to and in the same order as those in the input read-count file.  " +
                     "If a panel of normals containing annotations for GC content is provided, this input will be ignored.",
             fullName = CopyNumberStandardArgument.ANNOTATED_INTERVALS_FILE_LONG_NAME,
@@ -147,7 +136,7 @@ public final class DenoiseReadCounts extends CommandLineProgram {
             }
         } else {    //standardize and perform optional GC-bias correction
             //get GC content (null if not provided)
-            final double[] intervalGCContent = validateIntervalGCContent(logger, readCounts.getIntervals(), annotatedIntervalsFile);
+            final double[] intervalGCContent = GCBiasCorrector.validateIntervalGCContent(readCounts.getIntervals(), annotatedIntervalsFile);
 
             if (intervalGCContent == null) {
                 logger.warn("Neither a panel of normals nor GC-content annotations were provided, so only standardization will be performed...");
@@ -175,24 +164,5 @@ public final class DenoiseReadCounts extends CommandLineProgram {
         } catch (final HDF5LibException e) {
             return SimpleReadCountCollection.read(inputReadCountFile);
         }
-    }
-
-    //TODO move GC-bias correction classes into copynumber package, clean up use of TargetCollection, and move this method into appropriate class
-    //code is duplicated in CreateReadCountPanelOfNormals for now
-    private static double[] validateIntervalGCContent(final Logger logger,
-                                                      final List<SimpleInterval> intervals,
-                                                      final File annotatedIntervalsFile) {
-        if (annotatedIntervalsFile == null) {
-            logger.info("No GC-content annotations for intervals found; GC-bias correction will not be performed...");
-            return null;
-        }
-        logger.info("Reading and validating GC-content annotations for intervals...");
-        final TargetCollection<Target> annotatedIntervals = TargetArgumentCollection.readTargetCollection(annotatedIntervalsFile);
-        Utils.validateArg(annotatedIntervals.targets().stream().map(Target::getInterval).collect(Collectors.toList()).equals(intervals),
-                "Annotated intervals do not match intervals from read-count file.");
-        if (!annotatedIntervals.targets().stream().allMatch(t -> t.getAnnotations().hasAnnotation(TargetAnnotation.GC_CONTENT))) {
-            throw new UserException.BadInput("At least one interval is missing a GC-content annotation.");
-        }
-        return annotatedIntervals.targets().stream().mapToDouble(t -> t.getAnnotations().getDouble(TargetAnnotation.GC_CONTENT)).toArray();
     }
 }

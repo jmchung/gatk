@@ -143,7 +143,7 @@ public final class PairHMMUnitTest extends BaseTest {
 
     @DataProvider(name = "BasicLikelihoodTestProvider")
     public Object[][] makeBasicLikelihoodTests() {
-        // context on either side is ACGTTGCA REF ACGTTGCA
+        // context on either side is ACGTTGCA REFERENCE_FILE ACGTTGCA
         // test all combinations
         final List<Integer> baseQuals = EXTENSIVE_TESTING ? Arrays.asList(10, 20, 30, 40, 50) : Arrays.asList(30);
         final List<Integer> indelQuals = EXTENSIVE_TESTING ? Arrays.asList(20, 30, 40, 50) : Arrays.asList(40);

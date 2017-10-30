@@ -10,9 +10,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.tools.copynumber.CreateReadCountPanelOfNormals;
+import org.broadinstitute.hellbender.tools.copynumber.annotation.GCBiasCorrector;
 import org.broadinstitute.hellbender.tools.copynumber.formats.metadata.SimpleSampleMetadata;
 import org.broadinstitute.hellbender.tools.copynumber.temporary.SimpleReadCountCollection;
-import org.broadinstitute.hellbender.tools.exome.gcbias.GCCorrector;
 import org.broadinstitute.hellbender.utils.GATKProtectedMathUtils;
 import org.broadinstitute.hellbender.utils.MatrixSummaryUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
@@ -458,7 +458,7 @@ public final class SVDDenoisingUtils {
                                                         final double[] intervalGCContent) {
         if (intervalGCContent != null) {
             logger.info("Performing GC-bias correction...");
-            GCCorrector.correctTransposedCoverage(matrix, intervalGCContent); //GCCorrector expects intervals x samples
+            GCBiasCorrector.correctGCBias(matrix, intervalGCContent);
         }
     }
 

@@ -26,9 +26,8 @@ import java.util.stream.IntStream;
 /**
  * TODO
  *
- * Several attributes are stored transposed (in other words, the rows and columns are interchanged).
- * This dodges a very slow write time in HDF5, since we usually have many more rows (targets) than columns (samples),
- * and HDF5 writes matrices with few rows and many columns much faster than matrices with many rows and few columns.
+ * Several attributes are stored transposed.  This dodges a very slow write time in HDF5,
+ * since HDF5 writes wide matrices much faster than tall matrices.
  *
  * The following are stored as transposes:
  *

@@ -14,13 +14,10 @@ import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
 import org.broadinstitute.hellbender.cmdline.programgroups.CopyNumberProgramGroup;
 import org.broadinstitute.hellbender.engine.spark.SparkCommandLineProgram;
 import org.broadinstitute.hellbender.exceptions.UserException;
+import org.broadinstitute.hellbender.tools.copynumber.annotation.GCBiasCorrector;
 import org.broadinstitute.hellbender.tools.copynumber.coverage.denoising.svd.HDF5SVDReadCountPanelOfNormals;
 import org.broadinstitute.hellbender.tools.copynumber.formats.CopyNumberStandardArgument;
 import org.broadinstitute.hellbender.tools.copynumber.temporary.SimpleReadCountCollection;
-import org.broadinstitute.hellbender.tools.exome.Target;
-import org.broadinstitute.hellbender.tools.exome.TargetAnnotation;
-import org.broadinstitute.hellbender.tools.exome.TargetArgumentCollection;
-import org.broadinstitute.hellbender.tools.exome.TargetCollection;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.io.IOUtils;
@@ -42,20 +39,11 @@ import java.util.stream.Collectors;
  *
  * <h3>Examples</h3>
  *
- * <p>
- *     The following command is for either whole exome sequencing (WES) or whole genome sequencing (WGS) data.
- * </p>
- *
  * <pre>
  * gatk-launch --javaOptions "-Xmx4g" CreateReadCountPanelOfNormals \
  *   --input gc_corrected_coverages.tsv \
  *   --output panel_of_normals.pon
  * </pre>
- *
- * <p>
- * In addition to the resulting PoN, this command produces a .pon.removed_samples.txt file of samples removed for quality control (QC)
- * and a .pon.target_weights.txt file that gives the inverse variance per target that can optionally be passed to PerformSegmentation.
- * </p>
  *
  * @author Samuel Lee &lt;slee@broadinstitute.org&gt;
  */
@@ -202,7 +190,7 @@ public final class CreateReadCountPanelOfNormals extends SparkCommandLineProgram
         final List<SimpleInterval> intervals = getIntervalsFromFirstReadCountFile(logger, inputReadCountFiles);
 
         //get GC content (null if not provided)
-        final double[] intervalGCContent = validateIntervalGCContent(logger, intervals, annotatedIntervalsFile);
+        final double[] intervalGCContent = GCBiasCorrector.validateIntervalGCContent(intervals, annotatedIntervalsFile);
 
         //validate input read-count files (i.e., check intervals and that only integer counts are contained)
         //and aggregate as a RealMatrix with dimensions numIntervals x numSamples
@@ -227,25 +215,6 @@ public final class CreateReadCountPanelOfNormals extends SparkCommandLineProgram
                             "the number of samples retained after filtering will be used instead.",
                     numEigensamplesRequested, inputReadCountFiles.size()));
         }
-    }
-
-    //TODO move GC-bias correction classes into copynumber package, clean up use of TargetCollection, and move this method into appropriate class
-    //code is duplicated in DenoiseReadCounts for now
-    private static double[] validateIntervalGCContent(final Logger logger,
-                                                      final List<SimpleInterval> intervals,
-                                                      final File annotatedIntervalsFile) {
-        if (annotatedIntervalsFile == null) {
-            logger.info("No GC-content annotations for intervals found; GC-bias correction will not be performed...");
-            return null;
-        }
-        logger.info("Reading and validating GC-content annotations for intervals...");
-        final TargetCollection<Target> annotatedIntervals = TargetArgumentCollection.readTargetCollection(annotatedIntervalsFile);
-        Utils.validateArg(annotatedIntervals.targets().stream().map(Target::getInterval).collect(Collectors.toList()).equals(intervals),
-                "Annotated intervals do not match intervals from first read-count file.");
-        if (!annotatedIntervals.targets().stream().allMatch(t -> t.getAnnotations().hasAnnotation(TargetAnnotation.GC_CONTENT))) {
-            throw new UserException.BadInput("At least one interval is missing a GC-content annotation.");
-        }
-        return annotatedIntervals.targets().stream().mapToDouble(t -> t.getAnnotations().getDouble(TargetAnnotation.GC_CONTENT)).toArray();
     }
 
     private static List<SimpleInterval> getIntervalsFromFirstReadCountFile(final Logger logger,

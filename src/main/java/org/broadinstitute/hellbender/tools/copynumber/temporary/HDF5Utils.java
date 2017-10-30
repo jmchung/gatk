@@ -46,8 +46,8 @@ public class HDF5Utils {
         final String[] contigNames = file.readStringArray(path + INTERVAL_CONTIG_NAMES_SUB_PATH);
         final double[][] matrix = file.readDoubleMatrix(path + INTERVAL_MATRIX_SUB_PATH);
         final int numIntervals = matrix[0].length;
-        return IntStream.range(0, numIntervals).boxed()
-                .map(i -> (new SimpleInterval(
+        return IntStream.range(0, numIntervals)
+                .mapToObj(i -> (new SimpleInterval(
                         contigNames[(int) matrix[IntervalField.CONTIG_INDEX.index][i]],
                         (int) matrix[IntervalField.START.index][i],
                         (int) matrix[IntervalField.END.index][i])))

@@ -37,7 +37,7 @@ public final class AnnotatedIntervalCollection extends LocatableCollection<Annot
             dataLine.append(annotatedInterval.getInterval().getContig())
                     .append(annotatedInterval.getInterval().getStart())
                     .append(annotatedInterval.getInterval().getEnd())
-                    .append(annotatedInterval.getAnnotationSet().getGcContent());
+                    .append(annotatedInterval.getAnnotationSet().getGCContent());
 
     public AnnotatedIntervalCollection(final File inputFile) {
         super(inputFile, AnnotatedIntervalCollection.AnnotatedIntervalTableColumn.COLUMNS, ANNOTATED_INTERVAL_RECORD_FROM_DATA_LINE_DECODER, ANNOTATED_INTERVAL_RECORD_TO_DATA_LINE_ENCODER);

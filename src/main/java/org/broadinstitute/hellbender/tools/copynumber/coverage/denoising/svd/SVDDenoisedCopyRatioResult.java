@@ -51,14 +51,14 @@ public final class SVDDenoisedCopyRatioResult {
         Utils.nonNull(denoisedCopyRatiosFile);
         final CopyRatioCollection standardizedCopyRatios = new CopyRatioCollection(
                 sampleMetadata,
-                IntStream.range(0, intervals.size()).boxed()
-                        .map(i -> new CopyRatio(intervals.get(i), standardizedCopyRatioValues.getEntry(0, i)))
+                IntStream.range(0, intervals.size())
+                        .mapToObj(i -> new CopyRatio(intervals.get(i), standardizedCopyRatioValues.getEntry(0, i)))
                         .collect(Collectors.toList()));
         standardizedCopyRatios.write(standardizedCopyRatiosFile);
         final CopyRatioCollection denoisedCopyRatios = new CopyRatioCollection(
                 sampleMetadata,
-                IntStream.range(0, intervals.size()).boxed()
-                        .map(i -> new CopyRatio(intervals.get(i), denoisedCopyRatioValues.getEntry(0, i)))
+                IntStream.range(0, intervals.size())
+                        .mapToObj(i -> new CopyRatio(intervals.get(i), denoisedCopyRatioValues.getEntry(0, i)))
                         .collect(Collectors.toList()));
         denoisedCopyRatios.write(denoisedCopyRatiosFile);
     }

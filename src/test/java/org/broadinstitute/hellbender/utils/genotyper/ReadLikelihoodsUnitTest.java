@@ -426,7 +426,7 @@ public final class ReadLikelihoodsUnitTest {
                 }
                 final double medianLikelihood = median.evaluate(qualifylingLikelihoods.stream().mapToDouble(d -> d).toArray());
                 // NaN is returned in cases whether there is no elements in qualifyingLikelihoods.
-                // In such case we set the NON-REF likelihood to -Inf.
+                // In such case we set the NON-REFERENCE_FILE likelihood to -Inf.
                 final double expectedNonRefLk = !Double.isNaN(medianLikelihood) ? medianLikelihood
                         : ordinarynumberOfAlleles <= 1 ? Double.NaN : bestLk;
                 newLikelihoods[s][ordinarynumberOfAlleles][r] = expectedNonRefLk;

@@ -1,16 +1,12 @@
 package org.broadinstitute.hellbender.tools.copynumber;
 
-import htsjdk.samtools.util.Interval;
-import htsjdk.samtools.util.IntervalList;
 import org.broadinstitute.hellbender.CommandLineProgramTest;
 import org.broadinstitute.hellbender.tools.copynumber.annotation.AnnotatedInterval;
 import org.broadinstitute.hellbender.tools.copynumber.annotation.AnnotatedIntervalCollection;
 import org.broadinstitute.hellbender.tools.copynumber.annotation.AnnotationSet;
 import org.broadinstitute.hellbender.tools.copynumber.formats.collections.LocatableCollection;
-import org.broadinstitute.hellbender.tools.exome.AnnotateTargets;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.test.ArgumentsBuilder;
-import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -28,8 +24,8 @@ public final class AnnotateIntervalsIntegrationTest extends CommandLineProgramTe
     private static final File REFERENCE_FILE = new File(b37_reference_20_21);
 
     /**
-     * Intervals should be sorted according to {@link LocatableCollection#LEXICOGRAPHICAL_ORDER_COMPARATOR}.
-     * Expected GC content results were taken from output of {@link AnnotateTargets}.
+     * Test that intervals are sorted according to {@link LocatableCollection#LEXICOGRAPHICAL_ORDER_COMPARATOR}.
+     * GC content truth was taken from AnnotateTargets (a previous version of the tool).
      */
     @Test
     public void test() {

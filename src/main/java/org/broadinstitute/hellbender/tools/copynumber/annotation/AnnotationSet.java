@@ -20,7 +20,7 @@ public class AnnotationSet {
         this.gcContent = gcContent;
     }
 
-    public double getGcContent() {
+    public double getGCContent() {
         return gcContent;
     }
 
