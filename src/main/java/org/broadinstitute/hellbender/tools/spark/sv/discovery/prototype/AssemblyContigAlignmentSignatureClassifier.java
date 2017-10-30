@@ -9,6 +9,7 @@ import org.broadinstitute.hellbender.tools.spark.sv.discovery.AlignedContig;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.AlignmentInterval;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.ChimericAlignment;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.RDDUtils;
+import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.Utils;
 import scala.Tuple2;
 
@@ -79,7 +80,7 @@ final class AssemblyContigAlignmentSignatureClassifier {
 
         // split between the case where both alignments has unique ref span or not
         final Tuple2<JavaRDD<AlignedContig>, JavaRDD<AlignedContig>> hasFullyContainedRefSpanOrNot =
-                RDDUtils.split(preprocessedContigs, AssemblyContigAlignmentSignatureClassifier::hasIncompletePictureDueToRefSpanContainment, false);
+                RDDUtils.split(preprocessedContigs, AssemblyContigAlignmentSignatureClassifier::hasIncompletePicture, false);
         contigsByRawTypes.put(RawTypes.Incomplete, hasFullyContainedRefSpanOrNot._1);
 
         // split between same chromosome mapping or not
@@ -103,6 +104,12 @@ final class AssemblyContigAlignmentSignatureClassifier {
 
     // TODO: 10/27/17 add tests for these predicates
 
+    static boolean hasIncompletePicture(final AlignedContig contigWithOnlyOneConfigAnd2Aln) {
+        return hasIncompletePictureDueToRefSpanContainment(contigWithOnlyOneConfigAnd2Aln)
+                ||
+                (isSameChromosomeMapping(contigWithOnlyOneConfigAnd2Aln) && hasIncompletePictureDueToOverlappingRefOrderSwitch(contigWithOnlyOneConfigAnd2Aln));
+    }
+
     @VisibleForTesting
     static boolean hasIncompletePictureDueToRefSpanContainment(final AlignedContig contigWithOnlyOneConfigAnd2Aln) {
         Utils.validateArg(hasOnly2Alignments(contigWithOnlyOneConfigAnd2Aln),
@@ -113,6 +120,33 @@ final class AssemblyContigAlignmentSignatureClassifier {
         return one.referenceSpan.contains(two.referenceSpan)
                 ||
                 two.referenceSpan.contains(one.referenceSpan);
+    }
+
+    @VisibleForTesting
+    static boolean hasIncompletePictureDueToOverlappingRefOrderSwitch(final AlignedContig contigWithOnlyOneConfigAnd2AlnToSameChr) {
+        Utils.validateArg(isSameChromosomeMapping(contigWithOnlyOneConfigAnd2AlnToSameChr),
+                "assumption that input contig's 2 alignments map to the same chr is violated. \n" +
+                        contigWithOnlyOneConfigAnd2AlnToSameChr.toString());
+
+        final AlignmentInterval one = contigWithOnlyOneConfigAnd2AlnToSameChr.alignmentIntervals.get(0),
+                                two = contigWithOnlyOneConfigAnd2AlnToSameChr.alignmentIntervals.get(1);
+        final SimpleInterval referenceSpanOne = one.referenceSpan,
+                             referenceSpanTwo = two.referenceSpan;
+
+        if (referenceSpanOne.contains(referenceSpanTwo) || referenceSpanTwo.contains(referenceSpanOne))
+            return true;
+
+        if (one.forwardStrand != two.forwardStrand) {
+            return referenceSpanOne.overlaps(referenceSpanTwo);
+        } else {
+            if (one.forwardStrand) {
+                return referenceSpanOne.getStart() > referenceSpanTwo.getStart() &&
+                        referenceSpanOne.getStart() <= referenceSpanTwo.getEnd();
+            } else {
+                return referenceSpanTwo.getStart() > referenceSpanOne.getStart() &&
+                        referenceSpanTwo.getStart() <= referenceSpanOne.getEnd();
+            }
+        }
     }
 
     /**

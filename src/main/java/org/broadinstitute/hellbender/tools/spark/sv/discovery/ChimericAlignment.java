@@ -7,6 +7,7 @@ import com.esotericsoftware.kryo.io.Output;
 import com.google.common.annotations.VisibleForTesting;
 import htsjdk.samtools.SAMSequenceDictionary;
 import org.broadinstitute.hellbender.utils.IntervalUtils;
+import org.broadinstitute.hellbender.utils.SimpleInterval;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -286,14 +287,19 @@ public class ChimericAlignment {
                 .equals(regionWithHigherCoordOnContig.referenceSpan.getContig()))
             return true;
 
-        if (strandSwitch.equals(StrandSwitch.NO_SWITCH)) {
-            if (regionWithLowerCoordOnContig.forwardStrand) {
-                return regionWithLowerCoordOnContig.referenceSpan.getStart() > regionWithHigherCoordOnContig.referenceSpan.getStart();
-            } else {
-                return regionWithLowerCoordOnContig.referenceSpan.getEnd() < regionWithHigherCoordOnContig.referenceSpan.getEnd();
-            }
-        } else {
+        if ( !strandSwitch.equals(StrandSwitch.NO_SWITCH) )
             return false;
+
+        final SimpleInterval referenceSpanOne = regionWithLowerCoordOnContig.referenceSpan,
+                             referenceSpanTwo = regionWithHigherCoordOnContig.referenceSpan;
+
+        if (referenceSpanOne.contains(referenceSpanTwo) || referenceSpanTwo.contains(referenceSpanOne))
+            return false;
+
+        if (regionWithLowerCoordOnContig.forwardStrand) {
+            return referenceSpanOne.getStart() > referenceSpanTwo.getEnd();
+        } else {
+            return referenceSpanTwo.getStart() > referenceSpanOne.getEnd();
         }
     }
 
@@ -303,7 +309,9 @@ public class ChimericAlignment {
      * <ul>
      *  <li>inter-chromosomal translocations, i.e. novel adjacency between different reference chromosomes, or</li>
      *  <li>intra-chromosomal translocation that DOES NOT involve a strand switch, i.e.
-     *      novel adjacency between reference locations on the same chromosome involving NO strand switch but reference interval order switch
+     *      novel adjacency between reference locations on the same chromosome involving NO strand switch,
+     *      but in the meantime, the two inducing alignments CANNOT overlap each other since that would point to
+     *      incomplete picture, hence not "simple" anymore.
      *  </li>
      * </ul>
      * A caveat is that this does not cover the case when the novel adjacency suggested by the CA is between
