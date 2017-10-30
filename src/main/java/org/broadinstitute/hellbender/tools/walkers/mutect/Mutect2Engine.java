@@ -140,11 +140,11 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
         filters.add(ReadFilterLibrary.MAPPING_QUALITY_AVAILABLE);
         filters.add(ReadFilterLibrary.MAPPING_QUALITY_NOT_ZERO);
         filters.add(ReadFilterLibrary.MAPPED);
-        filters.add(ReadFilterLibrary.NOT_SECONDARY_ALIGNMENT); // different
+        filters.add(ReadFilterLibrary.NOT_SECONDARY_ALIGNMENT);
         filters.add(ReadFilterLibrary.NOT_DUPLICATE);
         filters.add(ReadFilterLibrary.PASSES_VENDOR_QUALITY_CHECK);
         filters.add(ReadFilterLibrary.NON_ZERO_REFERENCE_LENGTH_ALIGNMENT);
-        filters.add(GOOD_READ_LENGTH_FILTER); // different
+        filters.add(GOOD_READ_LENGTH_FILTER);
         filters.add(ReadFilterLibrary.MATE_ON_SAME_CONTIG_OR_NO_MAPPED_MATE);
         filters.add(ReadFilterLibrary.GOOD_CIGAR);
         filters.add(new WellformedReadFilter());

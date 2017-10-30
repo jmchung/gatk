@@ -5,6 +5,7 @@ import htsjdk.samtools.util.Histogram;
 import htsjdk.samtools.util.SequenceUtil;
 import org.broadinstitute.barclay.argparser.Argument;
 import org.broadinstitute.barclay.argparser.CommandLineProgramProperties;
+import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
 import org.broadinstitute.hellbender.cmdline.programgroups.VariantProgramGroup;
 import org.broadinstitute.hellbender.engine.*;
 import org.broadinstitute.hellbender.engine.filters.MappingQualityReadFilter;
@@ -43,14 +44,15 @@ public class CollectDataForReadOrientationFilter extends LocusWalker {
     public static final String REF_SITE_METRICS_SHORT_NAME = "ref-table";
     public static final String REF_SITE_METRICS_LONG_NAME = "ref-histogram-table";
 
-    public static final String MIN_MEDIAN_MQ_SHORT_NAME = "mq";
-    public static final String MIN_MEDIAN_MQ_LONG_NAME = "min-mq";
+    public static final String MIN_MEDIAN_MQ_SHORT_NAME = "median-mq";
 
     public static final String MIN_BASE_QUALITY_SHORT_NAME = "bq";
     public static final String MIN_BASE_QUALITY_LONG_NAME = "min-bq";
 
+    public static final String READ_LENGTH_THRESHOLD_SHORT_NAME = "read-length";
 
-    @Argument(fullName = MIN_MEDIAN_MQ_LONG_NAME,
+
+    @Argument(fullName = MIN_MEDIAN_MQ_SHORT_NAME,
             shortName = MIN_MEDIAN_MQ_SHORT_NAME,
             doc = "skip sites with median mapping quality below this value", optional = true)
     private static int MINIMUM_MEDIAN_MQ = 20;
@@ -59,11 +61,6 @@ public class CollectDataForReadOrientationFilter extends LocusWalker {
             shortName = MIN_BASE_QUALITY_SHORT_NAME,
             doc = "exclude bases below this quality from pileup", optional = true)
     private static int MINIMUM_BASE_QUALITY = 10;
-
-    @Argument(fullName = "",
-            shortName = "",
-            doc = "filter reads with mapping qualiyt below this value", optional = true)
-    private static int MAPPING_QUALITY_THRESHOLD = 20;
 
     @Argument(fullName = ALT_DATA_TABLE_LONG_NAME,
             shortName = ALT_DATA_TABLE_SHORT_NAME,

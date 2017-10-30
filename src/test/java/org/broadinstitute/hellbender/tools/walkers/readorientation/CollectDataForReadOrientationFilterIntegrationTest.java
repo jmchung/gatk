@@ -1,5 +1,6 @@
 package org.broadinstitute.hellbender.tools.walkers.readorientation;
 
+import com.google.common.collect.ImmutableMap;
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMReadGroupRecord;
 import htsjdk.samtools.metrics.MetricsFile;
@@ -26,7 +27,6 @@ import java.util.*;
  * Created by tsato on 8/1/17.
  */
 public class CollectDataForReadOrientationFilterIntegrationTest extends CommandLineProgramTest {
-    private final static double EPSILON = 1e-6;
     /**
      * Test the tool on a real bam to make sure that it does not crash
      */
@@ -50,10 +50,11 @@ public class CollectDataForReadOrientationFilterIntegrationTest extends CommandL
         final File refMetrics = createTempFile("ref", ".metrics");
         final File altTable = createTempFile("alt", ".table");
 
+        final int alignmentStart = 99_991;
         final int numAltReads = 30;
         final int numRefReads = 70;
         final int depth = numAltReads + numRefReads;
-        final File samFile = createSyntheticSam(numRefReads, numAltReads);
+        final File samFile = createSyntheticSam(numRefReads, numAltReads, alignmentStart);
 
         final String[] args = {
                 "-R", hg19_chr1_1M_Reference,
@@ -74,11 +75,13 @@ public class CollectDataForReadOrientationFilterIntegrationTest extends CommandL
 
         /** Expected result
          *
-         * (position chr1: 100,000,000-100,000,011)
+         * (position chr1: {@code alignmentStart})
          *
-         * ref: T C A C T A A G C A C A
-         * alt: x C T C T G A C C A A x
-         *          *     *   *     *
+         * coord.:    99,990             100,000             100,010             100,020
+         *              |                   |                   |                   |
+         * reference: | T C A T C A C A C T C A C T A A G C A C A C A G A G A A T A A T
+         * alt read:  | T C A T C A C A C T C T C T G A C C A A A G A G A A T A A T A A
+         *                                    *     *   *     *
          *
          * At each alt site, we have 75 ref and 25 alt reads
          *
@@ -91,7 +94,9 @@ public class CollectDataForReadOrientationFilterIntegrationTest extends CommandL
          *
          *
          * Ref: 6 sites at depth 100
-         * TCA, ACT, CTA, AAG, GCA, CAC
+         * TCA, CAT, ATC, TCA, CAC, ACA, CAC, ACT, CTC, TCA, ACT, CTA, AAG, GCA, CAC, CAC, ACA, CAG, AGA, GAG, AGA, GAA, AAT, ATA, TAA, AAT
+         * TCA*3, CAT, ATC, CAC*4, ACA*2, ACT*2, CTC, CTA, AAG, GCA, CAG, AGA*2, GAG, GAA, AAT*2, ATA, TAA
+         *
          **/
 
         // alt site tests
@@ -117,16 +122,42 @@ public class CollectDataForReadOrientationFilterIntegrationTest extends CommandL
         ArrayAsserts.assertArrayEquals(recordACA.getF1R2Counts(), new int[]{15, 35, 0, 0});
 
         // check ref histograms
-        for (String exptectedRefContext : Arrays.asList("TCA", "ACT", "CTA", "AAG", "GCA", "CAC")){
-            Histogram<Integer> histogram = histograms.stream()
-                    .filter(hist -> hist.getValueLabel().equals(exptectedRefContext))
-                    .findFirst().get();
-            Assert.assertEquals(histogram.get(depth).getValue(), 1.0 );
-            Assert.assertEquals(histogram.getSumOfValues(), 1.0);
+        // ImmutableMap.of can take up to 5 elements, and ImmutableMap.Builder is ugly
+        final ImmutableMap<String, Integer> expectedReferenceCounts1 = ImmutableMap.of(
+                "TCA", 3,
+                "CAT", 1,
+                "ATC", 1,
+                "CAC", 4,
+                "ACA", 2);
+        final ImmutableMap<String, Integer>  expectedReferenceCounts2 = ImmutableMap.of(
+                "ACT", 2,
+                "CTC", 1,
+                "CTA", 1,
+                "AAG", 1,
+                "GCA", 1);
+        final ImmutableMap<String, Integer>  expectedReferenceCounts3 = ImmutableMap.of(
+                "CAG", 1,
+                "AGA", 2,
+                "GAG", 1,
+                "GAA", 1,
+                "AAT", 2);
+        final ImmutableMap<String, Integer>  expectedReferenceCounts4 = ImmutableMap.of("ATA", 1, "TAA", 1);
+
+        for (ImmutableMap<String, Integer> expectedContextCountPairs : Arrays.asList(
+                expectedReferenceCounts1, expectedReferenceCounts2, expectedReferenceCounts3, expectedReferenceCounts4)){
+            expectedContextCountPairs.entrySet().stream().forEach(entrySet -> {
+                final String context = entrySet.getKey();
+                final double expectedCount = entrySet.getValue();
+                Histogram<Integer> histogram = histograms.stream()
+                        .filter(hist -> hist.getValueLabel().equals(context))
+                        .findFirst().get();
+                Assert.assertEquals(histogram.get(depth).getValue(), expectedCount);
+                Assert.assertEquals(histogram.getSumOfValues(), expectedCount );
+            });
         }
     }
 
-    private File createSyntheticSam(final int numRefReads, final int numAltReads) throws IOException {
+    private File createSyntheticSam(final int numRefReads, final int numAltReads, final int alignmentStart) throws IOException {
         // create a sam header
         final int numChromosomes = 1;
         final int startingChromosome = 1;
@@ -144,9 +175,8 @@ public class CollectDataForReadOrientationFilterIntegrationTest extends CommandL
         // specify chracteristics of reads
         final int depth = numAltReads + numRefReads;
 
-        final int alignmentStart = 100_000;
-        final byte[] refReadBases = "CACTAAGCAC".getBytes();
-        final byte[] altReadBases = "CTCTGACCAA".getBytes(); // SNPs at indices 1, 4, 6, 9
+        final byte[] refReadBases = "CATCACACTCACTAAGCACACAGAGAATAAT".getBytes();
+        final byte[] altReadBases = "CATCACACTCTCTGACCAAACAGAGAATAAT".getBytes();
         final int readLength = refReadBases.length;
         final byte baseq = 20;
         final byte[] quals = new byte[readLength];
@@ -157,8 +187,9 @@ public class CollectDataForReadOrientationFilterIntegrationTest extends CommandL
         final List<GATKRead> reads = new ArrayList<>(depth);
         for (int i = 0; i < depth; i++) {
             final byte[] bases = i < numAltReads ? altReadBases : refReadBases;
+            final String cigar = refReadBases.length + "M";
             final GATKRead read = ArtificialReadUtils.createArtificialRead(samHeader, "Read" + i, chromosomeIndex,
-                    alignmentStart, bases, quals, "10M");
+                    alignmentStart, bases, quals, cigar);
             read.setReadGroup(readGroupName);
             read.setMappingQuality(mapq);
             read.setIsFirstOfPair();
