@@ -2,6 +2,8 @@ package org.broadinstitute.hellbender.tools.walkers.mutect;
 
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMSequenceDictionary;
+import htsjdk.samtools.util.Interval;
+import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.writer.VariantContextWriter;
 import htsjdk.variant.vcf.*;
@@ -56,9 +58,9 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
     public static final int MAX_NORMAL_QUAL_SUM = 100;
 
     // if qual sum exceeds this amount, no need to continue realigning alt reads
-    public static final int REALIGNMENT_QUAL_SUM_THRESHOLD = 100;
+    public static final int REALIGNMENT_QUAL_SUM_THRESHOLD = 80;
 
-    public static final int MAX_REALIGNMENT_FAILS = 3;
+    public static final int MAX_REALIGNMENT_FAILS = 2;
 
 
     private M2ArgumentCollection MTAC;
@@ -329,9 +331,6 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
             return new ActivityProfileState(refInterval, 0.0);
         }
 
-
-
-
         return new ActivityProfileState( refInterval, 1.0, ActivityProfileState.Type.NONE, null);
     }
 
@@ -344,10 +343,12 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
     }
 
     private Pair<Integer, Double> altCountAndQualSum(final ReadPileup pileup, final byte refBase) {
+
         int altCount = 0;
         double qualSum = 0;
         int realignmentFailCount = 0;
 
+        Interval supposedRealignmentLocation = null;
         for (final PileupElement pe : pileup) {
             if (pe.getRead().getMappingQuality() == 0) {
                 realignmentFailCount++;
@@ -355,7 +356,13 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
             }
             final double altQual = altQuality(pe, refBase);
             if (altQual > 0) {
-                if (!realigner.isPresent() || qualSum > REALIGNMENT_QUAL_SUM_THRESHOLD || realigner.get().mapsToSupposedLocation(pe.getRead())) {
+                if (supposedRealignmentLocation == null) {
+                    final Locatable loc = pileup.getLocation();
+                    final Interval interval = new Interval(loc.getContig(), loc.getStart(), loc.getEnd());
+                    supposedRealignmentLocation = realigner.isPresent() ? realigner.get().getRealignemntCoordinates(interval) : interval;
+                }
+
+                if (!realigner.isPresent() || qualSum > REALIGNMENT_QUAL_SUM_THRESHOLD || realigner.get().mapsToSupposedLocation(pe.getRead(), supposedRealignmentLocation)) {
                     qualSum += altQual;
                     altCount++;
                 } else {

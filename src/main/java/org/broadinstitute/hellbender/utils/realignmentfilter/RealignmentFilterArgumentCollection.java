@@ -6,8 +6,8 @@ import java.io.File;
 
 public class RealignmentFilterArgumentCollection {
 
-    public static final int DEFAULT_MIN_SEED_LENGTH = 16;
-    public static final double DEFAULT_DROP_RATIO = 0.1;
+    public static final int DEFAULT_MIN_SEED_LENGTH = 19; //16;
+    public static final double DEFAULT_DROP_RATIO = 0.5; // 0.1;
     public static final double DEFAULT_SEED_SPLIT_FACTOR = 1.2;
 
     /**
@@ -17,9 +17,9 @@ public class RealignmentFilterArgumentCollection {
     public String bwaMemIndexImage;
 
     /**
-     * UCSC chain file for liftover of reads realigned to realignment reference, in case this differs from the original reference to which the bam was aligned.
+     * UCSC chain file for liftover of reads realigned to original bam reference, in case this differs from the reference to which reads are realigned
      */
-    @Argument(fullName = "liftover-chain-file", shortName = "chain", optional = true, doc = "UCSC chain file for liftover of realigned coordinates to original coordinates in case")
+    @Argument(fullName = "liftover-chain-file", shortName = "chain", optional = true, doc = "UCSC chain file for liftover of original bam coordinates to realignment coordinates")
     public File liftoverChainFile;
 
     /**

@@ -231,7 +231,7 @@ public class Mutect2IntegrationTest extends CommandLineProgramTest {
         Utils.resetRandomGenerator();
         final File unfilteredVcf = createTempFile("unfiltered", ".vcf");
 
-        final File hg38Tohg19ChainFile = new File("/Users/davidben/Desktop/liftover/hg38ToHg19.over.chain");
+        final File hg19Tohg38ChainFile = new File("/Users/davidben/Desktop/liftover/hg19noChrToHg38WithChr.over.chain");
 
         final File hg38IndexBundle = new File("/Users/davidben/Desktop/bwa_mem_hg_38/Homo_sapiens_assembly38.index_bundle");
 
@@ -244,7 +244,7 @@ public class Mutect2IntegrationTest extends CommandLineProgramTest {
                 "-I", normalBam.getAbsolutePath(),
                 "-normal", normalSample,
                 "-bwa-mem-index-image", hg38IndexBundle.getAbsolutePath(),
-                "-liftover-chain-file", hg38Tohg19ChainFile.getAbsolutePath(),
+                "-liftover-chain-file", hg19Tohg38ChainFile.getAbsolutePath(),
                 "-R", b37_reference_20_21,
                 "-L", "20",
                 "-germline_resource", GNOMAD.getAbsolutePath(),
