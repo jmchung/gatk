@@ -11,6 +11,7 @@ import org.broadinstitute.hellbender.engine.FeatureDataSource;
 import org.broadinstitute.hellbender.tools.exome.orientationbiasvariantfilter.OrientationBiasUtils;
 import org.broadinstitute.hellbender.tools.walkers.validation.ConcordanceSummaryRecord;
 import org.broadinstitute.hellbender.utils.Utils;
+import org.broadinstitute.hellbender.utils.bwa.BwaMemIndex;
 import org.broadinstitute.hellbender.utils.test.ArgumentsBuilder;
 import org.broadinstitute.hellbender.utils.test.BaseTest;
 import org.testng.Assert;
@@ -221,6 +222,36 @@ public class Mutect2IntegrationTest extends CommandLineProgramTest {
                 "-R", b37_reference_20_21,
                 "-O", outputVcf.getAbsolutePath()
         };
+        runCommandLine(args);
+    }
+
+    @Test(dataProvider = "dreamSyntheticData")
+    public void testRealignmentFilter(final File tumorBam, final String tumorSample, final File normalBam, final String normalSample,
+                                     final File truthVcf, final File mask, final double requiredSensitivity) throws Exception {
+        Utils.resetRandomGenerator();
+        final File unfilteredVcf = createTempFile("unfiltered", ".vcf");
+
+        final File hg38Tohg19ChainFile = new File("/Users/davidben/Desktop/liftover/hg38ToHg19.over.chain");
+
+        final File hg38IndexBundle = new File("/Users/davidben/Desktop/bwa_mem_hg_38/Homo_sapiens_assembly38.index_bundle");
+
+        //BwaMemIndex.createIndexImageFromIndexFiles("/Users/davidben/Desktop/bwa_mem_hg_38/Homo_sapiens_assembly38.fasta",
+        //        "/Users/davidben/Desktop/bwa_mem_hg_38/Homo_sapiens_assembly38.index_bundle");
+
+        final String[] args = {
+                "-I", tumorBam.getAbsolutePath(),
+                "-tumor", tumorSample,
+                "-I", normalBam.getAbsolutePath(),
+                "-normal", normalSample,
+                "-bwa-mem-index-image", hg38IndexBundle.getAbsolutePath(),
+                "-liftover-chain-file", hg38Tohg19ChainFile.getAbsolutePath(),
+                "-R", b37_reference_20_21,
+                "-L", "20",
+                "-germline_resource", GNOMAD.getAbsolutePath(),
+                "-XL", mask.getAbsolutePath(),
+                "-O", unfilteredVcf.getAbsolutePath()
+        };
+
         runCommandLine(args);
     }
 

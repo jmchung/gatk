@@ -37,7 +37,6 @@ import org.broadinstitute.hellbender.utils.variant.GATKVCFConstants;
 import org.broadinstitute.hellbender.utils.variant.GATKVCFHeaderLines;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Created by davidben on 9/15/16.
@@ -55,6 +54,11 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
     public static final int INDEL_CONTINUATION_QUAL = 10;
     public static final double MAX_ALT_FRACTION_IN_NORMAL = 0.3;
     public static final int MAX_NORMAL_QUAL_SUM = 100;
+
+    // if qual sum exceeds this amount, no need to continue realigning alt reads
+    public static final int REALIGNMENT_QUAL_SUM_THRESHOLD = 100;
+
+    public static final int MAX_REALIGNMENT_FAILS = 3;
 
 
     private M2ArgumentCollection MTAC;
@@ -103,7 +107,7 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
         aligner = SmithWatermanAligner.getAligner(MTAC.smithWatermanImplementation);
         initialize(createBamOutIndex, createBamOutMD5);
         realigner = MTAC.realignmentFilterArgumentCollection.bwaMemIndexImage == null ? Optional.empty() :
-                Optional.of(new Realigner(MTAC.realignmentFilterArgumentCollection));
+                Optional.of(new Realigner(MTAC.realignmentFilterArgumentCollection, header));
     }
 
     private void initialize(final boolean createBamOutIndex, final boolean createBamOutBamMD5) {
@@ -321,20 +325,6 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
             }
         }
 
-        if (realigner.isPresent()) {
-            final List<GATKRead> altReads = Utils.stream(tumorPileup)
-                    .filter(pe -> getCurrentOrFollowingIndelLength(pe) > 0 || isNextToUsefulSoftClip(pe) || (pe.getBase() != refBase && pe.getQual() > MINIMUM_BASE_QUALITY))
-                    .map(PileupElement::getRead)
-                    .collect(Collectors.toList());
-
-            final int numWellMappedReads = realigner.get().countWellMappedReads(altReads, context.getLocation());
-
-            //TODO: some criterion
-            //TODO: perhaps this could be moved to the logic for the tumor alt count and qual sum, where we test each read
-            //TODO: for good mapping and break when sufficient evidence is found
-        }
-
-
         if (!MTAC.genotypePonSites && !featureContext.getValues(MTAC.pon, new SimpleInterval(context.getContig(), (int) context.getPosition(), (int) context.getPosition())).isEmpty()) {
             return new ActivityProfileState(refInterval, 0.0);
         }
@@ -353,25 +343,45 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
         return INDEL_START_QUAL + (indelLength - 1) * INDEL_CONTINUATION_QUAL;
     }
 
-    private static Pair<Integer, Double> altCountAndQualSum(final ReadPileup pileup, final byte refBase) {
+    private Pair<Integer, Double> altCountAndQualSum(final ReadPileup pileup, final byte refBase) {
         int altCount = 0;
         double qualSum = 0;
+        int realignmentFailCount = 0;
 
         for (final PileupElement pe : pileup) {
-            final int indelLength = getCurrentOrFollowingIndelLength(pe);
-            if (indelLength > 0) {
-                altCount++;
-                qualSum += indelQual(indelLength);
-            } else if (isNextToUsefulSoftClip(pe)) {
-                altCount++;
-                qualSum += indelQual(1);
-            } else if (pe.getBase() != refBase && pe.getQual() > MINIMUM_BASE_QUALITY) {
-                altCount++;
-                qualSum += pe.getQual();
+            if (pe.getRead().getMappingQuality() == 0) {
+                realignmentFailCount++;
+                continue;
+            }
+            final double altQual = altQuality(pe, refBase);
+            if (altQual > 0) {
+                if (!realigner.isPresent() || qualSum > REALIGNMENT_QUAL_SUM_THRESHOLD || realigner.get().mapsToSupposedLocation(pe.getRead())) {
+                    qualSum += altQual;
+                    altCount++;
+                } else {
+                    pe.getRead().setMappingQuality(0);
+                    realignmentFailCount++;
+                    if (realignmentFailCount > MAX_REALIGNMENT_FAILS) {
+                        return new Pair<>(0, 0.0);
+                    }
+                }
             }
         }
 
         return new Pair<>(altCount, qualSum);
+    }
+
+    private static double altQuality(final PileupElement pe, final byte refBase) {
+        final int indelLength = getCurrentOrFollowingIndelLength(pe);
+        if (indelLength > 0) {
+            return indelQual(indelLength);
+        } else if (isNextToUsefulSoftClip(pe)) {
+            return indelQual(1);
+        } else if (pe.getBase() != refBase && pe.getQual() > MINIMUM_BASE_QUALITY) {
+            return pe.getQual();
+        } else {
+            return 0;
+        }
     }
 
     // check that we're next to a soft clip that is not due to a read that got out of sync and ended in a bunch of BQ2's

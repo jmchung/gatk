@@ -13,7 +13,7 @@ public class RealignmentFilterArgumentCollection {
     /**
      * BWA-mem index image created by {@link org.broadinstitute.hellbender.tools.BwaMemIndexImageCreator}
      */
-    @Argument(fullName = "bwa-mem-index-image", shortName = "index", doc = "BWA-mem index image")
+    @Argument(fullName = "bwa-mem-index-image", shortName = "index", doc = "BWA-mem index image", optional = true)
     public String bwaMemIndexImage;
 
     /**
