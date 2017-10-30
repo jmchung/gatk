@@ -136,6 +136,7 @@ final class AssemblyContigAlignmentSignatureClassifier {
         if (referenceSpanOne.contains(referenceSpanTwo) || referenceSpanTwo.contains(referenceSpanOne))
             return true;
 
+        // TODO: 10/29/17 this obsoletes the inverted duplication call code we have now, but those could be used to figure out how to annotate which known ref regions are invert duplicated 
         if (one.forwardStrand != two.forwardStrand) {
             return referenceSpanOne.overlaps(referenceSpanTwo);
         } else {
