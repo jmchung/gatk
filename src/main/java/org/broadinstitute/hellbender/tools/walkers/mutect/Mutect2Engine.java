@@ -1,7 +1,6 @@
 package org.broadinstitute.hellbender.tools.walkers.mutect;
 
 import htsjdk.samtools.SAMFileHeader;
-import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.writer.VariantContextWriter;
 import htsjdk.variant.vcf.*;
@@ -18,7 +17,6 @@ import org.broadinstitute.hellbender.tools.walkers.genotyper.GenotypingOutputMod
 import org.broadinstitute.hellbender.tools.walkers.haplotypecaller.*;
 import org.broadinstitute.hellbender.tools.walkers.haplotypecaller.readthreading.ReadThreadingAssembler;
 import org.broadinstitute.hellbender.utils.*;
-import org.broadinstitute.hellbender.utils.downsampling.AlleleBiasedDownsamplingUtils;
 import org.broadinstitute.hellbender.utils.fasta.CachingIndexedFastaSequenceFile;
 import org.broadinstitute.hellbender.utils.genotyper.IndexedSampleList;
 import org.broadinstitute.hellbender.utils.genotyper.ReadLikelihoods;
@@ -89,39 +87,26 @@ public final class Mutect2Engine {
         activeRegionEngine = new SomaticActiveRegionEngine(MTAC, header);
         referenceReader = AssemblyBasedCallerUtils.createReferenceReader(Utils.nonNull(reference));
         aligner = SmithWatermanAligner.getAligner(MTAC.smithWatermanImplementation);
-        initialize(createBamOutIndex, createBamOutMD5);
-    }
-
-    public SomaticActiveRegionEngine getActiveRegionEngine() { return activeRegionEngine; }
-
-    private void initialize(final boolean createBamOutIndex, final boolean createBamOutBamMD5) {
 
         samplesList = new IndexedSampleList(new ArrayList<>(ReadUtils.getSamplesFromHeader(header)));
         if (!samplesList.asListOfSamples().contains(MTAC.tumorSampleName)) {
-            throw new UserException.BadInput("BAM header sample names " + samplesList.asListOfSamples() + "does not contain given tumor" +
-                    " sample name " + MTAC.tumorSampleName);
+            throw new UserException.BadInput("BAM samples " + samplesList.asListOfSamples() + "do not contain tumor " + MTAC.tumorSampleName);
         } else if (MTAC.normalSampleName != null && !samplesList.asListOfSamples().contains(MTAC.normalSampleName)) {
-            throw new UserException.BadInput("BAM header sample names " + samplesList.asListOfSamples() + "does not contain given normal" +
-                    " sample name " + MTAC.normalSampleName);
+            throw new UserException.BadInput("BAM samples " + samplesList.asListOfSamples() + "do not contain normal " + MTAC.normalSampleName);
         }
 
-        annotationEngine = VariantAnnotatorEngine.ofSelectedMinusExcluded(MTAC.variantAnnotationArgumentCollection,
-                MTAC.dbsnp.dbsnp,
-                MTAC.comps);
-
+        annotationEngine = VariantAnnotatorEngine.ofSelectedMinusExcluded(MTAC.variantAnnotationArgumentCollection, MTAC.dbsnp.dbsnp, MTAC.comps);
         assemblyEngine = AssemblyBasedCallerUtils.createReadThreadingAssembler(MTAC);
         likelihoodsEngine = AssemblyBasedCallerUtils.createLikelihoodCalculationEngine(MTAC.likelihoodArgs);
         genotypingEngine = new SomaticGenotypingEngine(samplesList, MTAC);
         genotypingEngine.setAnnotationEngine(annotationEngine);
-        haplotypeBAMWriter = AssemblyBasedCallerUtils.createBamWriter(MTAC, createBamOutIndex, createBamOutBamMD5, header);
+        haplotypeBAMWriter = AssemblyBasedCallerUtils.createBamWriter(MTAC, createBamOutIndex, createBamOutMD5, header);
 
         trimmer.initialize(MTAC.assemblyRegionTrimmerArgs, header.getSequenceDictionary(), MTAC.debug,
                 MTAC.genotypingOutputMode == GenotypingOutputMode.GENOTYPE_GIVEN_ALLELES, false);
-
-        if( MTAC.CONTAMINATION_FRACTION_FILE != null ) {
-            MTAC.setSampleContamination(AlleleBiasedDownsamplingUtils.loadContaminationFile(MTAC.CONTAMINATION_FRACTION_FILE, MTAC.CONTAMINATION_FRACTION, samplesList.asSetOfSamples(), logger));
-        }
     }
+
+    public SomaticActiveRegionEngine getActiveRegionEngine() { return activeRegionEngine; }
 
     /**
      * @return the default set of read filters for use with Mutect2
@@ -145,55 +130,35 @@ public final class Mutect2Engine {
         return filters;
     }
 
-    public void writeHeader(final VariantContextWriter vcfWriter, final SAMSequenceDictionary sequenceDictionary,
-                            final Set<VCFHeaderLine>  defaultToolHeaderLines) {
+    public void writeHeader(final VariantContextWriter vcfWriter, final Set<VCFHeaderLine> defaultToolHeaderLines) {
         final Set<VCFHeaderLine> headerInfo = new HashSet<>();
-        headerInfo.add(new VCFHeaderLine(Mutect2FilteringEngine.FILTERING_STATUS_VCF_KEY, "Warning: unfiltered Mutect 2 calls.  Please run " + FilterMutectCalls.class.getSimpleName() + " to remove false positives."));
 
-        // all annotation fields from VariantAnnotatorEngine
+        headerInfo.add(new VCFHeaderLine("Mutect Version", MUTECT_VERSION));
+        headerInfo.add(new VCFHeaderLine(Mutect2FilteringEngine.FILTERING_STATUS_VCF_KEY, "Warning: unfiltered Mutect 2 calls.  Please run " + FilterMutectCalls.class.getSimpleName() + " to remove false positives."));
         headerInfo.addAll(annotationEngine.getVCFAnnotationDescriptions());
         headerInfo.addAll(defaultToolHeaderLines);
 
         // all callers need to add these standard FORMAT field header lines
-        VCFStandardHeaderLines.addStandardFormatLines(headerInfo, true,
-                VCFConstants.GENOTYPE_KEY,
-                VCFConstants.GENOTYPE_ALLELE_DEPTHS,
-                VCFConstants.GENOTYPE_QUALITY_KEY,
-                VCFConstants.DEPTH_KEY,
-                VCFConstants.GENOTYPE_PL_KEY);
-
-        headerInfo.addAll(getM2HeaderLines());
-        headerInfo.addAll(getSampleHeaderLines());
-
-        final VCFHeader vcfHeader = new VCFHeader(headerInfo, samplesList.asListOfSamples());
-        vcfHeader.setSequenceDictionary(sequenceDictionary);
-        vcfWriter.writeHeader(vcfHeader);
-    }
-
-    private Set<VCFHeaderLine> getM2HeaderLines(){
-        final Set<VCFHeaderLine> headerInfo = new HashSet<>();
-
-        headerInfo.add(new VCFHeaderLine("Mutect Version", MUTECT_VERSION));
+        VCFStandardHeaderLines.addStandardFormatLines(headerInfo, true, VCFConstants.GENOTYPE_KEY,
+                VCFConstants.GENOTYPE_ALLELE_DEPTHS, VCFConstants.GENOTYPE_QUALITY_KEY, VCFConstants.DEPTH_KEY, VCFConstants.GENOTYPE_PL_KEY);
 
         GATKVCFConstants.STANDARD_MUTECT_INFO_FIELDS.stream().map(GATKVCFHeaderLines::getInfoLine).forEach(headerInfo::add);
-
         headerInfo.add(GATKVCFHeaderLines.getFormatLine(GATKVCFConstants.ALLELE_FRACTION_KEY));
-
         if ( ! MTAC.doNotRunPhysicalPhasing ) {
             headerInfo.add(GATKVCFHeaderLines.getFormatLine(GATKVCFConstants.HAPLOTYPE_CALLER_PHASING_ID_KEY));
             headerInfo.add(GATKVCFHeaderLines.getFormatLine(GATKVCFConstants.HAPLOTYPE_CALLER_PHASING_GT_KEY));
         }
-        return headerInfo;
+
+        headerInfo.add(new VCFHeaderLine(TUMOR_SAMPLE_KEY_IN_VCF_HEADER, MTAC.tumorSampleName));
+        if (MTAC.normalSampleName != null) {
+            headerInfo.add(new VCFHeaderLine(NORMAL_SAMPLE_KEY_IN_VCF_HEADER, MTAC.normalSampleName));
+        }
+
+        final VCFHeader vcfHeader = new VCFHeader(headerInfo, samplesList.asListOfSamples());
+        vcfHeader.setSequenceDictionary(header.getSequenceDictionary());
+        vcfWriter.writeHeader(vcfHeader);
     }
 
-    private Set<VCFHeaderLine> getSampleHeaderLines(){
-        final Set<VCFHeaderLine> sampleLines = new HashSet<>();
-        if (MTAC.normalSampleName != null) {
-            sampleLines.add(new VCFHeaderLine(NORMAL_SAMPLE_KEY_IN_VCF_HEADER, MTAC.normalSampleName));
-        }
-        sampleLines.add(new VCFHeaderLine(TUMOR_SAMPLE_KEY_IN_VCF_HEADER, MTAC.tumorSampleName));
-        return sampleLines;
-    }
 
     public List<VariantContext> callRegion(final AssemblyRegion originalAssemblyRegion, final ReferenceContext referenceContext, final FeatureContext featureContext ) {
         if ( MTAC.justDetermineActiveRegions || !originalAssemblyRegion.isActive() || originalAssemblyRegion.size() == 0 ) {
@@ -224,13 +189,8 @@ public final class Mutect2Engine {
         final Map<GATKRead,GATKRead> readRealignments = AssemblyBasedCallerUtils.realignReadsToTheirBestHaplotype(readLikelihoods, assemblyResult.getReferenceHaplotype(), assemblyResult.getPaddedReferenceLoc(), aligner);
         readLikelihoods.changeReads(readRealignments);
 
-        final HaplotypeCallerGenotypingEngine.CalledHaplotypes calledHaplotypes = genotypingEngine.callMutations(
-                readLikelihoods,
-                assemblyResult,
-                referenceContext,
-                regionForGenotyping.getSpan(),
-                featureContext,
-                header);
+        final HaplotypeCallerGenotypingEngine.CalledHaplotypes calledHaplotypes = genotypingEngine.callMutations(readLikelihoods,
+                assemblyResult, referenceContext, regionForGenotyping.getSpan(), featureContext, header);
 
         writeBamOutput(assemblyResult, readLikelihoods, calledHaplotypes);
 
@@ -243,12 +203,8 @@ public final class Mutect2Engine {
             if (MTAC.disableOptimizations) {
                 calledHaplotypeSet.add(assemblyResult.getReferenceHaplotype());
             }
-            haplotypeBAMWriter.get().writeReadsAlignedToHaplotypes(
-                    assemblyResult.getHaplotypeList(),
-                    assemblyResult.getPaddedReferenceLoc(),
-                    assemblyResult.getHaplotypeList(),
-                    calledHaplotypeSet,
-                    readLikelihoods);
+            haplotypeBAMWriter.get().writeReadsAlignedToHaplotypes(assemblyResult.getHaplotypeList(),
+                    assemblyResult.getPaddedReferenceLoc(), assemblyResult.getHaplotypeList(), calledHaplotypeSet, readLikelihoods);
         }
     }
 
