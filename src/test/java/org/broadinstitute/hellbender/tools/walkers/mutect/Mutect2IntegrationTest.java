@@ -235,9 +235,6 @@ public class Mutect2IntegrationTest extends CommandLineProgramTest {
 
         final File hg38IndexBundle = new File("/Users/davidben/Desktop/bwa_mem_hg_38/Homo_sapiens_assembly38.index_bundle");
 
-        //BwaMemIndex.createIndexImageFromIndexFiles("/Users/davidben/Desktop/bwa_mem_hg_38/Homo_sapiens_assembly38.fasta",
-        //        "/Users/davidben/Desktop/bwa_mem_hg_38/Homo_sapiens_assembly38.index_bundle");
-
         final String[] args = {
                 "-I", tumorBam.getAbsolutePath(),
                 "-tumor", tumorSample,

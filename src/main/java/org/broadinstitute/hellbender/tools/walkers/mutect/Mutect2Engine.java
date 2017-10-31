@@ -2,12 +2,9 @@ package org.broadinstitute.hellbender.tools.walkers.mutect;
 
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMSequenceDictionary;
-import htsjdk.samtools.util.Interval;
-import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.writer.VariantContextWriter;
 import htsjdk.variant.vcf.*;
-import org.apache.commons.math3.util.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.broadinstitute.hellbender.engine.*;
@@ -21,7 +18,6 @@ import org.broadinstitute.hellbender.tools.walkers.genotyper.GenotypingOutputMod
 import org.broadinstitute.hellbender.tools.walkers.haplotypecaller.*;
 import org.broadinstitute.hellbender.tools.walkers.haplotypecaller.readthreading.ReadThreadingAssembler;
 import org.broadinstitute.hellbender.utils.*;
-import org.broadinstitute.hellbender.utils.activityprofile.ActivityProfileState;
 import org.broadinstitute.hellbender.utils.downsampling.AlleleBiasedDownsamplingUtils;
 import org.broadinstitute.hellbender.utils.fasta.CachingIndexedFastaSequenceFile;
 import org.broadinstitute.hellbender.utils.genotyper.IndexedSampleList;
@@ -29,11 +25,8 @@ import org.broadinstitute.hellbender.utils.genotyper.ReadLikelihoods;
 import org.broadinstitute.hellbender.utils.genotyper.SampleList;
 import org.broadinstitute.hellbender.utils.haplotype.Haplotype;
 import org.broadinstitute.hellbender.utils.haplotype.HaplotypeBAMWriter;
-import org.broadinstitute.hellbender.utils.pileup.PileupElement;
-import org.broadinstitute.hellbender.utils.pileup.ReadPileup;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
 import org.broadinstitute.hellbender.utils.read.ReadUtils;
-import org.broadinstitute.hellbender.utils.realignmentfilter.Realigner;
 import org.broadinstitute.hellbender.utils.smithwaterman.SmithWatermanAligner;
 import org.broadinstitute.hellbender.utils.variant.GATKVCFConstants;
 import org.broadinstitute.hellbender.utils.variant.GATKVCFHeaderLines;
@@ -43,7 +36,7 @@ import java.util.*;
 /**
  * Created by davidben on 9/15/16.
  */
-public final class Mutect2Engine implements AssemblyRegionEvaluator {
+public final class Mutect2Engine {
 
     private static final String MUTECT_VERSION = "2.1-beta";
 
@@ -52,35 +45,24 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
 
     private static final Logger logger = LogManager.getLogger(Mutect2Engine.class);
     private final static List<VariantContext> NO_CALLS = Collections.emptyList();
-    public static final int INDEL_START_QUAL = 30;
-    public static final int INDEL_CONTINUATION_QUAL = 10;
-    public static final double MAX_ALT_FRACTION_IN_NORMAL = 0.3;
-    public static final int MAX_NORMAL_QUAL_SUM = 100;
-
-    // if qual sum exceeds this amount, no need to continue realigning alt reads
-    public static final int REALIGNMENT_QUAL_SUM_THRESHOLD = 80;
-
-    public static final int MAX_REALIGNMENT_FAILS = 2;
-
 
     private M2ArgumentCollection MTAC;
     private SAMFileHeader header;
 
     private static final int MIN_READ_LENGTH = 30;
     private static final int READ_QUALITY_FILTER_THRESHOLD = 20;
-    public static final int MINIMUM_BASE_QUALITY = 6;   // for active region determination
 
     private SampleList samplesList;
 
     private CachingIndexedFastaSequenceFile referenceReader;
     private ReadThreadingAssembler assemblyEngine;
-    private ReadLikelihoodCalculationEngine likelihoodCalculationEngine;
+    private ReadLikelihoodCalculationEngine likelihoodsEngine;
+
+    final SomaticActiveRegionEngine activeRegionEngine;
     private SomaticGenotypingEngine genotypingEngine;
     private Optional<HaplotypeBAMWriter> haplotypeBAMWriter;
     private VariantAnnotatorEngine annotationEngine;
     private final SmithWatermanAligner aligner;
-    private final Optional<Realigner> realigner;
-
     private AssemblyRegionTrimmer trimmer = new AssemblyRegionTrimmer();
 
     private static ReadFilter GOOD_READ_LENGTH_FILTER = new ReadFilter() {
@@ -104,13 +86,13 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
     public Mutect2Engine(final M2ArgumentCollection MTAC, final boolean createBamOutIndex, final boolean createBamOutMD5, final SAMFileHeader header, final String reference ) {
         this.MTAC = Utils.nonNull(MTAC);
         this.header = Utils.nonNull(header);
-        Utils.nonNull(reference);
-        referenceReader = AssemblyBasedCallerUtils.createReferenceReader(reference);
+        activeRegionEngine = new SomaticActiveRegionEngine(MTAC, header);
+        referenceReader = AssemblyBasedCallerUtils.createReferenceReader(Utils.nonNull(reference));
         aligner = SmithWatermanAligner.getAligner(MTAC.smithWatermanImplementation);
         initialize(createBamOutIndex, createBamOutMD5);
-        realigner = MTAC.realignmentFilterArgumentCollection.bwaMemIndexImage == null ? Optional.empty() :
-                Optional.of(new Realigner(MTAC.realignmentFilterArgumentCollection, header));
     }
+
+    public SomaticActiveRegionEngine getActiveRegionEngine() { return activeRegionEngine; }
 
     private void initialize(final boolean createBamOutIndex, final boolean createBamOutBamMD5) {
 
@@ -128,7 +110,7 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
                 MTAC.comps);
 
         assemblyEngine = AssemblyBasedCallerUtils.createReadThreadingAssembler(MTAC);
-        likelihoodCalculationEngine = AssemblyBasedCallerUtils.createLikelihoodCalculationEngine(MTAC.likelihoodArgs);
+        likelihoodsEngine = AssemblyBasedCallerUtils.createLikelihoodCalculationEngine(MTAC.likelihoodArgs);
         genotypingEngine = new SomaticGenotypingEngine(samplesList, MTAC);
         genotypingEngine.setAnnotationEngine(annotationEngine);
         haplotypeBAMWriter = AssemblyBasedCallerUtils.createBamWriter(MTAC, createBamOutIndex, createBamOutBamMD5, header);
@@ -206,7 +188,7 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
 
     private Set<VCFHeaderLine> getSampleHeaderLines(){
         final Set<VCFHeaderLine> sampleLines = new HashSet<>();
-        if (hasNormal()) {
+        if (MTAC.normalSampleName != null) {
             sampleLines.add(new VCFHeaderLine(NORMAL_SAMPLE_KEY_IN_VCF_HEADER, MTAC.normalSampleName));
         }
         sampleLines.add(new VCFHeaderLine(TUMOR_SAMPLE_KEY_IN_VCF_HEADER, MTAC.tumorSampleName));
@@ -236,9 +218,9 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
 
         final AssemblyRegion regionForGenotyping = assemblyResult.getRegionForGenotyping();
 
-        final Map<String,List<GATKRead>> reads = splitReadsBySample( regionForGenotyping.getReads() );
+        final Map<String,List<GATKRead>> reads = AssemblyBasedCallerUtils.splitReadsBySample(samplesList, header, regionForGenotyping.getReads());
 
-        final ReadLikelihoods<Haplotype> readLikelihoods = likelihoodCalculationEngine.computeReadLikelihoods(assemblyResult,samplesList,reads);
+        final ReadLikelihoods<Haplotype> readLikelihoods = likelihoodsEngine.computeReadLikelihoods(assemblyResult,samplesList,reads);
         final Map<GATKRead,GATKRead> readRealignments = AssemblyBasedCallerUtils.realignReadsToTheirBestHaplotype(readLikelihoods, assemblyResult.getReferenceHaplotype(), assemblyResult.getPaddedReferenceLoc(), aligner);
         readLikelihoods.changeReads(readRealignments);
 
@@ -252,7 +234,6 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
 
         writeBamOutput(assemblyResult, readLikelihoods, calledHaplotypes);
 
-        if( MTAC.debug) { logger.info("----------------------------------------------------------------------------------"); }
         return calledHaplotypes.getCalls();
     }
 
@@ -271,132 +252,11 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
         }
     }
 
-    //TODO: should be a variable, not a function
-    private boolean hasNormal() {
-        return (MTAC.normalSampleName != null);
-    }
-
-    protected Map<String, List<GATKRead>> splitReadsBySample( final Collection<GATKRead> reads ) {
-        return AssemblyBasedCallerUtils.splitReadsBySample(samplesList, header, reads);
-    }
-
-    /**
-     * Shutdown this M2 engine, closing resources as appropriate
-     */
     public void shutdown() {
-        likelihoodCalculationEngine.close();
+        likelihoodsEngine.close();
         aligner.close();
-
-        if ( haplotypeBAMWriter.isPresent() ) {
-            haplotypeBAMWriter.get().close();
-        }
+        haplotypeBAMWriter.ifPresent(HaplotypeBAMWriter::close);
     }
 
-    @Override
-    public ActivityProfileState isActive(final AlignmentContext context, final ReferenceContext ref, final FeatureContext featureContext) {
-        final byte refBase = ref.getBase();
-        final SimpleInterval refInterval = ref.getInterval();
 
-        if( context == null || context.getBasePileup().isEmpty() ) {
-            return new ActivityProfileState(refInterval, 0.0);
-        }
-
-        final ReadPileup pileup = context.getBasePileup();
-        final ReadPileup tumorPileup = pileup.getPileupForSample(MTAC.tumorSampleName, header);
-        final Pair<Integer, Double> tumorAltCountAndQualSum = altCountAndQualSum(tumorPileup, refBase);
-        final int tumorAltCount = tumorAltCountAndQualSum.getFirst();
-        final int tumorRefCount = tumorPileup.size() - tumorAltCount;
-
-        final double tumorLog10Odds = -QualityUtils.qualToErrorProbLog10(tumorAltCountAndQualSum.getSecond()) +
-                MathUtils.log10Factorial(tumorAltCount) + MathUtils.log10Factorial(tumorRefCount) - MathUtils.log10Factorial(tumorPileup.size() + 1);
-
-        if (tumorLog10Odds < MTAC.initialTumorLodThreshold) {
-            return new ActivityProfileState(refInterval, 0.0);
-        } else if (hasNormal()) {
-            final ReadPileup normalPileup = pileup.getPileupForSample(MTAC.normalSampleName, header);
-            final Pair<Integer, Double> normalAltCountAndQualSum = altCountAndQualSum(normalPileup, refBase);
-            final int normalAltCount = normalAltCountAndQualSum.getFirst();
-            final double normalQualSum = normalAltCountAndQualSum.getSecond();
-            if (normalAltCount > normalPileup.size() * MAX_ALT_FRACTION_IN_NORMAL && normalQualSum > MAX_NORMAL_QUAL_SUM) {
-                return new ActivityProfileState(refInterval, 0.0);
-            }
-        } else {
-            final List<VariantContext> germline = featureContext.getValues(MTAC.germlineResource, refInterval);
-            if (!germline.isEmpty() && germline.get(0).getAttributeAsDoubleList(VCFConstants.ALLELE_FREQUENCY_KEY, 0.0).get(0) > MTAC.maxPopulationAlleleFrequency) {
-                return new ActivityProfileState(refInterval, 0.0);
-            }
-        }
-
-        if (!MTAC.genotypePonSites && !featureContext.getValues(MTAC.pon, new SimpleInterval(context.getContig(), (int) context.getPosition(), (int) context.getPosition())).isEmpty()) {
-            return new ActivityProfileState(refInterval, 0.0);
-        }
-
-        return new ActivityProfileState( refInterval, 1.0, ActivityProfileState.Type.NONE, null);
-    }
-
-    private static int getCurrentOrFollowingIndelLength(final PileupElement pe) {
-        return pe.isDeletion() ? pe.getCurrentCigarElement().getLength() : pe.getLengthOfImmediatelyFollowingIndel();
-    }
-
-    private static double indelQual(final int indelLength) {
-        return INDEL_START_QUAL + (indelLength - 1) * INDEL_CONTINUATION_QUAL;
-    }
-
-    private Pair<Integer, Double> altCountAndQualSum(final ReadPileup pileup, final byte refBase) {
-
-        int altCount = 0;
-        double qualSum = 0;
-        int realignmentFailCount = 0;
-
-        Interval supposedRealignmentLocation = null;
-        for (final PileupElement pe : pileup) {
-            if (pe.getRead().getMappingQuality() == 0) {
-                realignmentFailCount++;
-                continue;
-            }
-            final double altQual = altQuality(pe, refBase);
-            if (altQual > 0) {
-                if (supposedRealignmentLocation == null) {
-                    final Locatable loc = pileup.getLocation();
-                    final Interval interval = new Interval(loc.getContig(), loc.getStart(), loc.getEnd());
-                    supposedRealignmentLocation = realigner.isPresent() ? realigner.get().getRealignemntCoordinates(interval) : interval;
-                }
-
-                if (!realigner.isPresent() || qualSum > REALIGNMENT_QUAL_SUM_THRESHOLD || realigner.get().mapsToSupposedLocation(pe.getRead(), supposedRealignmentLocation)) {
-                    qualSum += altQual;
-                    altCount++;
-                } else {
-                    pe.getRead().setMappingQuality(0);
-                    realignmentFailCount++;
-                    if (realignmentFailCount > MAX_REALIGNMENT_FAILS) {
-                        return new Pair<>(0, 0.0);
-                    }
-                }
-            }
-        }
-
-        return new Pair<>(altCount, qualSum);
-    }
-
-    private static double altQuality(final PileupElement pe, final byte refBase) {
-        final int indelLength = getCurrentOrFollowingIndelLength(pe);
-        if (indelLength > 0) {
-            return indelQual(indelLength);
-        } else if (isNextToUsefulSoftClip(pe)) {
-            return indelQual(1);
-        } else if (pe.getBase() != refBase && pe.getQual() > MINIMUM_BASE_QUALITY) {
-            return pe.getQual();
-        } else {
-            return 0;
-        }
-    }
-
-    // check that we're next to a soft clip that is not due to a read that got out of sync and ended in a bunch of BQ2's
-    // we only need to check the next base's quality
-    private static boolean isNextToUsefulSoftClip(final PileupElement pe) {
-        final int offset = pe.getOffset();
-        return pe.getQual() > MINIMUM_BASE_QUALITY &&
-                ((pe.isBeforeSoftClip() && pe.getRead().getBaseQuality(offset + 1) > MINIMUM_BASE_QUALITY)
-                        || (pe.isAfterSoftClip() && pe.getRead().getBaseQuality(offset - 1) > MINIMUM_BASE_QUALITY));
-    }
 }
