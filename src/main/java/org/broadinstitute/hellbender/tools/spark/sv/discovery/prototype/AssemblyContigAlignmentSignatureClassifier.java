@@ -97,7 +97,7 @@ final class AssemblyContigAlignmentSignatureClassifier {
         final Tuple2<JavaRDD<AlignedContig>, JavaRDD<AlignedContig>> tandemDupBkptOrSimpleInsDel =
                 RDDUtils.split(strandSwitchOrNot._2, AssemblyContigAlignmentSignatureClassifier::indicatesIntraChrTandemDupBkpts, false);
         contigsByRawTypes.put(RawTypes.InsDel, tandemDupBkptOrSimpleInsDel._2);
-        contigsByRawTypes.put(RawTypes.TandemDupOrMEIBkpt, tandemDupBkptOrSimpleInsDel._1);
+        contigsByRawTypes.replace(RawTypes.TandemDupOrMEIBkpt, contigsByRawTypes.get(RawTypes.TandemDupOrMEIBkpt).union(tandemDupBkptOrSimpleInsDel._1));
     }
 
     //==================================================================================================================
